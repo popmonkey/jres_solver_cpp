@@ -1,0 +1,41 @@
+{
+  "success": true,
+  "availability": {
+    "Nikki": {
+      "1973-06-09T14:00:00.000Z": "Unavailable",
+      "1973-06-09T15:00:00.000Z": "Available",
+      "1973-06-09T16:00:00.000Z": "Available",
+      "1973-06-09T17:00:00.000Z": "Available"
+    },
+    "Ayrton": {
+      "1973-06-09T14:00:00.000Z": "Available",
+      "1973-06-09T15:00:00.000Z": "Available",
+      "1973-06-09T16:00:00.000Z": "Available",
+      "1973-06-09T17:00:00.000Z": "Unavailable"
+    }
+  },
+  "teamMembers": [
+    {
+      "name": "Nikki",
+      "timezone": "1",
+      "isDriver": true,
+      "isSpotter": true,
+      "preferredStints": 1,
+      "minimumRestHours": 8
+    },
+    {
+      "name": "Ayrton",
+      "timezone": "-3",
+      "isDriver": true,
+      "isSpotter": false,
+      "preferredStints": 2,
+      "minimumRestHours": 8
+    }
+  ],
+  "durationHours": 2,
+  "raceStartUTC": "1973-06-09T14:37:00.000Z",
+  "avgLapTimeInSeconds": 220.5,
+  "fuelTankSize": 120,
+  "fuelUsePerLap": 9.2,
+  "pitTimeInSeconds": 150
+}

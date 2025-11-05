@@ -1,130 +1,750 @@
-/*
- * Phase 1: "Hello, C++ Solver"
- *
- * This file is a simple test to prove our environment is working.
- * It does NOT solve the race problem yet.
- *
- * It tests:
- * 1. C++ compilation
- * 2. cxxopts - for argument parsing
- * 3. nlohmann/json - for JSON parsing
- * 4. Cbc/Osi - for linking and solving a simple problem
- */
-
 #include <iostream>
+#include <fstream>
 #include <string>
+#include <stdexcept>
+#include <memory> // For std::unique_ptr
 #include <vector>
+#include <map>
+#include <cmath>     // For std::ceil, std::floor
+#include <chrono>    // For time parsing
+#include <iomanip>   // For std::get_time, std::setw, std::setfill
+#include <sstream>   // For std::stringstream
+#include <algorithm> // For std::find_if
+#include <ctime>     // For time_t, tm, timegm/_mkgmtime
 
-// --- Dependency Includes ---
-
-// 1. cxxopts (needs to be in lib/cxxopts/include)
+// --- 3rd Party Libs ---
 #include "cxxopts.hpp"
-
-// 2. nlohmann/json (needs to be in lib/json/single_include)
 #include "nlohmann/json.hpp"
 
-// 3. Cbc/Osi (COIN-OR Solver Interface)
-// These headers come from the Homebrew installation
-#include "OsiClpSolverInterface.hpp" // The solver implementation (CLP)
-#include "CbcModel.hpp"              // The Cbc Model builder
-#include "CoinPackedVector.hpp"      // Efficiently stores sparse vectors
-#include "CoinBuild.hpp"             // For building constraints
+// --- COIN-OR Cbc ---
+#include "OsiClpSolverInterface.hpp"
+#include "CbcModel.hpp"
+#include "CoinPackedVector.hpp"
+#include "CoinBuild.hpp"
 
-// Use the nlohmann::json namespace for convenience
+// Use the nlohmann::json namespace
 using json = nlohmann::json;
 
-// Simple logger prefix
-#define LOG(msg) std::cout << "[Solver] " << msg << std::endl
+// --- Data Structures ---
 
 /**
- * @brief Tests the Cbc solver by solving a simple LP problem.
- *
- * Problem:
- * max:  1x
- * s.t.: 1x <= 5
- * 0 <= x <= 10
- *
- * Expected Result: x = 5
+ * @brief Represents a single team member.
  */
-void runCbcTest()
+struct TeamMember
 {
-    LOG("--- Cbc Solver Test ---");
-    LOG("Solving: max x, s.t. x <= 5");
+    std::string name;
+    bool isDriver = false;
+    bool isSpotter = false;
+    int preferredStints = 3; // Default value
+    int minimumRestHours = 0; // Default value
+};
 
-    // 1. Create a solver interface. We use CLP (Coin Linear Programming)
-    //    which is the linear solver Cbc is built on.
-    OsiClpSolverInterface solver;
-    LOG("Model created.");
+/**
+ * @brief Represents the main race data input.
+ */
+struct RaceData
+{
+    double avgLapTimeInSeconds;
+    double pitTimeInSeconds;
+    double fuelTankSize;
+    double fuelUsePerLap;
+    int durationHours;
+    std::string raceStartUTC;
+    std::string firstStintDriver; // Optional, may be empty
+    std::vector<TeamMember> teamMembers;
+    json availability; // Keep availability as raw JSON for easy lookup
+};
 
-    // 2. Set objective sense: -1 for maximize, 1 for minimize
-    solver.setObjSense(-1.0);
-    LOG("Solver set to maximize.");
+// --- JSON Deserialization ---
+// These functions tell nlohmann/json how to convert
+// JSON data into our C++ structs.
 
-    // 3. Add one variable, 'x'
-    //    - col vector: empty (no constraints yet)
-    //    - bounds: 0.0 to 10.0
-    //    - obj coeff: 1.0 (this is the '1x' in 'max: 1x')
-    solver.addCol(CoinPackedVector(), 0.0, 10.0, 1.0);
-    LOG("Added var 'x' with bounds [0, 10] and obj coeff 1.");
+// Helper for TeamMember
+void from_json(const json &j, TeamMember &member)
+{
+    j.at("name").get_to(member.name);
+    member.isDriver = j.value("isDriver", false);
+    member.isSpotter = j.value("isSpotter", false);
+    member.preferredStints = j.value("preferredStints", 3);
+    member.minimumRestHours = j.value("minimumRestHours", 0);
+}
 
-    // 4. Add one constraint: 1x <= 5
-    //    - We build a 'row' vector representing '1x'
-    CoinPackedVector row;
-    int varIndex = 0; // The first variable we added
-    double coefficient = 1.0;
-    row.insert(varIndex, coefficient);
+// Helper for RaceData
+void from_json(const json &j, RaceData &data)
+{
+    j.at("avgLapTimeInSeconds").get_to(data.avgLapTimeInSeconds);
+    j.at("pitTimeInSeconds").get_to(data.pitTimeInSeconds);
+    j.at("fuelTankSize").get_to(data.fuelTankSize);
+    j.at("fuelUsePerLap").get_to(data.fuelUsePerLap);
+    j.at("durationHours").get_to(data.durationHours);
+    j.at("raceStartUTC").get_to(data.raceStartUTC);
+    j.at("teamMembers").get_to(data.teamMembers);
+    j.at("availability").get_to(data.availability);
+    data.firstStintDriver = j.value("firstStintDriver", "");
+}
 
-    //    - Add the row to the solver
-    //    - bounds: -infinity to 5.0
-    solver.addRow(row, -solver.getInfinity(), 5.0);
-    LOG("Added constraint: x <= 5");
+// --- JSON Serialization ---
+// These functions tell nlohmann/json how to convert
+// our C++ structs *back* into JSON.
 
-    // 5. Solve the problem
-    LOG("Solving...");
-    solver.initialSolve();
-    LOG("Solver finished.");
+void to_json(json &j, const TeamMember &member)
+{
+    j = json{
+        {"name", member.name},
+        {"isDriver", member.isDriver},
+        {"isSpotter", member.isSpotter},
+        {"preferredStints", member.preferredStints},
+        {"minimumRestHours", member.minimumRestHours}};
+}
 
-    // 6. Print the result
-    if (solver.isProvenOptimal())
+void to_json(json &j, const RaceData &data)
+{
+    j = json{
+        {"avgLapTimeInSeconds", data.avgLapTimeInSeconds},
+        {"pitTimeInSeconds", data.pitTimeInSeconds},
+        {"fuelTankSize", data.fuelTankSize},
+        {"fuelUsePerLap", data.fuelUsePerLap},
+        {"durationHours", data.durationHours},
+        {"raceStartUTC", data.raceStartUTC},
+        {"teamMembers", data.teamMembers},
+        {"availability", data.availability},
+        {"firstStintDriver", data.firstStintDriver}};
+}
+
+
+/**
+ * @brief Holds all configuration and data for the solver.
+ */
+struct SolverContext
+{
+    bool quiet;
+    int timeLimit;
+    std::string spotterMode;
+    bool allowNoSpotter;
+    double optimalityGap;
+    RaceData raceData;
+    std::string outputPath; // Optional
+};
+
+/**
+ * @brief Manages the Cbc variable indices for a participant model.
+ */
+struct ParticipantModel
+{
+    std::string prefix;
+    // Maps (participantName, stint) -> CbcColumnIndex
+    std::map<std::pair<std::string, int>, int> workVars;
+    std::map<std::pair<std::string, int>, int> switchVars;
+    int maxWorkStintsVar = -1;
+    int minWorkStintsVar = -1;
+
+    ParticipantModel(std::string p) : prefix(p) {}
+};
+
+/**
+ * @brief Represents one line in the final schedule output.
+ */
+struct ScheduleEntry {
+    int stint;
+    std::string driver;
+    std::string spotter;
+};
+
+/**
+ * @brief Helper to convert ISO 8601 string to a time_point.
+ */
+namespace TimeHelpers
+{
+    // --- THIS IS THE FIX ---
+    // Portable version of timegm (which converts a UTC tm struct to time_t)
+    // std::mktime assumes local time, which is the source of our bug.
+    std::time_t timegm_portable(std::tm *tm)
     {
-        // Get the solution value for our variable (index 0)
-        double solution = solver.getColSolution()[0];
-        LOG("Solution: x = " << solution);
+#if defined(_WIN32) || defined(_WIN64)
+        // Windows
+        return _mkgmtime(tm);
+#else
+        // macOS, Linux, and other POSIX
+        return timegm(tm);
+#endif
+    }
+    // --- END FIX ---
+
+
+    // Z-suffix indicates UTC
+    std::chrono::system_clock::time_point stringToTimePoint(const std::string &utc_string)
+    {
+        std::tm tm = {};
+        std::stringstream ss(utc_string);
+        ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
+        // We ignore the fractional seconds (.%fZ) as we only care about the hour
+
+        // --- THIS IS THE FIX ---
+        // Use our portable timegm_portable instead of std::mktime
+        return std::chrono::system_clock::from_time_t(timegm_portable(&tm));
+        // --- END FIX ---
+    }
+
+    // Formats a time_point into the key format (e.g., "2025-01-01T14:00:00.000Z")
+    std::string timePointToKey(std::chrono::system_clock::time_point tp)
+    {
+        std::time_t time = std::chrono::system_clock::to_time_t(tp);
+        std::tm tm = *std::gmtime(&time); // Use gmtime for UTC
+        std::stringstream ss;
+        ss << std::put_time(&tm, "%Y-%m-%dT%H:00:00.000Z");
+        return ss.str();
+    }
+} // namespace TimeHelpers
+
+
+/**
+ * @brief Adds a generic participant model (variables, constraints, objectives)
+ * to the CbcModel. This is a port of _add_participant_model from Python.
+ */
+ParticipantModel add_participant_model(
+    CbcModel &model,
+    const std::vector<TeamMember> &participants,
+    int totalStints,
+    const std::string &prefix,
+    const SolverContext &ctx,
+    double stintWithPitSeconds,
+    int stintLaps)
+{
+    ParticipantModel p_model(prefix);
+    if (participants.empty())
+    {
+        return p_model;
+    }
+
+    auto raceStartUTC = TimeHelpers::stringToTimePoint(ctx.raceData.raceStartUTC);
+
+    // --- 1. Create Variables ---
+    p_model.maxWorkStintsVar = model.solver()->getNumCols();
+    model.solver()->addCol(CoinPackedVector(), 0.0, COIN_DBL_MAX, 0.0); // No bool
+    model.solver()->setInteger(p_model.maxWorkStintsVar); // Set as integer
+    model.solver()->setColName(p_model.maxWorkStintsVar, prefix + "MaxStints");
+
+    p_model.minWorkStintsVar = model.solver()->getNumCols();
+    model.solver()->addCol(CoinPackedVector(), 0.0, COIN_DBL_MAX, 0.0); // No bool
+    model.solver()->setInteger(p_model.minWorkStintsVar); // Set as integer
+    model.solver()->setColName(p_model.minWorkStintsVar, prefix + "MinStints");
+
+    for (const auto &p : participants)
+    {
+        for (int s = 0; s < totalStints; ++s)
+        {
+            // --- Work Variables (Binary) ---
+            int workVarIdx = model.solver()->getNumCols();
+            p_model.workVars[{p.name, s}] = workVarIdx;
+            model.solver()->addCol(CoinPackedVector(), 0.0, 1.0, 0.0); // No bool
+            model.solver()->setInteger(workVarIdx); // Set as integer (binary)
+            model.solver()->setColName(workVarIdx, prefix + "_" + p.name + "_s" + std::to_string(s));
+
+            // --- Switch Variables (Binary) ---
+            if (s > 0)
+            {
+                int switchVarIdx = model.solver()->getNumCols();
+                p_model.switchVars[{p.name, s}] = switchVarIdx;
+                model.solver()->addCol(CoinPackedVector(), 0.0, 1.0, 0.0); // No bool
+                model.solver()->setInteger(switchVarIdx); // Set as integer (binary)
+                model.solver()->setColName(switchVarIdx, prefix + "Switch_" + p.name + "_s" + std::to_string(s));
+            }
+        }
+    }
+
+    // --- 2. Add Objective Function Components ---
+    // A. Balance Objective (Minimize (max - min) * 1000)
+    model.solver()->setObjCoeff(p_model.maxWorkStintsVar, 1000.0);
+    model.solver()->setObjCoeff(p_model.minWorkStintsVar, -1000.0);
+
+    // B. Switch Objective (Minimize sum(switches) * 100)
+    for (const auto &pair : p_model.switchVars)
+    {
+        model.solver()->setObjCoeff(pair.second, 100.0);
+    }
+
+    // C. Preference Objective (Maximize sum(preferred_stints) * 1)
+    // (We *subtract* from the minimization objective)
+    for (int s = 0; s < totalStints; ++s)
+    {
+        auto stintStart = raceStartUTC + std::chrono::seconds(static_cast<long>(s * stintWithPitSeconds));
+        std::string availabilityKey = TimeHelpers::timePointToKey(stintStart);
+
+        for (const auto &p : participants)
+        {
+            if (ctx.raceData.availability.contains(p.name) &&
+                ctx.raceData.availability[p.name].contains(availabilityKey) &&
+                ctx.raceData.availability[p.name][availabilityKey] == "Preferred")
+            {
+                int workVarIdx = p_model.workVars.at({p.name, s});
+                model.solver()->setObjCoeff(workVarIdx, -1.0);
+            }
+        }
+    }
+
+    // --- 3. Add Constraints ---
+    double totalLaps = totalStints * stintLaps;
+    double equalShareLaps = totalLaps / participants.size();
+    int minLapsPerParticipant = static_cast<int>(std::ceil(0.25 * equalShareLaps));
+    int minStintsPerParticipant = (stintLaps > 0) ? static_cast<int>(std::ceil(minLapsPerParticipant / stintLaps)) : 0;
+
+    for (const auto &p : participants)
+    {
+        // --- Availability Constraints ---
+        for (int s = 0; s < totalStints; ++s)
+        {
+            auto stintStart = raceStartUTC + std::chrono::seconds(static_cast<long>(s * stintWithPitSeconds));
+            auto stintEnd = stintStart + std::chrono::seconds(static_cast<long>(stintWithPitSeconds));
+            // Check the hour *before* the exact end time (e.g., 2:00:00 is in the 1:00 block)
+            auto stintEndCheck = stintEnd - std::chrono::seconds(1);
+
+            std::string startKey = TimeHelpers::timePointToKey(stintStart);
+            std::string endKey = TimeHelpers::timePointToKey(stintEndCheck);
+
+            bool isAvailable = true;
+            if (ctx.raceData.availability.contains(p.name))
+            {
+                auto p_avail = ctx.raceData.availability[p.name];
+                if (p_avail.value(startKey, "Unavailable") == "Unavailable" ||
+                    p_avail.value(endKey, "Unavailable") == "Unavailable")
+                {
+                    isAvailable = false;
+                }
+            } else {
+                isAvailable = false; // No availability data = unavailable
+            }
+
+            if (!isAvailable)
+            {
+                // Fix this variable to 0: workVar[p, s] = 0
+                int workVarIdx = p_model.workVars.at({p.name, s});
+                model.solver()->setColBounds(workVarIdx, 0.0, 0.0);
+            }
+        }
+
+        // --- Switch Constraints ---
+        // switchVar[s] >= workVar[s] - workVar[s-1]
+        // ...or: switchVar[s] - workVar[s] + workVar[s-1] >= 0
+        for (int s = 1; s < totalStints; ++s)
+        {
+            CoinPackedVector row;
+            row.insert(p_model.switchVars.at({p.name, s}), 1.0);
+            row.insert(p_model.workVars.at({p.name, s}), -1.0);
+            row.insert(p_model.workVars.at({p.name, s - 1}), 1.0);
+            model.solver()->addRow(row, 0.0, COIN_DBL_MAX);
+        }
+
+        // --- Max/Min Stint Count Constraints ---
+        CoinPackedVector totalStintsRow;
+        for (int s = 0; s < totalStints; ++s)
+        {
+            totalStintsRow.insert(p_model.workVars.at({p.name, s}), 1.0);
+        }
+        
+        // Define totalParticipantStints
+        // totalStintsRow - maxWork <= 0  (maxWork >= total)
+        CoinPackedVector maxRow = totalStintsRow;
+        maxRow.insert(p_model.maxWorkStintsVar, -1.0);
+        model.solver()->addRow(maxRow, -COIN_DBL_MAX, 0.0);
+
+        // totalStintsRow - minWork >= 0  (minWork <= total)
+        CoinPackedVector minRow = totalStintsRow;
+        minRow.insert(p_model.minWorkStintsVar, -1.0);
+        model.solver()->addRow(minRow, 0.0, COIN_DBL_MAX);
+
+        // --- Fair Share Constraint (Drivers only) ---
+        if (prefix == "Drive")
+        {
+            // totalStintsRow >= minStintsPerParticipant
+            model.solver()->addRow(totalStintsRow, minStintsPerParticipant, COIN_DBL_MAX);
+        }
+
+        // --- Max Consecutive Stints ---
+        int maxConsecutive = p.preferredStints;
+        for (int s = 0; s < totalStints - maxConsecutive; ++s)
+        {
+            // sum(workVar[s]...workVar[s + maxConsecutive]) <= maxConsecutive
+            CoinPackedVector consecutiveRow;
+            for (int i = 0; i <= maxConsecutive; ++i)
+            {
+                consecutiveRow.insert(p_model.workVars.at({p.name, s + i}), 1.0);
+            }
+            model.solver()->addRow(consecutiveRow, -COIN_DBL_MAX, maxConsecutive);
+        }
+
+        // --- Minimum Rest Constraints ---
+        int minRestHours = p.minimumRestHours;
+        if (minRestHours > 0 && stintWithPitSeconds > 0)
+        {
+            int minRestStints = static_cast<int>(std::floor((minRestHours * 3600) / stintWithPitSeconds));
+            
+            // *** THIS IS THE FIX ***
+            // Only add the constraint if the rest period is achievable (i.e., shorter than the race)
+            if (minRestStints > 0 && minRestStints <= totalStints)
+            {
+                // We need to add binary helper variables
+                std::vector<int> restAchievedVars;
+                CoinPackedVector oneRestRow; // sum(restAchievedVars) >= 1
+                
+                int possibleRestStarts = totalStints - minRestStints + 1;
+                for (int s = 0; s < possibleRestStarts; ++s)
+                {
+                    int restVarIdx = model.solver()->getNumCols();
+                    restAchievedVars.push_back(restVarIdx);
+                    model.solver()->addCol(CoinPackedVector(), 0.0, 1.0, 0.0); // No bool
+                    model.solver()->setInteger(restVarIdx); // Set as integer (binary)
+                    oneRestRow.insert(restVarIdx, 1.0);
+
+                    // Enforce rest: sum(workVar[s]...workVar[s+rest-1]) <= M * (1 - restVar)
+                    // ...or: sum(workVar) + M*restVar <= M
+                    CoinPackedVector enforceRestRow;
+                    for (int i = 0; i < minRestStints; ++i)
+                    {
+                        enforceRestRow.insert(p_model.workVars.at({p.name, s + i}), 1.0);
+                    }
+                    double M = minRestStints + 1;
+                    enforceRestRow.insert(restVarIdx, M);
+                    model.solver()->addRow(enforceRestRow, -COIN_DBL_MAX, M);
+                }
+
+                // MustHaveOneRest: sum(restAchievedVars) >= 1
+                // Only add if we actually created helper variables
+                if (oneRestRow.getNumElements() > 0) 
+                {
+                    model.solver()->addRow(oneRestRow, 1.0, COIN_DBL_MAX);
+                }
+            }
+        }
+    } // end for each participant
+
+    return p_model;
+}
+
+/**
+ * @brief Prints schedule to console and saves to file (if requested).
+ */
+void output_results(const SolverContext &ctx, const std::vector<ScheduleEntry> &schedule, double solveDuration)
+{
+    json outputJson;
+    outputJson["raceData"] = ctx.raceData;
+    outputJson["solveDurationSeconds"] = solveDuration;
+    
+    json scheduleJson = json::array();
+
+    if (!ctx.quiet) {
+        std::cout << "\n--- 🏁 Race Schedule ---" << std::endl;
+        bool hasSpotters = (ctx.spotterMode != "none");
+
+        for(const auto& entry : schedule) {
+            std::stringstream ss;
+            ss << "Stint " << std::setw(3) << entry.stint
+               << ": Driver: " << std::setw(15) << std::left << entry.driver;
+            
+            json entryJson;
+            entryJson["stint"] = entry.stint;
+            entryJson["driver"] = entry.driver;
+
+            if (hasSpotters) {
+                ss << " | Spotter: " << std::setw(15) << std::left << entry.spotter;
+                entryJson["spotter"] = entry.spotter;
+            }
+            std::cout << ss.str() << std::endl;
+            scheduleJson.push_back(entryJson);
+        }
+    } else {
+        // Just build the JSON, don't print
+        bool hasSpotters = (ctx.spotterMode != "none");
+        for(const auto& entry : schedule) {
+            json entryJson;
+            entryJson["stint"] = entry.stint;
+            entryJson["driver"] = entry.driver;
+            if (hasSpotters) {
+                entryJson["spotter"] = entry.spotter;
+            }
+            scheduleJson.push_back(entryJson);
+        }
+    }
+    
+    outputJson["schedule"] = scheduleJson;
+
+    if (!ctx.outputPath.empty()) {
+        try {
+            std::ofstream o(ctx.outputPath);
+            o << std::setw(4) << outputJson << std::endl;
+            if (!ctx.quiet) {
+                std::cout << "\n[App] Schedule saved to " << ctx.outputPath << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[App] Error: Failed to write output file: " << e.what() << std::endl;
+        }
+    }
+}
+
+
+/**
+ * @brief Main function to formulate and solve the schedule.
+ */
+void solve_schedule(const SolverContext &ctx)
+{
+    if (!ctx.quiet)
+    {
+        std::cout << "[Solver] solve_schedule() called." << std::endl;
+        std::cout << "[Solver] Mode: " << ctx.spotterMode << std::endl;
+        std::cout << "[Solver] Team Members: " << ctx.raceData.teamMembers.size() << std::endl;
+    }
+
+    // --- 1. Calculate Race Parameters ---
+    double lapTimeSeconds = ctx.raceData.avgLapTimeInSeconds;
+    double pitTimeSeconds = ctx.raceData.pitTimeInSeconds;
+    int stintLaps = (ctx.raceData.fuelUsePerLap > 0) ? static_cast<int>(ctx.raceData.fuelTankSize / ctx.raceData.fuelUsePerLap) : 0;
+    double stintWithPitSeconds = (stintLaps * lapTimeSeconds) + pitTimeSeconds;
+    double raceDurationSeconds = ctx.raceData.durationHours * 3600.0;
+    int totalStints = (stintWithPitSeconds > 0) ? static_cast<int>(std::ceil(raceDurationSeconds / stintWithPitSeconds)) : 0;
+
+    if (!ctx.quiet)
+    {
+        std::cout << "[Solver] Race duration: " << raceDurationSeconds << "s" << std::endl;
+        std::cout << "[Solver] Stint laps: " << stintLaps << std::endl;
+        std::cout << "[Solver] Stint duration: " << stintWithPitSeconds << "s" << std::endl;
+        std::cout << "[Solver] Total stints: " << totalStints << std::endl;
+    }
+
+    if (totalStints <= 0)
+    {
+        throw std::runtime_error("Invalid race parameters: totalStints must be > 0.");
+    }
+
+    // --- 2. Initialize Solver and Model ---
+    std::unique_ptr<OsiClpSolverInterface> solver(new OsiClpSolverInterface);
+    solver->setObjSense(1.0); // Minimize (default)
+    CbcModel model(*solver);
+
+    // Set solver parameters
+    model.setDblParam(CbcModel::CbcAllowableFractionGap, ctx.optimalityGap);
+    model.setDblParam(CbcModel::CbcMaximumSeconds, static_cast<double>(ctx.timeLimit));
+    if (ctx.quiet) {
+        model.setLogLevel(0);
+        solver->setLogLevel(0);
+    } else {
+        model.setLogLevel(1);
+        solver->setLogLevel(1);
+    }
+
+    // --- 3. Filter Participant Pools ---
+    std::vector<TeamMember> driverPool;
+    std::vector<TeamMember> spotterPool;
+    for (const auto& member : ctx.raceData.teamMembers) {
+        if (member.isDriver) {
+            driverPool.push_back(member);
+        }
+        if (member.isSpotter) {
+            spotterPool.push_back(member);
+        }
+    }
+    if (!ctx.quiet) {
+        std::cout << "[Solver] Driver pool size: " << driverPool.size() << std::endl;
+        std::cout << "[Solver] Spotter pool size: " << spotterPool.size() << std::endl;
+    }
+
+    // --- 4. Add Driver Model ---
+    if (driverPool.empty()) {
+        throw std::runtime_error("No drivers available for this race.");
+    }
+
+    ParticipantModel driverModel = add_participant_model(
+        model, driverPool, totalStints, "Drive", ctx, stintWithPitSeconds, stintLaps
+    );
+
+    // --- 5. Add Core Constraints ---
+    // A. OneDriver_Stint_s: sum(driveVar[p, s]) == 1
+    for (int s = 0; s < totalStints; ++s)
+    {
+        CoinPackedVector oneDriverRow;
+        for (const auto &p : driverPool)
+        {
+            oneDriverRow.insert(driverModel.workVars.at({p.name, s}), 1.0);
+        }
+        model.solver()->addRow(oneDriverRow, 1.0, 1.0); // == 1
+    }
+
+    // B. FirstStintDriver
+    if (!ctx.raceData.firstStintDriver.empty())
+    {
+        std::string firstName = ctx.raceData.firstStintDriver;
+        auto it = std::find_if(driverPool.begin(), driverPool.end(), 
+                             [&](const TeamMember& m){ return m.name == firstName; });
+        
+        if (it != driverPool.end())
+        {
+            if (!ctx.quiet) {
+                std::cout << "[Solver] Adding constraint: First stint driver is " << firstName << std::endl;
+            }
+            // Fix variable: driveVar[firstName, 0] = 1
+            int varIdx = driverModel.workVars.at({firstName, 0});
+            model.solver()->setColBounds(varIdx, 1.0, 1.0);
+        }
+        else
+        {
+            std::cerr << "[Solver] Warning: FirstStintDriver '" << firstName << "' is not in the driver pool. Constraint ignored." << std::endl;
+        }
+    }
+
+    // --- 6. (TODO) Add Spotter Model (based on mode) ---
+    if (ctx.spotterMode == "integrated")
+    {
+        // TODO
+    }
+    else if (ctx.spotterMode == "sequential")
+    {
+        // TODO
+    }
+
+    // --- 7. Solve the Model ---
+    if (!ctx.quiet) {
+        std::cout << "[Solver] Calling CbcModel::branchAndBound()..." << std::endl;
+    }
+
+    auto solveStart = std::chrono::high_resolution_clock::now();
+    model.branchAndBound();
+    auto solveEnd = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> solveDuration = solveEnd - solveStart;
+
+    if (!ctx.quiet) {
+        std::cout << "[Solver] Solve finished." << std::endl;
+        std::cout << "[Solver] Status: " << model.status() << " (secondary " << model.secondaryStatus() << ")" << std::endl;
+        std::cout << "[Solver] Is proven optimal? " << model.isProvenOptimal() << std::endl;
+    }
+
+    // --- 8. Process Results ---
+    std::vector<ScheduleEntry> schedule;
+    if (model.isProvenOptimal() || model.isProvenInfeasible() == 0) // Found a solution
+    {
+        const double* solution = model.solver()->getColSolution();
+        
+        for (int s = 0; s < totalStints; ++s) {
+            ScheduleEntry entry;
+            entry.stint = s + 1; // 1-indexed
+            entry.driver = "N/A";
+            entry.spotter = "N/A"; // Placeholder
+
+            for (const auto& p : driverPool) {
+                int varIdx = driverModel.workVars.at({p.name, s});
+                if (solution[varIdx] > 0.5) {
+                    entry.driver = p.name;
+                    break;
+                }
+            }
+            // TODO: Add spotter logic here
+            schedule.push_back(entry);
+        }
+
+        output_results(ctx, schedule, solveDuration.count());
     }
     else
     {
-        LOG("Solver did not find an optimal solution.");
+        std::cerr << "[Solver] Error: Could not find a valid solution." << std::endl;
+        if (model.isProvenInfeasible()) {
+            std::cerr << "[Solver] The model is infeasible. No solution exists." << std::endl;
+        }
     }
-    LOG("--- Test Complete ---");
+
 }
 
+/**
+ * @brief Main entry point for the C++ Race Solver.
+ */
 int main(int argc, char **argv)
 {
-    LOG("Hello, C++ Race Solver!");
+    // --- 1. Parse Command-Line Arguments ---
+    cxxopts::Options options("solver", "A C++ port of the JRES endurance race solver.");
+    options.add_options()("i,input", "Path to the race_data.json file. Reads from stdin if not provided.", cxxopts::value<std::string>())("o,output", "Optional. Path to save the schedule as a JSON file.", cxxopts::value<std::string>())("t,time-limit", "Maximum time in seconds to let the solver run.", cxxopts::value<int>()->default_value("30"))("q,quiet", "Suppress INFO logs.", cxxopts::value<bool>()->default_value("false"))("s,spotter-mode", "Method for scheduling spotters (none, integrated, sequential).", cxxopts::value<std::string>()->default_value("none"))("allow-no-spotter", "Allow stints to have no spotter assigned.", cxxopts::value<bool>()->default_value("false"))("g,optimality-gap", "Solver stops when the gap to optimal is less than this (e.g., 0.01 for 1%).", cxxopts::value<double>()->default_value("0.0"))("h,help", "Print usage.");
 
-    // --- cxxopts Test ---
-    cxxopts::Options options("RaceSolver", "Solves endurance race schedules");
-    options.add_options()
-        ("f,file", "Input JSON file", cxxopts::value<std::string>())
-        ("h,help", "Print usage");
-    
-    // This will just prove that it links and runs
     auto result = options.parse(argc, argv);
-    LOG("Found cxxopts.");
 
-    // --- nlohmann/json Test ---
-    // Create a dummy JSON and parse it
-    json testJson = {
-        {"pi", 3.141},
-        {"happy", true},
-        {"name", "nlohmann"}};
-    
-    // This will prove it links and runs
-    std::string s = testJson.dump();
-    LOG("Found nlohmann/json.");
+    if (result.count("help"))
+    {
+        std::cout << options.help() << std::endl;
+        return 0;
+    }
 
-    // --- Cbc/Osi Test ---
-    runCbcTest();
+    // --- 2. Load Input JSON Data ---
+    json rawJsonData;
+    bool quiet = result["quiet"].as<bool>(); // Get this early
+    try
+    {
+        if (result.count("input"))
+        {
+            std::string inputPath = result["input"].as<std::string>();
+            if (!quiet)
+                std::cout << "[App] Loading data from file: " << inputPath << std::endl;
+            std::ifstream f(inputPath);
+            if (!f.is_open())
+            {
+                throw std::runtime_error("Could not open input file: " + inputPath);
+            }
+            rawJsonData = json::parse(f);
+        }
+        else
+        {
+            if (!quiet)
+                std::cout << "[App] Loading data from stdin..." << std::endl;
+            rawJsonData = json::parse(std::cin);
+        }
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "[App] Error: " << e.what() << std::endl;
+        return 1;
+    }
+
+    // --- 3. Build Solver Context ---
+    SolverContext ctx;
+    try
+    {
+        ctx.quiet = quiet;
+        ctx.timeLimit = result["time-limit"].as<int>();
+        ctx.spotterMode = result["spotter-mode"].as<std::string>();
+        ctx.allowNoSpotter = result["allow-no-spotter"].as<bool>();
+        ctx.optimalityGap = result["optimality-gap"].as<double>();
+        ctx.outputPath = result.count("output") ? result["output"].as<std::string>() : "";
+
+        // This line automatically calls our from_json functions
+        ctx.raceData = rawJsonData.get<RaceData>();
+
+        if (!quiet)
+        {
+            std::cout << "[App] JSON data parsed and validated." << std::endl;
+        }
+    }
+    catch (const json::exception &e)
+    {
+        std::cerr << "[App] Error: Failed to parse JSON into data structures." << std::endl;
+        std::cerr << "Message: " << e.what() << std::endl;
+        std::cerr << "Field ID: " << e.id << std::endl;
+        return 1;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "[App] Error: " << e.what() << std::endl;
+        return 1;
+    }
+
+    // --- 4. Call the Solver ---
+    try
+    {
+        solve_schedule(ctx);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "[Solver] Critical Error: " << e.what() << '\n';
+        return 1;
+    }
+
+    if (!quiet)
+    {
+        std::cout << "[App] Solver finished." << std::endl;
+    }
 
     return 0;
 }
+

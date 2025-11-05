@@ -8,9 +8,8 @@
             // The program path is provided by the CMake Tools extension
             "program": "${command:cmake.launchTargetPath}",
             "args": [
-                // You can put test arguments here.
-                // For example, once we're ready:
-                // "data/race_data.json"
+                "--input",
+                "data/race_data.json"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
