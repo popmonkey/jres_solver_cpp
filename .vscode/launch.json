@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(lldb) Launch Solver",
+            "type": "cppdbg",
+            "request": "launch",
+            // The program path is provided by the CMake Tools extension
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [
+                // You can put test arguments here.
+                // For example, once we're ready:
+                // "data/race_data.json"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            // This task will run before debugging starts
+            "preLaunchTask": "Build (CMake)"
+        }
+    ]
+}

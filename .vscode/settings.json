@@ -1,0 +1,9 @@
+{
+  // These settings are for the VSCode "CMake Tools" extension
+  "cmake.configureArgs": [
+    // This is the "hint" that tells cmake where to find Homebrew libs.
+    // This fixes the IntelliSense errors.
+    "-DCMAKE_PREFIX_PATH=/opt/homebrew"
+  ]
+}
+
