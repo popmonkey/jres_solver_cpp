@@ -12,6 +12,12 @@
       "1973-06-09T15:00:00.000Z": "Available",
       "1973-06-09T16:00:00.000Z": "Available",
       "1973-06-09T17:00:00.000Z": "Unavailable"
+    },
+    "Alain": {
+      "1973-06-09T14:00:00.000Z": "Available",
+      "1973-06-09T15:00:00.000Z": "Available",
+      "1973-06-09T16:00:00.000Z": "Available",
+      "1973-06-09T17:00:00.000Z": "Available"
     }
   },
   "teamMembers": [
@@ -20,14 +26,22 @@
       "timezone": "1",
       "isDriver": true,
       "isSpotter": true,
-      "preferredStints": 1,
+      "preferredStints": 2,
       "minimumRestHours": 8
     },
     {
       "name": "Ayrton",
       "timezone": "-3",
       "isDriver": true,
-      "isSpotter": false,
+      "isSpotter": true,
+      "preferredStints": 2,
+      "minimumRestHours": 8
+    },
+    {
+      "name": "Alain",
+      "timezone": "1",
+      "isDriver": false,
+      "isSpotter": true,
       "preferredStints": 2,
       "minimumRestHours": 8
     }

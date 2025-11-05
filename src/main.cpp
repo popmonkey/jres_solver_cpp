@@ -515,19 +515,20 @@ void solve_schedule(const SolverContext &ctx)
     }
 
     // --- 2. Initialize Solver and Model ---
-    std::unique_ptr<OsiClpSolverInterface> solver(new OsiClpSolverInterface);
-    solver->setObjSense(1.0); // Minimize (default)
-    CbcModel model(*solver);
+    // This is now the "main" or "driver" model
+    std::unique_ptr<OsiClpSolverInterface> mainSolver(new OsiClpSolverInterface);
+    mainSolver->setObjSense(1.0); // Minimize (default)
+    CbcModel mainModel(*mainSolver);
 
     // Set solver parameters
-    model.setDblParam(CbcModel::CbcAllowableFractionGap, ctx.optimalityGap);
-    model.setDblParam(CbcModel::CbcMaximumSeconds, static_cast<double>(ctx.timeLimit));
+    mainModel.setDblParam(CbcModel::CbcAllowableFractionGap, ctx.optimalityGap);
+    mainModel.setDblParam(CbcModel::CbcMaximumSeconds, static_cast<double>(ctx.timeLimit));
     if (ctx.quiet) {
-        model.setLogLevel(0);
-        solver->setLogLevel(0);
+        mainModel.setLogLevel(0);
+        mainSolver->setLogLevel(0);
     } else {
-        model.setLogLevel(1);
-        solver->setLogLevel(1);
+        mainModel.setLogLevel(1);
+        mainSolver->setLogLevel(1);
     }
 
     // --- 3. Filter Participant Pools ---
@@ -552,7 +553,7 @@ void solve_schedule(const SolverContext &ctx)
     }
 
     ParticipantModel driverModel = add_participant_model(
-        model, driverPool, totalStints, "Drive", ctx, stintWithPitSeconds, stintLaps
+        mainModel, driverPool, totalStints, "Drive", ctx, stintWithPitSeconds, stintLaps
     );
 
     // --- 5. Add Core Constraints ---
@@ -564,7 +565,7 @@ void solve_schedule(const SolverContext &ctx)
         {
             oneDriverRow.insert(driverModel.workVars.at({p.name, s}), 1.0);
         }
-        model.solver()->addRow(oneDriverRow, 1.0, 1.0); // == 1
+        mainModel.solver()->addRow(oneDriverRow, 1.0, 1.0); // == 1
     }
 
     // B. FirstStintDriver
@@ -581,7 +582,7 @@ void solve_schedule(const SolverContext &ctx)
             }
             // Fix variable: driveVar[firstName, 0] = 1
             int varIdx = driverModel.workVars.at({firstName, 0});
-            model.solver()->setColBounds(varIdx, 1.0, 1.0);
+            mainModel.solver()->setColBounds(varIdx, 1.0, 1.0);
         }
         else
         {
@@ -589,61 +590,195 @@ void solve_schedule(const SolverContext &ctx)
         }
     }
 
-    // --- 6. (TODO) Add Spotter Model (based on mode) ---
+    // --- 6. Add Spotter Model (based on mode) ---
+    ParticipantModel spotterModel("Spot"); // Create, even if empty
+
     if (ctx.spotterMode == "integrated")
     {
-        // TODO
-    }
-    else if (ctx.spotterMode == "sequential")
-    {
-        // TODO
-    }
+        if (!ctx.quiet) {
+            std::cout << "[Solver] Adding integrated spotter model..." << std::endl;
+        }
+        if (spotterPool.empty() && !ctx.allowNoSpotter) {
+            throw std::runtime_error("Spotter mode is 'integrated' but no spotters are available and 'allow-no-spotter' is false.");
+        }
 
-    // --- 7. Solve the Model ---
+        // Add spotter model to the *main model*
+        spotterModel = add_participant_model(
+            mainModel, spotterPool, totalStints, "Spot", ctx, stintWithPitSeconds, stintLaps
+        );
+
+        // A. Spotter Coverage Constraint
+        for (int s = 0; s < totalStints; ++s) {
+            CoinPackedVector spotterCoverageRow;
+            for (const auto& p : spotterPool) {
+                spotterCoverageRow.insert(spotterModel.workVars.at({p.name, s}), 1.0);
+            }
+
+            if (ctx.allowNoSpotter) {
+                // sum(spotVar[p, s]) <= 1
+                mainModel.solver()->addRow(spotterCoverageRow, 0.0, 1.0);
+            } else {
+                // sum(spotVar[p, s]) == 1
+                mainModel.solver()->addRow(spotterCoverageRow, 1.0, 1.0);
+            }
+        }
+
+        // B. No Dual-Duty Constraint
+        for (const auto& p : ctx.raceData.teamMembers) {
+            if (p.isDriver && p.isSpotter) {
+                for (int s = 0; s < totalStints; ++s) {
+                    // driveVar[p, s] + spotVar[p, s] <= 1
+                    CoinPackedVector dualDutyRow;
+                    dualDutyRow.insert(driverModel.workVars.at({p.name, s}), 1.0);
+                    dualDutyRow.insert(spotterModel.workVars.at({p.name, s}), 1.0);
+                    mainModel.solver()->addRow(dualDutyRow, 0.0, 1.0);
+                }
+            }
+        }
+    }
+    // Note: The "sequential" logic will happen *after* the main solve.
+
+    // --- 7. Solve the Main Model (Drivers, or Drivers + Spotters) ---
     if (!ctx.quiet) {
-        std::cout << "[Solver] Calling CbcModel::branchAndBound()..." << std::endl;
+        std::cout << "[Solver] Calling CbcModel::branchAndBound() for main model..." << std::endl;
     }
 
     auto solveStart = std::chrono::high_resolution_clock::now();
-    model.branchAndBound();
+    mainModel.branchAndBound();
     auto solveEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> solveDuration = solveEnd - solveStart;
 
     if (!ctx.quiet) {
-        std::cout << "[Solver] Solve finished." << std::endl;
-        std::cout << "[Solver] Status: " << model.status() << " (secondary " << model.secondaryStatus() << ")" << std::endl;
-        std::cout << "[Solver] Is proven optimal? " << model.isProvenOptimal() << std::endl;
+        std::cout << "[Solver] Main solve finished." << std::endl;
+        std::cout << "[Solver] Status: " << mainModel.status() << " (secondary " << mainModel.secondaryStatus() << ")" << std::endl;
+        std::cout << "[Solver] Is proven optimal? " << mainModel.isProvenOptimal() << std::endl;
     }
 
-    // --- 8. Process Results ---
+    // --- 8. Process Main Model Results (And Solve Spotters if Sequential) ---
     std::vector<ScheduleEntry> schedule;
-    if (model.isProvenOptimal() || model.isProvenInfeasible() == 0) // Found a solution
+    if (mainModel.isProvenOptimal() || mainModel.isProvenInfeasible() == 0) // Found a solution
     {
-        const double* solution = model.solver()->getColSolution();
+        const double* mainSolution = mainModel.solver()->getColSolution();
         
+        // --- 8A. Process Driver Results (ALWAYS) ---
         for (int s = 0; s < totalStints; ++s) {
             ScheduleEntry entry;
             entry.stint = s + 1; // 1-indexed
             entry.driver = "N/A";
-            entry.spotter = "N/A"; // Placeholder
+            entry.spotter = "N/A"; // Default
 
             for (const auto& p : driverPool) {
                 int varIdx = driverModel.workVars.at({p.name, s});
-                if (solution[varIdx] > 0.5) {
+                if (mainSolution[varIdx] > 0.5) {
                     entry.driver = p.name;
                     break;
                 }
             }
-            // TODO: Add spotter logic here
-            schedule.push_back(entry);
+            schedule.push_back(entry); // Add entry with driver, spotter is "N/A"
         }
 
+        // --- 8B. Process Spotter Results (Based on Mode) ---
+        if (ctx.spotterMode == "integrated") 
+        {
+            if (!ctx.quiet) {
+                std::cout << "[Solver] Processing integrated spotter results..." << std::endl;
+            }
+            for (int s = 0; s < totalStints; ++s) {
+                if (spotterPool.empty()) break;
+                for (const auto& p : spotterPool) {
+                    int varIdx = spotterModel.workVars.at({p.name, s});
+                    if (mainSolution[varIdx] > 0.5) {
+                        schedule[s].spotter = p.name;
+                        break;
+                    }
+                }
+            }
+        } 
+        else if (ctx.spotterMode == "sequential")
+        {
+            if (!ctx.quiet) {
+                std::cout << "[Solver] Starting sequential spotter solve..." << std::endl;
+            }
+            if (spotterPool.empty()) {
+                if (!ctx.quiet) std::cout << "[Solver] Spotter pool is empty, skipping sequential solve." << std::endl;
+            } else {
+                // --- Create a NEW, separate model for spotters ---
+                std::unique_ptr<OsiClpSolverInterface> spotterSolver(new OsiClpSolverInterface);
+                spotterSolver->setObjSense(1.0); // Minimize
+                CbcModel spotterCbcModel(*spotterSolver);
+
+                // Set solver parameters
+                spotterCbcModel.setDblParam(CbcModel::CbcAllowableFractionGap, ctx.optimalityGap);
+                spotterCbcModel.setDblParam(CbcModel::CbcMaximumSeconds, static_cast<double>(ctx.timeLimit));
+                if (ctx.quiet) spotterCbcModel.setLogLevel(0);
+                else spotterCbcModel.setLogLevel(1);
+
+                // --- Add spotter model to the new CbcModel ---
+                ParticipantModel seqSpotterModel = add_participant_model(
+                    spotterCbcModel, spotterPool, totalStints, "Spot", ctx, stintWithPitSeconds, stintLaps
+                );
+
+                // --- Add spotter constraints to the new CbcModel ---
+                // A. Spotter Coverage
+                for (int s = 0; s < totalStints; ++s) {
+                    CoinPackedVector row;
+                    for (const auto& p : spotterPool) {
+                        row.insert(seqSpotterModel.workVars.at({p.name, s}), 1.0);
+                    }
+                    if (ctx.allowNoSpotter) spotterCbcModel.solver()->addRow(row, 0.0, 1.0); // <= 1
+                    else spotterCbcModel.solver()->addRow(row, 1.0, 1.0); // == 1
+                }
+
+                // B. No Dual-Duty (based on *fixed* driver schedule)
+                for (int s = 0; s < totalStints; ++s) {
+                    const std::string& driverName = schedule[s].driver;
+                    if (driverName == "N/A") continue;
+
+                    // Check if this driver is *also* in the spotter pool
+                    auto it = std::find_if(spotterPool.begin(), spotterPool.end(), 
+                                         [&](const TeamMember& m){ return m.name == driverName; });
+                    
+                    if (it != spotterPool.end()) {
+                        // This person is driving stint 's' and is a spotter.
+                        // They CANNOT spot this stint.
+                        // spotVar[driverName, s] = 0
+                        int varIdx = seqSpotterModel.workVars.at({driverName, s});
+                        spotterCbcModel.solver()->setColBounds(varIdx, 0.0, 0.0);
+                    }
+                }
+
+                // --- Solve the sequential spotter model ---
+                if (!ctx.quiet) std::cout << "[Solver] Calling CbcModel::branchAndBound() for sequential spotter model..." << std::endl;
+                
+                auto seqSolveStart = std::chrono::high_resolution_clock::now();
+                spotterCbcModel.branchAndBound();
+                auto seqSolveEnd = std::chrono::high_resolution_clock::now();
+                
+                solveDuration += (seqSolveEnd - seqSolveStart); // Add to total time
+
+                if (spotterCbcModel.isProvenOptimal() || spotterCbcModel.isProvenInfeasible() == 0) {
+                    const double* spotterSolution = spotterCbcModel.solver()->getColSolution();
+                    for (int s = 0; s < totalStints; ++s) {
+                        for (const auto& p : spotterPool) {
+                            int varIdx = seqSpotterModel.workVars.at({p.name, s});
+                            if (spotterSolution[varIdx] > 0.5) {
+                                schedule[s].spotter = p.name;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                     std::cerr << "[Solver] Error: Could not find a valid spotter schedule in sequential mode." << std::endl;
+                }
+            }
+        }
+        
         output_results(ctx, schedule, solveDuration.count());
     }
     else
     {
         std::cerr << "[Solver] Error: Could not find a valid solution." << std::endl;
-        if (model.isProvenInfeasible()) {
+        if (mainModel.isProvenInfeasible()) {
             std::cerr << "[Solver] The model is infeasible. No solution exists." << std::endl;
         }
     }
