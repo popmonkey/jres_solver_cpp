@@ -2,9 +2,6 @@
     "version": "2.0.0",
     "tasks": [
         {
-            // This simple task just tells VSCode how to run the default
-            // CMake build command. The "preLaunchTask" in launch.json
-            // will use this.
             "label": "Build (CMake)",
             "type": "shell",
             "command": "cmake",

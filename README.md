@@ -1,37 +1,119 @@
-# JRES Race Solver (C++)
-A C++ port of the Python-based endurance race scheduling solver, designed for high performance and portability.This project uses CMake for building and links against the COIN-OR Cbc (Branch and Cut) optimization library.Core RequirementsBefore building, you will need:GitCMake (v3.15 or later)A C++17 compliant compiler (e.g., AppleClang, GCC, MSVC)Building the SolverThe project includes header-only libraries (cxxopts, nlohmann/json) as Git submodules. The first time you clone the repository, or any time you pull updates, you must initialize them:# Clone the repository
-git clone [YOUR_REPO_URL]
+# JRES Solver (C++ Port)
+
+This library can be used to solve for optimal driver and spotter schedules for endurance racing events.  It uses the COIN-OR Cbc optimization library.
+
+It has been structured as a C-API library (`racesolver`) and a simple CLI client (`solver`) that uses the library.
+
+## Project Structure
+
+```
+.
+├── include/
+│   └── racesolver.hpp      # The public C-API header for the library
+├── src/
+│   ├── racesolver.cpp      # The C++ library implementation
+│   └── main.cpp            # The CLI client implementation
+├── lib/
+│   ├── cxxopts/            # (Git Submodule) cxxopts header-only library
+│   └── json/               # (Git Submodule) nlohmann/json header-only library
+├── CMakeLists.txt          # The main build script
+└── README.md
+```
+
+## Bootstrap & Dependencies
+
+This project relies on `cmake` for building and `git` for dependency management (via submodules). The only external binary dependency is the Cbc library.
+
+### 1. Clone & Init Submodules
+
+First, clone the repo and initialize the `lib` submodules:
+
+```
+git clone git@github.com:popmonkey/jres_solver_cpp.git jres_solver_cpp
 cd jres_solver_cpp
-
-# Initialize and pull the submodules (cxxopts, nlohmann/json)
 git submodule update --init --recursive
-After that, follow the instructions for your platform.macOS (with Homebrew)This is the simplest setup, as Homebrew manages all paths.Install Dependencies:brew install cmake cbc
-Configure (VSCode):This is the recommended method.Install the "CMake Tools" extension.Open the project folder in VSCode.The .vscode/settings.json file in this repository will automatically tell CMake to use the Homebrew path.When prompted, select a Kit (e.g., "Clang").The project will configure automatically. All IntelliSense errors will be resolved.Configure & Build (Terminal):If you prefer the command line, you can pass the Homebrew prefix manually.# Clean any old build
-rm -rf build
+```
 
-# Configure, hinting CMake at the Homebrew path
-cmake -S . -B build -DCMAKE_PREFIX_PATH=$(brew --prefix)
+### 2. Install Cbc
 
-# Build the 'solver' executable
-cmake --build build
-Linux (e.g., Ubuntu/Debian)Linux package managers typically place headers and libraries in standard system paths, so no "hint" is required.Install Dependencies:sudo apt-get update
-sudo apt-get install build-essential g++ cmake libcbc-dev
-(Note: libcbc-dev should provide all necessary Cbc, Osi, Clp, and CoinUtils headers and libraries.)Configure & Build (Terminal):rm -rf build
-cmake -S . -B build
-cmake --build build
-Windows (with Visual Studio & vcpkg)Windows requires using the vcpkg package manager to install Cbc and passing its "toolchain file" to CMake.Install Core Tools:Install Visual Studio 2022 (or 2019) with the "Desktop development with C++" workload.Install Git and CMake.Install vcpkg and Cbc:(Run these commands in PowerShell or CMD)# Clone vcpkg to a permanent location (e.g., C:\src\vcpkg)
-git clone [https://github.com/microsoft/vcpkg.git](https://github.com/microsoft/vcpkg.git) C:\src\vcpkg
-.\C:\src\vcpkg\bootstrap-vcpkg.bat
+The COIN-OR Cbc library must be installed on your system.
 
-# Install the Cbc library for 64-bit Windows
-.\C:\src\vcpkg\vcpkg install cbc:x64-windows
-Configure & Build (Terminal):The key is telling CMake to use the vcpkg toolchain file.# Clean any old build
-rm -rf build
+#### macOS (Homebrew)
 
-# Configure, pointing to the vcpkg toolchain
-# (Adjust the path to your vcpkg install)
-cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=C:\src\vcpkg\scripts\buildsystems\vcpkg.cmake
+This is the easiest method for macOS:
 
-# Build the 'solver.exe' executable (in Release mode)
-cmake --build build --config Release
-Running the SolverAfter building, the executable will be located at:./build/solver (on macOS / Linux)./build/Release/solver.exe (on Windows, if using the command above)
+```
+brew install cbc
+```
+
+#### Linux (apt)
+
+```
+sudo apt-get update
+sudo apt-get install coinor-cbc coinor-libclp-dev coinor-libcoinutils-dev coinor-libosi-dev
+```
+
+*(Note: Package names may vary slightly by distribution).*
+
+#### Windows
+
+This is the most complex path. It's recommended to use a package manager like `vcpkg` to install `cbc` and all its dependencies, or to build from source using MSYS2.
+
+## Building the Project
+
+We use a standard out-of-source CMake build.
+
+1.  **Create a build directory:**
+
+    ```
+    mkdir build
+    cd build
+    ```
+
+2.  **Run CMake (Configure):**
+    You must provide a "hint" (the `CMAKE_PREFIX_PATH`) to tell CMake where your Cbc installation lives.
+
+    **On macOS (Homebrew on Apple Silicon):**
+
+    ```
+    cmake .. -DCMAKE_PREFIX_PATH=/opt/homebrew
+    ```
+
+    **On macOS (Homebrew on Intel):**
+
+    ```
+    cmake .. -DCMAKE_PREFIX_PATH=/usr/local
+    ```
+
+    **On Linux (Standard):**
+    (CMake should find the system libraries automatically)
+
+    ```
+    cmake ..
+    ```
+
+3.  **Run Make (Build):**
+
+    ```
+    make
+    ```
+
+This will create two main products in the `build/` directory:
+
+  * `libracesolver.dylib` (or `.so` on Linux): The shared library.
+  * `solver`: The CLI executable.
+
+## Running the CLI Client
+
+The `solver` executable is a client that uses the `racesolver` library.
+
+```
+# Run with a file
+./solver -i ../data/race_data.json -s integrated
+
+# Pipe from stdin
+cat ../data/race_data.json | ./solver -s sequential --allow-no-spotter
+
+# Get help
+./solver --help
+```
