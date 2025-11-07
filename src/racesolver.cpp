@@ -51,7 +51,7 @@ struct RaceData
     double pitTimeInSeconds;
     double fuelTankSize;
     double fuelUsePerLap;
-    int durationHours;
+    double durationHours;
     std::string raceStartUTC;
     std::string firstStintDriver;
     std::vector<TeamMember> teamMembers;

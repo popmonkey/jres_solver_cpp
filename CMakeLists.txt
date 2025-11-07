@@ -90,3 +90,8 @@ target_link_libraries(solver PRIVATE
   cxxopts
 )
 
+# --- Enable Testing ---
+# These lines add the 'test' subdirectory, which will download
+# GoogleTest and build our 'solver_tests' executable.
+enable_testing()
+add_subdirectory(test)
