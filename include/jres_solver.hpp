@@ -1,5 +1,5 @@
 /**
- * @file racesolver.hpp
+ * @file jres_solver.hpp
  * @brief Public C-API for the JRES Solver Library.
  *
  * This file defines the C-style interface for the solver,
@@ -10,8 +10,8 @@
  * . free_solver_result: A function to free the memory allocated by the solver.
  */
 
-#ifndef RACESOLVER_HPP
-#define RACESOLVER_HPP
+#ifndef JRES_SOLVER_HPP
+#define JRES_SOLVER_HPP
 
 // Use standard C-style linking for compatibility
 #ifdef __cplusplus
@@ -21,7 +21,7 @@ extern "C" {
 /**
  * @brief Options for the race schedule solver.
  */
-struct RaceSolverOptions {
+struct JresSolverOptions {
     int timeLimit;           // Maximum time in seconds to let the solver run
     const char* spotterMode; // "none", "integrated", or "sequential"
     bool allowNoSpotter;     // Allow stints to have no spotter assigned
@@ -47,7 +47,7 @@ struct RaceSolverOptions {
  * containing an "error" key.
  */
 int solve_race_schedule(const char* raceDataJson,
-                        const RaceSolverOptions& options,
+                        const JresSolverOptions& options,
                         char** outputJson);
 
 /**
@@ -64,4 +64,4 @@ void free_solver_result(char* resultJson);
 } // extern "C"
 #endif
 
-#endif // RACESOLVER_HPP
+#endif // JRES_SOLVER_HPP

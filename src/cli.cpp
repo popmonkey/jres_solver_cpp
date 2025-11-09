@@ -1,8 +1,8 @@
 /**
- * @file main.cpp
+ * @file cli.cpp
  * @brief An example CLI client for the JRES Solver Library.
  *
- * This application is a simple wrapper around the `racesolver` library.
+ * This application is an example `JresSolver` library client.
  */
 
 #include <iostream>
@@ -14,7 +14,7 @@
 #include "cxxopts.hpp"
 #include "nlohmann/json.hpp" 
 
-#include "racesolver.hpp"
+#include "jres_solver.hpp"
 
 using json = nlohmann::json;
 
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
     }
 
     // Build Solver Options Struct
-    RaceSolverOptions solverOptions;
+    JresSolverOptions solverOptions;
     solverOptions.quiet = quiet;
     solverOptions.timeLimit = result["time-limit"].as<int>();
     // Need to get c_str() for the const char*

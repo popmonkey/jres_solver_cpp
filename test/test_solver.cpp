@@ -1,5 +1,5 @@
 #include "gtest/gtest.h"
-#include "racesolver.hpp"
+#include "jres_solver.hpp"
 #include "nlohmann/json.hpp"
 
 // Use the nlohmann::json namespace
@@ -41,7 +41,7 @@ const char* SOLVABLE_JSON = R"({
 // Stint 1 @ 15:27 (needs 15:00 and 16:00 keys)
 
 TEST(SolverTest, BasicIntegratedSolve) {
-    RaceSolverOptions options;
+    JresSolverOptions options;
     options.timeLimit = 30;
     options.spotterMode = "integrated";
     options.allowNoSpotter = false;
@@ -101,7 +101,7 @@ const char* INFEASIBLE_JSON = R"({
 // Both drivers are unavailable.
 
 TEST(SolverTest, InfeasibleModel) {
-    RaceSolverOptions options;
+    JresSolverOptions options;
     options.timeLimit = 10;
     options.spotterMode = "none";
     options.allowNoSpotter = false;
@@ -123,7 +123,7 @@ TEST(SolverTest, InfeasibleModel) {
     // Check the error message
     ASSERT_FALSE(resultJson["success"].get<bool>());
     
-    // After we fix `racesolver.cpp`, this test will correctly
+    // After we fix `jres_solver.cpp`, this test will correctly
     // fail with "Model is infeasible..." instead of "Invalid race parameters..."
     EXPECT_EQ(resultJson["error"].get<std::string>(), "Model is infeasible. No solution exists.");
 }

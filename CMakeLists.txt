@@ -2,14 +2,14 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Set the project name and language
-project(RaceSolver CXX)
+project(JresSolver CXX)
 
 # Use C++17 standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Set the public include directory for the library
-set(RACESOLVER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(JRES_SOLVER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # --- Find Dependencies ---
 
@@ -54,23 +54,23 @@ target_include_directories(cxxopts INTERFACE
 
 # --- Define Our Library ---
 
-# This creates a shared library named "racesolver"
-add_library(racesolver SHARED
-  src/racesolver.cpp
+# This creates a shared library named "jres_solver"
+add_library(jres_solver SHARED
+  src/jres_solver.cpp
 )
 
 # Tell the library where to find its own public headers
-target_include_directories(racesolver PUBLIC
-  ${RACESOLVER_INCLUDE_DIR}
+target_include_directories(jres_solver PUBLIC
+  ${JRES_SOLVER_INCLUDE_DIR}
 )
 
 # Tell the library where to find all the Cbc headers
-target_include_directories(racesolver PRIVATE
+target_include_directories(jres_solver PRIVATE
   ${CBC_INCLUDE_DIRS}
 )
 
 # Link all dependencies to the LIBRARY
-target_link_libraries(racesolver PRIVATE
+target_link_libraries(jres_solver PRIVATE
   ${CBC_LIBRARIES}
   nlohmann_json
   cxxopts
@@ -78,14 +78,14 @@ target_link_libraries(racesolver PRIVATE
 
 # --- Define Our Executable (The Client) ---
 
-# This creates an executable named "solver" from our main.cpp file
+# This creates an executable named "solver" from our cli.cpp file
 add_executable(solver
-  src/main.cpp
+  src/cli.cpp
 )
 
 # Link the EXECUTABLE against our new library
 target_link_libraries(solver PRIVATE
-  racesolver
+  jres_solver
   nlohmann_json
   cxxopts
 )

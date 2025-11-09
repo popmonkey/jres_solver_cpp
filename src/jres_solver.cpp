@@ -1,5 +1,5 @@
 /**
- * @file racesolver.cpp
+ * @file jres_solver.cpp
  * @brief JRES Solver Library
  */
 
@@ -20,7 +20,7 @@
 #include <cstring>   // For strlen, strcpy
 
 // --- Our Public API Header ---
-#include "racesolver.hpp" // Note: This is a C-compatible header
+#include "jres_solver.hpp" // Note: This is a C-compatible header
 
 // --- 3rd Party Libs ---
 #include "nlohmann/json.hpp"
@@ -598,7 +598,7 @@ char* create_output_string(const std::string& s) {
  * @brief The main C-API function.
  */
 int solve_race_schedule(const char* raceDataJson,
-                        const RaceSolverOptions& options,
+                        const JresSolverOptions& options,
                         char** outputJson)
 {
     try {

@@ -2,17 +2,17 @@
 
 This library can be used to solve for optimal driver and spotter schedules for endurance racing events.  It uses the COIN-OR Cbc optimization library.
 
-It has been structured as a C-API library (`racesolver`) and a simple CLI client (`solver`) that uses the library.
+It has been structured as a C-API library (`jres_solver`) and a simple CLI client (`solver`) that uses the library.
 
 ## Project Structure
 
 ```
 .
 ├── include/
-│   └── racesolver.hpp      # The public C-API header for the library
+│   └── jres_solver.hpp      # The public C-API header for the library
 ├── src/
-│   ├── racesolver.cpp      # The C++ library implementation
-│   └── main.cpp            # The CLI client implementation
+│   ├── jres_solver.cpp      # The C++ library implementation
+│   └── cli.cpp              # A CLI client implementation
 ├── lib/
 │   ├── cxxopts/            # (Git Submodule) cxxopts header-only library
 │   └── json/               # (Git Submodule) nlohmann/json header-only library
@@ -100,12 +100,12 @@ We use a standard out-of-source CMake build.
 
 This will create two main products in the `build/` directory:
 
-  * `libracesolver.dylib` (or `.so` on Linux): The shared library.
+  * `libjres_solver.dylib` (or `.so` on Linux): The shared library.
   * `solver`: The CLI executable.
 
 ## Running the CLI Client
 
-The `solver` executable is a client that uses the `racesolver` library.
+The `solver` executable is a client that uses the `jres_solver` library.
 
 ```
 # Run with a file

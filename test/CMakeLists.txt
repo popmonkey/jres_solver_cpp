@@ -22,18 +22,18 @@ add_executable(solver_tests
 
 # --- Link Dependencies ---
 target_link_libraries(solver_tests PRIVATE
-  racesolver
+  jres_solver
   gtest_main
   nlohmann_json
 )
 
 # Tell the test runner where to find our library's public header
 target_include_directories(solver_tests PRIVATE
-  ${RACESOLVER_INCLUDE_DIR}
+  ${JRES_SOLVER_INCLUDE_DIR}
 )
 
 # This tells the 'solver_tests' executable where to find
-# 'libracesolver.dylib' at runtime.
+# 'libjres_solver.dylib' at runtime.
 # ${CMAKE_BINARY_DIR} is the 'build/' directory.
 set_target_properties(solver_tests PROPERTIES
   INSTALL_RPATH "${CMAKE_BINARY_DIR}"
