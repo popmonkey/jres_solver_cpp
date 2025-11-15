@@ -14,7 +14,7 @@
 #include "cxxopts.hpp"
 #include "nlohmann/json.hpp" 
 
-#include "jres_solver.hpp"
+#include "jres_solver/jres_solver.hpp"
 
 using json = nlohmann::json;
 

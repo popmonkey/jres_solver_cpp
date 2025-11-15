@@ -34,7 +34,7 @@ set(CBC_INCLUDE_DIRS
   ${CLP_INCLUDE_DIR} ${COINUTILS_INCLUDE_DIR} ${OSI_INCLUDE_DIR} ${CBC_INCLUDE_DIR_MAIN}
 )
 
-# lohmann/json (Header-only)
+# nlohmann/json (Header-only)
 add_library(nlohmann_json INTERFACE)
 target_include_directories(nlohmann_json INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/lib/json/single_include
@@ -50,32 +50,32 @@ target_include_directories(cxxopts INTERFACE
 # --- Define Our Library ---
 
 add_library(jres_solver SHARED
-  src/jres_solver.cpp
+  src/jres_solver.cpp         # The C-API wrapper
+  src/jres_solver_impl.cpp    # The C++ solver logic
+  src/jres_solver_types.cpp   # The JSON/Type logic
 )
 
-# Add the 'include' directory so we can find <jres_solver/jres_solver.hpp>
+# Add the 'include' directory so we can find our public header
 target_include_directories(jres_solver PUBLIC
   ${JRES_SOLVER_INCLUDE_DIR}
 )
 
-# Cbc headers are only needed internally by jres_solver.cpp
+# Cbc headers are only needed internally by jres_solver_impl.cpp
 target_include_directories(jres_solver PRIVATE
   ${CBC_INCLUDE_DIRS}
 )
 
 # Link all dependencies to the LIBRARY
 target_link_libraries(jres_solver
-  PUBLIC
-    nlohmann_json
-
   PRIVATE
+    nlohmann_json
     ${CBC_LIBRARIES}
 )
 
 # --- Define Our Executable (The Client) ---
 
+# This creates an executable named "solver"
 add_executable(solver
-  # CHANGED: This now points to its new home in cmd/
   cmd/solver/cli.cpp
 )
 
@@ -86,13 +86,11 @@ target_link_libraries(solver PRIVATE
 
   # This is needed by cli.cpp for argument parsing
   cxxopts
-)
-# Note: We removed nlohmann_json because `jres_solver`
-# provides it to us automatically (it's a PUBLIC dependency).
 
+  # This is needed by cli.cpp to read the JSON file
+  nlohmann_json
+)
 
 # --- Enable Testing ---
-# These lines are correct. They tell CMake to look for a
-# 'CMakeLists.txt' file inside the 'test' directory and run it.
 enable_testing()
 add_subdirectory(test)

@@ -9,7 +9,8 @@ It has been structured as a C-API library (`jres_solver`) and a simple CLI clien
 ```
 .
 ├── include/
-│   └── jres_solver.hpp      # The public C-API header for the library
+|   └── jres_solver
+│       └── jres_solver.hpp      # The public C-API header for the library
 ├── src/
 │   ├── jres_solver.cpp      # The C++ library implementation
 │   └── cli.cpp              # A CLI client implementation

@@ -1,5 +1,5 @@
 #include "gtest/gtest.h"
-#include "jres_solver.hpp"
+#include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"
 
 // Use the nlohmann::json namespace
