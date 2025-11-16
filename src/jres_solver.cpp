@@ -63,7 +63,7 @@ int solve_race_schedule(const char* raceDataJson,
         SolverContext ctx;
         ctx.quiet = options.quiet;
         ctx.timeLimit = options.timeLimit;
-        ctx.spotterMode = translate_spotter_mode(options.spotterMode); // <-- Changed
+        ctx.spotterMode = translate_spotter_mode(options.spotterMode);
         ctx.allowNoSpotter = options.allowNoSpotter;
         ctx.optimalityGap = options.optimalityGap;
         ctx.raceData = rawJsonData.get<RaceData>();

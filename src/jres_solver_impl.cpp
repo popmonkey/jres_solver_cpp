@@ -100,8 +100,8 @@ JresSolverImpl::JresSolverImpl(const SolverContext& ctx)
 
     m_mainModel->setDblParam(CbcModel::CbcAllowableFractionGap, m_ctx.optimalityGap);
     m_mainModel->setDblParam(CbcModel::CbcMaximumSeconds, static_cast<double>(m_ctx.timeLimit));
-    m_mainModel->setLogLevel(m_ctx.quiet ? 0 : 1);
-    m_mainSolver->setLogLevel(m_ctx.quiet ? 0 : 1);
+    m_mainModel->setLogLevel(0);  // m_ctx.quiet ? 0 : 1
+    m_mainSolver->setLogLevel(0); // m_ctx.quiet ? 0 : 1
 
     // Filter Participant Pools
     for (const auto& member : m_ctx.raceData.teamMembers) {
