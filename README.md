@@ -1,24 +1,26 @@
-# JRES Solver (C++ Port)
+# JRES Solver
 
 This library can be used to solve for optimal driver and spotter schedules for endurance racing events.  It uses the COIN-OR Cbc optimization library.
 
 It has been structured as a C-API library (`jres_solver`) and a simple CLI client (`solver`) that uses the library.
+
+>[!NOTE]
+>this is a C++ port and continuation of the python JRES Solver https://github.com/popmonkey/jres_solver
 
 ## Project Structure
 
 ```
 .
 ├── include/
-|   └── jres_solver
-│       └── jres_solver.hpp      # The public C-API header for the library
-├── src/
-│   ├── jres_solver.cpp      # The C++ library implementation
-│   └── cli.cpp              # A CLI client implementation
+|   └── jres_solver/        # The public C-API header for the library
+├── src/                    # The C++ library implementation
 ├── lib/
 │   ├── cxxopts/            # (Git Submodule) cxxopts header-only library
 │   └── json/               # (Git Submodule) nlohmann/json header-only library
-├── CMakeLists.txt          # The main build script
-└── README.md
+├── command/
+│   └── /solver/.           # A CLI client implementation              
+├── command/                # Tests
+└── CMakeLists.txt          # The main build script
 ```
 
 ## Bootstrap & Dependencies

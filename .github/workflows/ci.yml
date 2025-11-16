@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      name: "Linux (x64)"
+      os: ubuntu-latest
+      arch: x64
+      asset_ext: tar.gz
+      upload_assets: false
+      upload_url: ""
+
+  macos-intel:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      name: "macOS Intel (x64)"
+      os: macos-latest
+      arch: x64
+      asset_ext: tar.gz
+      upload_assets: false
+      upload_url: ""
+
+  macos-arm:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      name: "macOS Apple Silicon (arm64)"
+      os: macos-14
+      arch: arm64
+      asset_ext: tar.gz
+      upload_assets: false
+      upload_url: ""

@@ -1,0 +1,27 @@
+name: Build and Release
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build-all:
+    strategy:
+      matrix:
+        include:
+          - { name: "Linux (x64)",              os: ubuntu-latest, arch: x64,  asset_ext: tar.gz }
+          - { name: "macOS Intel (x64)",        os: macos-latest,  arch: x64,  asset_ext: tar.gz }
+          - { name: "macOS Apple Silicon (arm64)", os: macos-14,   arch: arm64, asset_ext: tar.gz }
+
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      name:       ${{ matrix.name }}
+      os:         ${{ matrix.os }}
+      arch:       ${{ matrix.arch }}
+      asset_ext:  ${{ matrix.asset_ext }}
+      upload_assets: true
+      upload_url:   ${{ github.event.release.upload_url }}

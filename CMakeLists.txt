@@ -16,10 +16,30 @@ set(JRES_SOLVER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # Cbc (COIN-OR Branch and Cut)
 set(CMAKE_FIND_ROOT_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_FIND_ROOT_PATH})
 
-find_path(CLP_INCLUDE_DIR NAMES OsiClpSolverInterface.hpp PATH_SUFFIXES include/clp/coin REQUIRED)
-find_path(COINUTILS_INCLUDE_DIR NAMES CoinPragma.hpp PATH_SUFFIXES include/coinutils/coin REQUIRED)
-find_path(OSI_INCLUDE_DIR NAMES OsiSolverInterface.hpp PATH_SUFFIXES include/osi/coin REQUIRED)
-find_path(CBC_INCLUDE_DIR_MAIN NAMES CbcModel.hpp PATH_SUFFIXES include/cbc/coin REQUIRED)
+# Support both vcpkg/Homebrew (include/cbc/coin) and Ubuntu (include/coin)
+find_path(CLP_INCLUDE_DIR
+  NAMES OsiClpSolverInterface.hpp
+  PATH_SUFFIXES include/clp/coin include/coin
+  REQUIRED
+)
+
+find_path(COINUTILS_INCLUDE_DIR
+  NAMES CoinPragma.hpp
+  PATH_SUFFIXES include/coinutils/coin include/coin
+  REQUIRED
+)
+
+find_path(OSI_INCLUDE_DIR
+  NAMES OsiSolverInterface.hpp
+  PATH_SUFFIXES include/osi/coin include/coin
+  REQUIRED
+)
+
+find_path(CBC_INCLUDE_DIR_MAIN
+  NAMES CbcModel.hpp
+  PATH_SUFFIXES include/cbc/coin include/coin
+  REQUIRED
+)
 
 find_library(CBC_LIBRARY NAMES Cbc PATH_SUFFIXES lib REQUIRED)
 find_library(OSICLP_LIBRARY NAMES OsiClp PATH_SUFFIXES lib REQUIRED)
