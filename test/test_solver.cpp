@@ -43,7 +43,7 @@ const char* SOLVABLE_JSON = R"({
 TEST(SolverTest, BasicIntegratedSolve) {
     JresSolverOptions options;
     options.timeLimit = 30;
-    options.spotterMode = "integrated";
+    options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
     options.allowNoSpotter = false;
     options.optimalityGap = 0.0;
     options.quiet = true;
@@ -103,7 +103,7 @@ const char* INFEASIBLE_JSON = R"({
 TEST(SolverTest, InfeasibleModel) {
     JresSolverOptions options;
     options.timeLimit = 10;
-    options.spotterMode = "none";
+    options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = false;
     options.optimalityGap = 0.0;
     options.quiet = true;

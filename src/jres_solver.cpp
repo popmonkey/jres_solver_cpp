@@ -33,6 +33,22 @@ char* create_output_string(const std::string& s) {
 }
 
 /**
+ * @brief Translates the C-API spotter mode enum to the internal C++ enum.
+ */
+SpotterMode translate_spotter_mode(JresSpotterMode mode) {
+    switch (mode) {
+        case JRES_SPOTTER_MODE_NONE:
+            return SpotterMode::None;
+        case JRES_SPOTTER_MODE_INTEGRATED:
+            return SpotterMode::Integrated;
+        case JRES_SPOTTER_MODE_SEQUENTIAL:
+            return SpotterMode::Sequential;
+        default:
+            throw std::runtime_error("Unknown spotter mode enum provided.");
+    }
+}
+
+/**
  * @brief The main C-API function.
  */
 int solve_race_schedule(const char* raceDataJson,
@@ -47,7 +63,7 @@ int solve_race_schedule(const char* raceDataJson,
         SolverContext ctx;
         ctx.quiet = options.quiet;
         ctx.timeLimit = options.timeLimit;
-        ctx.spotterMode = options.spotterMode;
+        ctx.spotterMode = translate_spotter_mode(options.spotterMode); // <-- Changed
         ctx.allowNoSpotter = options.allowNoSpotter;
         ctx.optimalityGap = options.optimalityGap;
         ctx.raceData = rawJsonData.get<RaceData>();

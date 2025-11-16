@@ -19,14 +19,23 @@ extern "C" {
 #endif
 
 /**
+ * @brief C-API enum for specifying the spotter scheduling mode.
+ */
+enum JresSpotterMode {
+    JRES_SPOTTER_MODE_NONE,
+    JRES_SPOTTER_MODE_INTEGRATED,
+    JRES_SPOTTER_MODE_SEQUENTIAL
+};
+
+/**
  * @brief Options for the race schedule solver.
  */
 struct JresSolverOptions {
-    int timeLimit;           // Maximum time in seconds to let the solver run
-    const char* spotterMode; // "none", "integrated", or "sequential"
-    bool allowNoSpotter;     // Allow stints to have no spotter assigned
-    double optimalityGap;    // e.g., 0.01 for 1%
-    bool quiet;              // Suppress console logging from the library
+    int timeLimit;               // Maximum time in seconds to let the solver run
+    JresSpotterMode spotterMode; // "none", "integrated", or "sequential"
+    bool allowNoSpotter;         // Allow stints to have no spotter assigned
+    double optimalityGap;        // e.g., 0.01 for 1%
+    bool quiet;                  // Suppress console logging from the library
 };
 
 /**

@@ -32,11 +32,20 @@ struct RaceData
     json availability;
 };
 
+/**
+ * @brief Internal C++ enum for spotter scheduling mode.
+ */
+enum class SpotterMode {
+    None,
+    Integrated,
+    Sequential
+};
+
 struct SolverContext
 {
     bool quiet;
     int timeLimit;
-    std::string spotterMode;
+    SpotterMode spotterMode;
     bool allowNoSpotter;
     double optimalityGap;
     RaceData raceData;

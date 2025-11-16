@@ -154,7 +154,7 @@ json JresSolverImpl::solve()
     // Add Spotter Model
     ParticipantModel spotterModel("Spot");
 
-    if (m_ctx.spotterMode == "integrated")
+    if (m_ctx.spotterMode == SpotterMode::Integrated)
     {
         if (m_spotterPool.empty() && !m_ctx.allowNoSpotter) {
             throw std::runtime_error("Spotter mode is 'integrated' but no spotters are available and 'allow-no-spotter' is false.");
@@ -213,7 +213,7 @@ json JresSolverImpl::solve()
         schedule.push_back(entry);
     }
 
-    if (m_ctx.spotterMode == "integrated") 
+    if (m_ctx.spotterMode == SpotterMode::Integrated)
     {
         for (int s = 0; s < m_totalStints; ++s) {
             if (m_spotterPool.empty()) break;
@@ -225,7 +225,7 @@ json JresSolverImpl::solve()
             }
         }
     } 
-    else if (m_ctx.spotterMode == "sequential" && !m_spotterPool.empty())
+    else if (m_ctx.spotterMode == SpotterMode::Sequential && !m_spotterPool.empty())
     {
         std::unique_ptr<OsiClpSolverInterface> spotterSolver(new OsiClpSolverInterface);
         spotterSolver->setObjSense(1.0);
@@ -281,7 +281,7 @@ json JresSolverImpl::solve()
     // Build the final JSON output
     outputJson["solveDurationSeconds"] = solveDuration.count();
     json scheduleJson = json::array();
-    bool hasSpotters = (m_ctx.spotterMode != "none");
+    bool hasSpotters = (m_ctx.spotterMode != SpotterMode::None);
     for(const auto& entry : schedule) {
         json entryJson;
         entryJson["stint"] = entry.stint;

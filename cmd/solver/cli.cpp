@@ -74,9 +74,21 @@ int main(int argc, char **argv)
     JresSolverOptions solverOptions;
     solverOptions.quiet = quiet;
     solverOptions.timeLimit = result["time-limit"].as<int>();
-    // Need to get c_str() for the const char*
+    
+    // --- Translate spotter-mode string to enum ---
     std::string spotterModeStr = result["spotter-mode"].as<std::string>();
-    solverOptions.spotterMode = spotterModeStr.c_str();
+    if (spotterModeStr == "none") {
+        solverOptions.spotterMode = JRES_SPOTTER_MODE_NONE;
+    } else if (spotterModeStr == "integrated") {
+        solverOptions.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
+    } else if (spotterModeStr == "sequential") {
+        solverOptions.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
+    } else {
+        std::cerr << "[App] Error: Invalid spotter mode '" << spotterModeStr << "'. Must be 'none', 'integrated', or 'sequential'." << std::endl;
+        return 1;
+    }
+    // --- End translation ---
+
     solverOptions.allowNoSpotter = result["allow-no-spotter"].as<bool>();
     solverOptions.optimalityGap = result["optimality-gap"].as<double>();
 
@@ -101,7 +113,7 @@ int main(int argc, char **argv)
             if (!quiet) {
                 // Print the schedule
                 std::cout << "\n--- 🏁 Race Schedule ---" << std::endl;
-                bool hasSpotters = (solverOptions.spotterMode != "none");
+                bool hasSpotters = (solverOptions.spotterMode != JRES_SPOTTER_MODE_NONE);
                 for (const auto& entry : resultJson["schedule"]) {
                     std::stringstream ss;
                     ss << "Stint " << std::setw(3) << entry["stint"].get<int>()
