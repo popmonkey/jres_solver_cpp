@@ -17,7 +17,9 @@ FetchContent_MakeAvailable(googletest)
 
 # --- Define Our Test Executable ---
 add_executable(solver_tests
-  test_solver.cpp
+  test_spotter_modes.cpp
+  test_constraints.cpp
+  test_errors.cpp
 )
 
 # --- Link Dependencies ---
