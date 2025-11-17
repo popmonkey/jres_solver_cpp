@@ -29,7 +29,7 @@ jobs:
 
     steps:
       # ---------------------------------------------------------
-      # Debug info
+      # Debug Info
       # ---------------------------------------------------------
       - name: Print Build Info
         run: |
@@ -39,7 +39,7 @@ jobs:
           echo "Ext:       ${{ inputs.asset_ext }}"
 
       # ---------------------------------------------------------
-      # Checkout repo + submodules (for cxxopts/json)
+      # Checkout repo with submodules (cxxopts/json)
       # ---------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,19 +66,34 @@ jobs:
         if: startsWith(inputs.os, 'macos')
         run: brew install cbc
 
-      # Apple Silicon: tell CMake where Homebrew lives
+      # Apple Silicon Homebrew prefix
       - name: Set CMAKE_PREFIX_PATH (Apple Silicon)
         if: inputs.os == 'macos-14'
         run: echo "CMAKE_PREFIX_PATH=/opt/homebrew" >> $GITHUB_ENV
 
       # ---------------------------------------------------------
-      # Configure & build
+      # Configure (normal platforms)
       # ---------------------------------------------------------
       - name: Configure CMake
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
+      # ---------------------------------------------------------
+      # Build library + solver
+      # ---------------------------------------------------------
       - name: Build Project
         run: cmake --build build --config Release
+
+      # ---------------------------------------------------------
+      # Build tests
+      # ---------------------------------------------------------
+      - name: Build Tests
+        run: cmake --build build --config Release --target solver_tests
+
+      # ---------------------------------------------------------
+      # Run tests
+      # ---------------------------------------------------------
+      - name: Run Tests
+        run: ctest --test-dir build --output-on-failure -C Release
 
       # ---------------------------------------------------------
       # Package binaries
@@ -86,16 +101,17 @@ jobs:
       - name: Set Asset Name
         run: echo "ASSET_NAME=jres-solver-${{ inputs.name }}.${{ inputs.asset_ext }}" >> $GITHUB_ENV
 
-      - name: Package (tar.gz)
+      - name: Package (tar.gz for macOS/Linux)
         run: |
           cd build
+          # Include solver + shared library; ignore missing *.so or *.dylib automatically
           tar -czvf "../${{ env.ASSET_NAME }}" \
             solver \
             libjres_solver.* \
             2>/dev/null || true
 
       # ---------------------------------------------------------
-      # Upload for releases
+      # Upload to release (if enabled)
       # ---------------------------------------------------------
       - name: Upload Release Asset
         if: inputs.upload_assets == true
