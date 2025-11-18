@@ -1,0 +1,7 @@
+name: Windows Workflow
+on: workflow_dispatch
+jobs:
+  dummy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Placeholder to register workflow"
