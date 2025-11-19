@@ -22,9 +22,22 @@ add_executable(solver_tests
   test_errors.cpp
 )
 
+# FIX: LNK1181 - Explicitly declare dependency to ensure jres_solver.dll (and .lib) 
+# is built BEFORE solver_tests tries to link. This is the most crucial fix for build ordering.
+add_dependencies(solver_tests jres_solver)
+
+# FIX: LNK1181 - Add the directory where the .lib file is placed
+if (WIN32)
+  target_link_directories(solver_tests PRIVATE 
+    ${CMAKE_BINARY_DIR}/Release
+  )
+endif()
+
 # --- Link Dependencies ---
 target_link_libraries(solver_tests PRIVATE
+  # Links the DLL's import library (jres_solver.lib) using the standard target name.
   jres_solver
+  
   gtest_main
   nlohmann_json
 )
@@ -35,7 +48,7 @@ target_include_directories(solver_tests PRIVATE
 )
 
 # This tells the 'solver_tests' executable where to find
-# 'libjres_solver.dylib' at runtime.
+# 'libjres_solver.dylib' at runtime on macOS/Linux.
 # ${CMAKE_BINARY_DIR} is the 'build/' directory.
 set_target_properties(solver_tests PROPERTIES
   INSTALL_RPATH "${CMAKE_BINARY_DIR}"

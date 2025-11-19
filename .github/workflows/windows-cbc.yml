@@ -1,7 +1,60 @@
-name: Windows CBC Builder
-on: workflow_dispatch
+name: Windows Build CBC (Static)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
-  dummy:
-    runs-on: ubuntu-latest
+  build-cbc:
+    runs-on: windows-2022
+
+    env:
+      TRIPLET: x64-windows-static
+      VCPKG_ROOT: C:\vcpkg-custom
+      CBC_TAG: cbc-windows-static
+      CBC_ZIP: cbc-windows-x64-static.zip
+
     steps:
-      - run: echo "Placeholder to register workflow"
+    - name: Checkout (dummy)
+      uses: actions/checkout@v4
+
+    - name: Ensure clean vcpkg dir
+      shell: pwsh
+      run: |
+        if (Test-Path $env:VCPKG_ROOT) {
+          Write-Host "Removing existing $env:VCPKG_ROOT"
+          Remove-Item -Recurse -Force $env:VCPKG_ROOT
+        }
+        New-Item -ItemType Directory -Path $env:VCPKG_ROOT | Out-Null
+
+    - name: Clone vcpkg
+      shell: pwsh
+      run: git clone https://github.com/microsoft/vcpkg.git $env:VCPKG_ROOT
+
+    - name: Bootstrap vcpkg
+      shell: pwsh
+      run: |
+        & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics
+
+    - name: Install CBC via vcpkg (static)
+      shell: pwsh
+      run: |
+        & "$env:VCPKG_ROOT\vcpkg.exe" install coin-or-cbc --triplet $env:TRIPLET
+
+    - name: Archive CBC installed tree
+      shell: pwsh
+      run: |
+        $source = "$env:VCPKG_ROOT\installed"
+        Write-Host "Zipping $source into $env:CBC_ZIP"
+        if (Test-Path $env:CBC_ZIP) { Remove-Item $env:CBC_ZIP -Force }
+        Compress-Archive -Path $source -DestinationPath $env:CBC_ZIP -Force
+
+    - name: Upload CBC zip to release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: pwsh
+      run: |
+        Write-Host "Uploading $env:CBC_ZIP to release tag $env:CBC_TAG"
+        gh release upload $env:CBC_TAG $env:CBC_ZIP --repo $env:GITHUB_REPOSITORY --clobber

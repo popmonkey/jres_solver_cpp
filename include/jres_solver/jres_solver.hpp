@@ -13,6 +13,23 @@
 #ifndef JRES_SOLVER_HPP
 #define JRES_SOLVER_HPP
 
+// === CRITICAL FIX: CROSS-PLATFORM EXPORT MACRO DEFINITION ===
+
+#if defined(_WIN32)
+    // Windows/MSVC: Use __declspec(dllexport/dllimport)
+    #ifdef JRES_SOLVER_EXPORTS
+        #define JRES_SOLVER_API __declspec(dllexport)
+    #else
+        #define JRES_SOLVER_API __declspec(dllimport)
+    #endif
+#else
+    // macOS/Linux (GCC/Clang): Use visibility attribute
+    // This allows the shared library (.dylib/.so) to function correctly.
+    #define JRES_SOLVER_API __attribute__((visibility("default")))
+#endif
+// =============================================
+
+
 // Use standard C-style linking for compatibility
 #ifdef __cplusplus
 extern "C" {
@@ -55,7 +72,7 @@ struct JresSolverOptions {
  * On failure, outputJson will still be set to a JSON string
  * containing an "error" key.
  */
-int solve_race_schedule(const char* raceDataJson,
+JRES_SOLVER_API int solve_race_schedule(const char* raceDataJson,
                         const JresSolverOptions& options,
                         char** outputJson);
 
@@ -67,7 +84,7 @@ int solve_race_schedule(const char* raceDataJson,
  *
  * @param resultJson The string to free.
  */
-void free_solver_result(char* resultJson);
+JRES_SOLVER_API void free_solver_result(char* resultJson);
 
 #ifdef __cplusplus
 } // extern "C"
