@@ -1,0 +1,16 @@
+name: Windows Release
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    uses: ./.github/workflows/win-build.yml
+    secrets: inherit
+    with:
+      upload_assets: true
+      upload_url: ${{ github.event.release.upload_url }}
