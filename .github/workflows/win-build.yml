@@ -59,6 +59,9 @@ jobs:
         Write-Host "Extracted CBC into:"
         Get-ChildItem $env:CBC_DIR -Recurse
 
+    # ------------------------------------------------------------------
+    # Configure CMake (MSVC)
+    # ------------------------------------------------------------------
     - name: Configure CMake (MSVC)
       shell: pwsh
       run: |
@@ -127,9 +130,23 @@ jobs:
         $solver_exe = "${{ github.workspace }}\build\Release\solver.exe"
         & $solver_exe -h
 
-    - name: Build Test Executable
+    # --- Formatter Build ---
+    - name: Build Formatter Executable
       shell: pwsh
-      run: cmake --build build --config Release --target solver_tests
+      run: cmake --build build --config Release --target formatter
+
+    - name: Run Formatter Sanity Check
+      shell: pwsh
+      run: |
+        $formatter_exe = "${{ github.workspace }}\build\Release\formatter.exe"
+        & $formatter_exe -h
+    # ----------------------------
+
+    - name: Build Test Executables
+      shell: pwsh
+      run: | 
+        cmake --build build --config Release --target solver_tests
+        cmake --build build --config Release --target formatter_tests
       
     - name: Run Tests (ctest)
       shell: pwsh
