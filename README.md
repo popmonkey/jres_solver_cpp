@@ -1,32 +1,56 @@
 # JRES Solver
 
-This library can be used to solve for optimal driver and spotter schedules for endurance racing events. It uses the COIN-OR Cbc optimization library.
-
-It has been structured as a C-API library (`jres_solver`) and two CLI clients (`solver` and `formatter`) that use the library.
+This library can be used to solve for optimal driver and spotter schedules for endurance racing events.  It uses the COIN-OR Cbc optimization library.
 
 >[!NOTE]
 >this is based on the python JRES Solver https://github.com/popmonkey/jres_solver
 
 ## Additional Documentation
 
-```
-.
-├── include/
-|   └── jres_solver/        # The public C-API header for the library
-├── src/                    # The C++ library implementation
-├── lib/
-│   ├── cxxopts/            # (Git Submodule) cxxopts header-only library
-│   └── json/               # (Git Submodule) nlohmann/json header-only library
-├── command/
-│   ├── solver/             # The Solver CLI implementation
-│   └── formatter/          # The Formatter CLI implementation           
-├── command/                # Tests
-└── CMakeLists.txt          # The main build script
+* **[Tools](./TOOLS.md)** - releases include some command line tools that use the library
+* **[Development](./DEVELOPMENT.md)** - instructions for development of the library
+
+## The Library
+
+**JresSolver** is a C++ library designed to optimize endurance racing schedules. It uses the **COIN-OR Cbc** Mixed Integer Programming (MIP) solver to assign drivers (and optional spotters) to race stints while satisfying constraints such as fuel usage, maximum drive times, minimum rest periods, and driver availability.
+
+### 1. Integration (C-API)
+
+The library exposes a C-compatible API and can be bound to languages like C, C++, Go, Python, or Rust.
+
+#### Header: `jres_solver.h`
+
+```cpp
+// Structure defining solver configuration
+struct JresSolverOptions {
+    int timeLimit;               // Max runtime in seconds (e.g., 30)
+    JresSpotterMode spotterMode; // 0=None, 1=Integrated, 2=Sequential
+    bool allowNoSpotter;         // If true, stints can go without a spotter
+    double optimalityGap;        // Stop when solution is within this % of optimal (e.g., 0.05)
+    bool quiet;                  // If true, suppresses stdout logging
+};
+
+// Enum for spotter modes
+enum JresSpotterMode {
+    JRES_SPOTTER_MODE_NONE = 0,
+    JRES_SPOTTER_MODE_INTEGRATED = 1,
+    JRES_SPOTTER_MODE_SEQUENTIAL = 2
+};
+
+// Main Solver Function
+// Returns 0 on success, -1 on failure.
+// outputJson is allocated by the library and must be freed by the caller.
+int solve_race_schedule(const char* raceDataJson,
+                        const JresSolverOptions& options,
+                        char** outputJson);
+
+// Memory Cleanup
+void free_solver_result(char* resultJson);
 ```
 
 -----
 
-This project relies on `cmake` for building and `git` for dependency management (via submodules). It requires `Cbc` (for optimization).
+### 2. Input JSON Specification
 
 The `raceDataJson` string passed to `solve_race_schedule` must strictly follow this schema.
 
@@ -105,7 +129,7 @@ The `availability` object maps a **Team Member's Name** to a dictionary of **Tim
 }
 ```
 
-This project relies on `cmake` for building and `git` for dependency management (via submodules). It requires `Cbc` (for optimization).
+-----
 
 ### 3. Output JSON Specification
 
@@ -130,74 +154,22 @@ The function returns a JSON string containing the solution or error details.
 
 #### Error Response
 
-### 2. Install Dependencies (macOS & Linux)
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `success` | Boolean | Always `false`. |
+| `error` | String | Description of the failure (e.g., "Infeasible model", "Parse error"). |
 
-### 2. Install Dependencies (macOS & Linux)
+##### Example Output
 
-#### Step A: Install Cbc
-
-**macOS (Homebrew)**
-```
-brew install cbc
-```
-
-**Linux (apt)**
-```
-sudo apt-get update
-sudo apt-get install coinor-cbc coinor-libclp-dev coinor-libcoinutils-dev coinor-libosi-dev
-```
-
-## Building the Project
-
-We use a standard out-of-source CMake build.
-
-1.  **Create a build directory:**
-
-    ```
-    mkdir build
-    cd build
-    ```
-
-2.  **Run CMake (Configure):**
-    
-    **On macOS (Homebrew on Apple Silicon):**
-    ```
-    cmake .. -DCMAKE_PREFIX_PATH="/opt/homebrew"
-    ```
-
-    **On Linux/Intel macOS:**
-    ```
-    cmake ..
-    ```
-
-3.  **Run Make (Build):**
-
-    ```
-    make
-    ```
-
-This will create the products in the `build/` directory:
-  * `libjres_solver.dylib`: The shared library.
-  * `solver`: The optimization CLI.
-  * `formatter`: The output generation CLI.
-
-## Running the Tools
-
-### 1. The Solver
-The `solver` ingests JSON data and outputs a raw solution JSON.
-
-```
-# Run with a file
-./solver -i ../data/race_data.json -s integrated -o solution.json
-```
-
-### 2. The Formatter
-The `formatter` takes the `solution.json` and converts it into human-readable formats (ZIP of CSVs, single CSV, Text).
-
-```
-# Generate a ZIP containing detailed CSV schedules for every member
-./formatter -i solution.json -o schedule.zip --format zip
-
-# Generate a single master CSV
-./formatter -i solution.json -o schedule.csv --format csv
+```json
+{
+  "success": true,
+  "solveDurationSeconds": 0.45,
+  "schedule": [
+    { "stint": 1, "driver": "Alice", "spotter": "Bob" },
+    { "stint": 2, "driver": "Alice", "spotter": "Bob" },
+    { "stint": 3, "driver": "Bob", "spotter": "Alice" }
+  ],
+  "raceData": { ... }
+}
 ```
