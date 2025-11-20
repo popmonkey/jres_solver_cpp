@@ -3,8 +3,18 @@ name: Windows CI
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - '**.cpp'
+      - '**.hpp'
+      - '**/CMakeLists.txt'
+      - '.github/workflows/*.yml'
   pull_request:
     branches: [ "main" ]
+    paths:
+      - '**.cpp'
+      - '**.hpp'
+      - '**/CMakeLists.txt'
+      - '.github/workflows/*.yml'
 
 permissions:
   contents: read
