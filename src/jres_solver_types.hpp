@@ -55,6 +55,9 @@ struct ScheduleEntry {
     int stint;
     std::string driver;
     std::string spotter;
+    std::string startTimeUTC;
+    std::string endTimeUTC;
+    int laps;
 };
 
 // --- JSON Deserialization Declarations ---
