@@ -2,57 +2,13 @@
 
 This library can be used to solve for optimal driver and spotter schedules for endurance racing events. It uses the COIN-OR Cbc optimization library.
 
-<<<<<<< HEAD
-=======
 It has been structured as a C-API library (`jres_solver`) and two CLI clients (`solver` and `formatter`) that use the library.
 
->>>>>>> 261e6ac (feat(formatter): Introduce formatter CLI and core functionality)
 >[!NOTE]
 >this is based on the python JRES Solver https://github.com/popmonkey/jres_solver
 
 ## Additional Documentation
 
-<<<<<<< HEAD
-* **[Tools](./TOOLS.md)** - releases include some command line tools that use the library
-* **[Development](./DEVELOPMENT.md)** - instructions for development of the library
-
-## The Library
-
-**JresSolver** is a C++ library designed to optimize endurance racing schedules. It uses the **COIN-OR Cbc** Mixed Integer Programming (MIP) solver to assign drivers (and optional spotters) to race stints while satisfying constraints such as fuel usage, maximum drive times, minimum rest periods, and driver availability.
-
-### 1. Integration (C-API)
-
-The library exposes a C-compatible API and can be bound to languages like C, C++, Go, Python, or Rust.
-
-#### Header: `jres_solver.h`
-
-```cpp
-// Structure defining solver configuration
-struct JresSolverOptions {
-    int timeLimit;               // Max runtime in seconds (e.g., 30)
-    JresSpotterMode spotterMode; // 0=None, 1=Integrated, 2=Sequential
-    bool allowNoSpotter;         // If true, stints can go without a spotter
-    double optimalityGap;        // Stop when solution is within this % of optimal (e.g., 0.05)
-    bool quiet;                  // If true, suppresses stdout logging
-};
-
-// Enum for spotter modes
-enum JresSpotterMode {
-    JRES_SPOTTER_MODE_NONE = 0,
-    JRES_SPOTTER_MODE_INTEGRATED = 1,
-    JRES_SPOTTER_MODE_SEQUENTIAL = 2
-};
-
-// Main Solver Function
-// Returns 0 on success, -1 on failure.
-// outputJson is allocated by the library and must be freed by the caller.
-int solve_race_schedule(const char* raceDataJson,
-                        const JresSolverOptions& options,
-                        char** outputJson);
-
-// Memory Cleanup
-void free_solver_result(char* resultJson);
-=======
 ```
 .
 ├── include/
@@ -66,16 +22,11 @@ void free_solver_result(char* resultJson);
 │   └── formatter/          # The Formatter CLI implementation           
 ├── command/                # Tests
 └── CMakeLists.txt          # The main build script
->>>>>>> 261e6ac (feat(formatter): Introduce formatter CLI and core functionality)
 ```
 
 -----
 
-<<<<<<< HEAD
-### 2. Input JSON Specification
-=======
 This project relies on `cmake` for building and `git` for dependency management (via submodules). It requires `Cbc` (for optimization).
->>>>>>> 261e6ac (feat(formatter): Introduce formatter CLI and core functionality)
 
 The `raceDataJson` string passed to `solve_race_schedule` must strictly follow this schema.
 
@@ -154,8 +105,7 @@ The `availability` object maps a **Team Member's Name** to a dictionary of **Tim
 }
 ```
 
-<<<<<<< HEAD
------
+This project relies on `cmake` for building and `git` for dependency management (via submodules). It requires `Cbc` (for optimization).
 
 ### 3. Output JSON Specification
 
@@ -180,25 +130,8 @@ The function returns a JSON string containing the solution or error details.
 
 #### Error Response
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `success` | Boolean | Always `false`. |
-| `error` | String | Description of the failure (e.g., "Infeasible model", "Parse error"). |
+### 2. Install Dependencies (macOS & Linux)
 
-##### Example Output
-
-```json
-{
-  "success": true,
-  "solveDurationSeconds": 0.45,
-  "schedule": [
-    { "stint": 1, "driver": "Alice", "spotter": "Bob" },
-    { "stint": 2, "driver": "Alice", "spotter": "Bob" },
-    { "stint": 3, "driver": "Bob", "spotter": "Alice" }
-  ],
-  "raceData": { ... }
-}
-=======
 ### 2. Install Dependencies (macOS & Linux)
 
 #### Step A: Install Cbc
@@ -267,5 +200,4 @@ The `formatter` takes the `solution.json` and converts it into human-readable fo
 
 # Generate a single master CSV
 ./formatter -i solution.json -o schedule.csv --format csv
->>>>>>> 261e6ac (feat(formatter): Introduce formatter CLI and core functionality)
 ```
