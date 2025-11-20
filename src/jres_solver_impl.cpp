@@ -61,6 +61,15 @@ namespace TimeHelpers
         return std::chrono::system_clock::from_time_t(timegm_portable(&tm));
     }
 
+    std::string timePointToString(std::chrono::system_clock::time_point tp)
+    {
+        std::time_t time = std::chrono::system_clock::to_time_t(tp);
+        std::tm tm = *std::gmtime(&time);
+        std::stringstream ss;
+        ss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+        return ss.str();
+    }
+
     std::string timePointToKey(std::chrono::system_clock::time_point tp)
     {
         std::time_t time = std::chrono::system_clock::to_time_t(tp);
@@ -199,11 +208,27 @@ json JresSolverImpl::solve()
     }
 
     const double* mainSolution = m_mainModel->solver()->getColSolution();
+    
+    // Setup for Time Calculation
+    auto currentTimePoint = TimeHelpers::stringToTimePoint(m_ctx.raceData.raceStartUTC);
+    double stintDurationSeconds = m_stintLaps * m_ctx.raceData.avgLapTimeInSeconds;
+    double pitSeconds = m_ctx.raceData.pitTimeInSeconds;
+
     for (int s = 0; s < m_totalStints; ++s) {
         ScheduleEntry entry;
         entry.stint = s + 1;
         entry.driver = "N/A";
         entry.spotter = "N/A";
+        entry.laps = m_stintLaps;
+        
+        // Calculate times
+        entry.startTimeUTC = TimeHelpers::timePointToString(currentTimePoint);
+        auto endTimePoint = currentTimePoint + std::chrono::seconds(static_cast<long>(stintDurationSeconds));
+        entry.endTimeUTC = TimeHelpers::timePointToString(endTimePoint);
+        
+        // Advance time (Stint + Pit)
+        currentTimePoint = endTimePoint + std::chrono::seconds(static_cast<long>(pitSeconds));
+
         for (const auto& p : m_driverPool) {
             if (mainSolution[driverModel.workVars.at({p.name, s})] > 0.5) {
                 entry.driver = p.name;
@@ -273,8 +298,6 @@ json JresSolverImpl::solve()
                     }
                 }
             }
-        } else {
-            // Could not find a sequential spotter solution, but we don't fail the whole solve
         }
     }
     
@@ -285,6 +308,9 @@ json JresSolverImpl::solve()
     for(const auto& entry : schedule) {
         json entryJson;
         entryJson["stint"] = entry.stint;
+        entryJson["startTimeUTC"] = entry.startTimeUTC;
+        entryJson["endTimeUTC"] = entry.endTimeUTC;
+        entryJson["laps"] = entry.laps;
         entryJson["driver"] = entry.driver;
         if (hasSpotters) {
             entryJson["spotter"] = entry.spotter;

@@ -13,7 +13,7 @@
 using namespace jres;
 using json = nlohmann::json;
 
-// --- Internal Structures (Only used internally) ---
+// --- Internal Structures ---
 struct DutyBlock {
     DateTime start_utc;
     DateTime end_utc;
@@ -33,32 +33,42 @@ std::map<std::string, std::vector<ItineraryItem>> jres::generate_member_itinerar
     std::map<std::string, int> tz_map;
 
     // Initialize
-    for (const auto& m : data["teamMembers"]) {
-        std::string name = m["name"];
-        raw_duties[name] = {};
-        tz_map[name] = m.contains("timezone") ? m["timezone"].get<int>() : 0;
+    if (data.contains("teamMembers")) {
+        for (const auto& m : data["teamMembers"]) {
+            std::string name = m.value("name", "Unknown");
+            raw_duties[name] = {};
+            tz_map[name] = m.value("timezone", 0);
+        }
     }
 
     // Collect Duties
     for (const auto& entry : schedule) {
-        DateTime start = DateTime::parse(entry["startTimeUTC"]);
-        DateTime end = DateTime::parse(entry["endTimeUTC"]);
-        int stint_num = entry["stint"];
-        std::string driver = entry["driver"];
+        DateTime start = DateTime::parse(entry.value("startTimeUTC", ""));
+        DateTime end = DateTime::parse(entry.value("endTimeUTC", ""));
+        int stint_num = entry.value("stint", 0);
+        std::string driver = entry.value("driver", "N/A");
         
-        if (driver != "N/A" && raw_duties.count(driver)) {
+        if (driver != "N/A") {
+            if (raw_duties.find(driver) == raw_duties.end()) {
+                raw_duties[driver] = {};
+                tz_map[driver] = 0;
+            }
             raw_duties[driver].push_back({start, end, "Driving", {stint_num}});
         }
 
         if (has_spotters && entry.contains("spotter")) {
-            std::string spotter = entry.contains("spotter") ? entry["spotter"] : "N/A";
-            if (spotter != "N/A" && raw_duties.count(spotter)) {
+            std::string spotter = entry.value("spotter", "N/A");
+            if (spotter != "N/A") {
+                if (raw_duties.find(spotter) == raw_duties.end()) {
+                    raw_duties[spotter] = {};
+                    tz_map[spotter] = 0;
+                }
                 raw_duties[spotter].push_back({start, end, "Spotting", {stint_num}});
             }
         }
     }
 
-    DateTime race_start_utc = DateTime::parse(data["raceStartUTC"]);
+    DateTime race_start_utc = DateTime::parse(data.value("raceStartUTC", "1970-01-01T00:00:00Z"));
     
     std::map<std::string, std::vector<ItineraryItem>> final_itineraries;
 
@@ -114,9 +124,13 @@ std::map<std::string, std::vector<ItineraryItem>> jres::generate_member_itinerar
             last_duty_end_local = end_local;
         }
         
-        // We need duration for the final rest check, defaulting to 24 if missing for safety
-        int duration = data.contains("durationHours") ? data["durationHours"].get<int>() : 24;
-        DateTime race_end_local = race_start_utc.add_hours(duration + tz_offset);
+        // We need duration for the final rest check
+        double duration_h = data.value("durationHours", 24.0);
+        // Use long long explicitly to avoid ambiguity with overloaded add_seconds/add_hours
+        DateTime race_end_local = race_start_utc
+            .add_hours(static_cast<int>(duration_h))
+            .add_seconds(static_cast<long long>((duration_h - static_cast<int>(duration_h)) * 3600))
+            .add_hours(tz_offset);
         
         if (race_end_local.diff_seconds(last_duty_end_local) > 1.0) {
             final_itineraries[name].push_back({last_duty_end_local, race_end_local, "Resting"});
@@ -133,14 +147,14 @@ std::string jres::generate_schedule_csv_string(const std::vector<json>& schedule
     oss << ",Laps\n";
 
     for (const auto& entry : schedule) {
-        oss << entry["stint"] << "," 
-            << entry["startTimeUTC"].get<std::string>() << ","
-            << entry["endTimeUTC"].get<std::string>() << ","
-            << entry["driver"].get<std::string>();
+        oss << entry.value("stint", 0) << "," 
+            << entry.value("startTimeUTC", "") << "," 
+            << entry.value("endTimeUTC", "") << "," 
+            << entry.value("driver", "N/A");
         if (has_spotters) {
-            oss << "," << (entry.contains("spotter") ? entry["spotter"].get<std::string>() : "N/A");
+            oss << "," << (entry.contains("spotter") ? entry.value("spotter", "N/A") : "N/A");
         }
-        oss << "," << entry["laps"] << "\n";
+        oss << "," << entry.value("laps", 0) << "\n";
     }
     return oss.str();
 }
@@ -198,10 +212,29 @@ void _write_to_txt(
     std::ofstream f(filename);
     f << "--- DRIVER SUMMARY ---\n";
     for (const auto& [name, stats] : driver_stats) {
-        f << name << ": " << stats.first << " stints\n";
+        f << name << ": " << stats.first << " stints, " << stats.second << " laps\n";
     }
+    
+    if (has_spotters) {
+        f << "\n--- SPOTTER SUMMARY ---\n";
+        for (const auto& [name, count] : spotter_stats) {
+            if (count > 0) f << name << ": " << count << " stints\n";
+        }
+    }
+
     f << "\n--- SCHEDULE ---\n";
     f << jres::generate_schedule_csv_string(schedule, has_spotters);
+    
+    f << "\n--- ITINERARIES ---\n";
+    for (const auto& [name, items] : itineraries) {
+        if (items.empty()) continue;
+        f << "\nSchedule for " << name << ":\n";
+        for (const auto& item : items) {
+             double dur = item.end_local.diff_seconds(item.start_local);
+             f << "  " << item.start_local.to_string() << " to " << item.end_local.time_string() 
+               << " (" << DateTime::format_duration((long long)dur) << "): " << item.activity << "\n";
+        }
+    }
 }
 
 void _write_to_zip(
@@ -227,6 +260,13 @@ void _write_to_zip(
 }
 
 void jres::write_output(const json& solved_data, const std::string& output_file, const std::string& format) {
+    // SAFETY: Check keys before accessing
+    if (!solved_data.contains("schedule") || !solved_data.contains("raceData")) {
+        std::cerr << "Error: JSON missing 'schedule' or 'raceData' keys." << std::endl;
+        return;
+    }
+
+    // NOTE: The schedule now comes Pre-Enriched from the Solver!
     const auto& schedule = solved_data["schedule"];
     const auto& data = solved_data["raceData"];
     
@@ -236,29 +276,36 @@ void jres::write_output(const json& solved_data, const std::string& output_file,
     std::map<std::string, std::pair<int, int>> driver_stats; 
     std::map<std::string, int> spotter_stats;
 
-    for (const auto& m : data["teamMembers"]) {
-        if (m.value("isDriver", false)) driver_stats[m["name"]] = {0, 0};
-        if (m.value("isSpotter", false)) spotter_stats[m["name"]] = 0;
+    if (data.contains("teamMembers")) {
+        for (const auto& m : data["teamMembers"]) {
+            if (m.value("isDriver", false)) driver_stats[m.value("name", "Unknown")] = {0, 0};
+            if (m.value("isSpotter", false)) spotter_stats[m.value("name", "Unknown")] = 0;
+        }
     }
 
     std::vector<json> sched_vec;
     for (const auto& item : schedule) {
         sched_vec.push_back(item);
-        std::string driver = item["driver"];
-        int laps = item["laps"];
-        if (driver_stats.count(driver)) {
-            driver_stats[driver].first++;
-            driver_stats[driver].second += laps;
+        
+        std::string driver = item.value("driver", "N/A");
+        int laps = item.value("laps", 0); // Read directly!
+        
+        if (driver != "N/A") {
+             if (driver_stats.find(driver) == driver_stats.end()) driver_stats[driver] = {0, 0};
+             driver_stats[driver].first++;
+             driver_stats[driver].second += laps;
         }
+        
         if (has_spotters && item.contains("spotter")) {
-            std::string spotter = item["spotter"];
-            if (spotter_stats.count(spotter)) {
-                spotter_stats[spotter]++;
+            std::string spotter = item.value("spotter", "N/A");
+            if (spotter != "N/A") {
+                 if (spotter_stats.find(spotter) == spotter_stats.end()) spotter_stats[spotter] = 0;
+                 spotter_stats[spotter]++;
             }
         }
     }
 
-    int pit_time = data["pitTimeInSeconds"];
+    int pit_time = data.value("pitTimeInSeconds", 0);
     auto member_itineraries = generate_member_itineraries(sched_vec, data, pit_time, has_spotters);
 
     if (format == "csv") {
@@ -266,12 +313,17 @@ void jres::write_output(const json& solved_data, const std::string& output_file,
     } else if (format == "txt") {
         _write_to_txt(sched_vec, driver_stats, spotter_stats, member_itineraries, output_file, has_spotters);
     } else {
+        // Default to ZIP
+        std::string zip_file = output_file;
         if (format == "xlsx") {
              std::cerr << "Warning: XLSX support has been removed. Generating ZIP instead." << std::endl;
-             std::string zip_file = output_file.substr(0, output_file.find_last_of('.')) + ".zip";
-             _write_to_zip(sched_vec, driver_stats, spotter_stats, member_itineraries, zip_file, has_spotters);
-        } else {
-             _write_to_zip(sched_vec, driver_stats, spotter_stats, member_itineraries, output_file, has_spotters);
+             size_t lastindex = output_file.find_last_of("."); 
+             if (lastindex != std::string::npos) { 
+                 zip_file = output_file.substr(0, lastindex) + ".zip"; 
+             } else {
+                 zip_file += ".zip";
+             }
         }
+        _write_to_zip(sched_vec, driver_stats, spotter_stats, member_itineraries, zip_file, has_spotters);
     }
 }
