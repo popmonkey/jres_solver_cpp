@@ -2,121 +2,174 @@
 
 This library can be used to solve for optimal driver and spotter schedules for endurance racing events.  It uses the COIN-OR Cbc optimization library.
 
-It has been structured as a C-API library (`jres_solver`) and a simple CLI client (`solver`) that uses the library.
-
 >[!NOTE]
->this is a C++ port and continuation of the python JRES Solver https://github.com/popmonkey/jres_solver
+>this is based on the python JRES Solver https://github.com/popmonkey/jres_solver
 
-## Project Structure
+## Additional Documentation
 
-```
-.
-├── include/
-|   └── jres_solver/        # The public C-API header for the library
-├── src/                    # The C++ library implementation
-├── lib/
-│   ├── cxxopts/            # (Git Submodule) cxxopts header-only library
-│   └── json/               # (Git Submodule) nlohmann/json header-only library
-├── command/
-│   └── /solver/.           # A CLI client implementation              
-├── command/                # Tests
-└── CMakeLists.txt          # The main build script
-```
+* **[Tools](./TOOLS.md)** - releases include some command line tools that use the library
+* **[Development](./DEVELOPMENT.md)** - instructions for development of the library
 
-## Bootstrap & Dependencies
+## The Library
 
-This project relies on `cmake` for building and `git` for dependency management (via submodules). The only external binary dependency is the Cbc library.
+**JresSolver** is a C++ library designed to optimize endurance racing schedules. It uses the **COIN-OR Cbc** Mixed Integer Programming (MIP) solver to assign drivers (and optional spotters) to race stints while satisfying constraints such as fuel usage, maximum drive times, minimum rest periods, and driver availability.
 
-### 1. Clone & Init Submodules
+### 1. Integration (C-API)
 
-First, clone the repo and initialize the `lib` submodules:
+The library exposes a C-compatible API and can be bound to languages like C, C++, Go, Python, or Rust.
 
-```
-git clone git@github.com:popmonkey/jres_solver_cpp.git jres_solver_cpp
-cd jres_solver_cpp
-git submodule update --init --recursive
-```
+#### Header: `jres_solver.h`
 
-### 2. Install Cbc
+```cpp
+// Structure defining solver configuration
+struct JresSolverOptions {
+    int timeLimit;               // Max runtime in seconds (e.g., 30)
+    JresSpotterMode spotterMode; // 0=None, 1=Integrated, 2=Sequential
+    bool allowNoSpotter;         // If true, stints can go without a spotter
+    double optimalityGap;        // Stop when solution is within this % of optimal (e.g., 0.05)
+    bool quiet;                  // If true, suppresses stdout logging
+};
 
-The COIN-OR Cbc library must be installed on your system.
+// Enum for spotter modes
+enum JresSpotterMode {
+    JRES_SPOTTER_MODE_NONE = 0,
+    JRES_SPOTTER_MODE_INTEGRATED = 1,
+    JRES_SPOTTER_MODE_SEQUENTIAL = 2
+};
 
-#### macOS (Homebrew)
+// Main Solver Function
+// Returns 0 on success, -1 on failure.
+// outputJson is allocated by the library and must be freed by the caller.
+int solve_race_schedule(const char* raceDataJson,
+                        const JresSolverOptions& options,
+                        char** outputJson);
 
-This is the easiest method for macOS:
-
-```
-brew install cbc
-```
-
-#### Linux (apt)
-
-```
-sudo apt-get update
-sudo apt-get install coinor-cbc coinor-libclp-dev coinor-libcoinutils-dev coinor-libosi-dev
+// Memory Cleanup
+void free_solver_result(char* resultJson);
 ```
 
-*(Note: Package names may vary slightly by distribution).*
+-----
 
-#### Windows
+### 2. Input JSON Specification
 
-This is the most complex path. It's recommended to use a package manager like `vcpkg` to install `cbc` and all its dependencies, or to build from source using MSYS2.
+The `raceDataJson` string passed to `solve_race_schedule` must strictly follow this schema.
 
-## Building the Project
+#### Root Object (`RaceData`)
 
-We use a standard out-of-source CMake build.
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `raceStartUTC` | String | Yes | ISO 8601 timestamp for the start of the race (e.g., `"2023-06-10T14:00:00"`). |
+| `durationHours` | Number | Yes | Total length of the race in hours. |
+| `avgLapTimeInSeconds`| Number | Yes | Average lap time used to calculate stint duration. |
+| `pitTimeInSeconds` | Number | Yes | Time lost during a pit stop. |
+| `fuelTankSize` | Number | Yes | Total fuel capacity (units must match `fuelUsePerLap`). |
+| `fuelUsePerLap` | Number | Yes | Fuel consumed per lap. |
+| `teamMembers` | Array | Yes | List of drivers and spotters (see below). |
+| `availability` | Object | Yes | Map of availability constraints (see below). |
+| `firstStintDriver` | String | No | Name of the driver forced to take the first stint. |
 
-1.  **Create a build directory:**
+#### Team Member Object
 
-    ```
-    mkdir build
-    cd build
-    ```
+| Field | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | String | **Required** | Unique identifier for the member. |
+| `isDriver` | Boolean | `false` | Can this member drive? |
+| `isSpotter` | Boolean | `false` | Can this member spot? |
+| `preferredStints` | Integer| `3` | Soft constraint: solver attempts to limit consecutive stints to this number. |
+| `minimumRestHours` | Integer| `0` | Hard constraint: Minimum rest time required after a driving shift before driving again. |
 
-2.  **Run CMake (Configure):**
-    You must provide a "hint" (the `CMAKE_PREFIX_PATH`) to tell CMake where your Cbc installation lives.
+#### Availability Map & Time Formatting
 
-    **On macOS (Homebrew on Apple Silicon):**
+The `availability` object maps a **Team Member's Name** to a dictionary of **Time Keys**.
 
-    ```
-    cmake .. -DCMAKE_PREFIX_PATH=/opt/homebrew
-    ```
+**Important:** The solver discretizes time slots to the **top of the hour**.
 
-    **On macOS (Homebrew on Intel):**
+  * You must provide availability for every hour the race covers.
+  * The keys must be formatted exactly as: `YYYY-MM-DDTHH:00:00.000Z`.
+  * If a driver/time pair is missing, the solver assumes the driver is **Available** (Standard) unless specific logic interprets missing keys as unavailable.
+      * *Note on current implementation:* The solver checks for `"Unavailable"` explicitly. If the key exists and value is `"Unavailable"`, they cannot drive. If the key is `"Preferred"`, the cost is reduced.
 
-    ```
-    cmake .. -DCMAKE_PREFIX_PATH=/usr/local
-    ```
+##### Values:
 
-    **On Linux (Standard):**
-    (CMake should find the system libraries automatically)
+  * `"Preferred"`: The solver is incentivized to schedule the driver here.
+  * `"Unavailable"`: The driver is strictly forbidden from being scheduled.
+  * (Missing/Other): The driver is available but not preferred.
 
-    ```
-    cmake ..
-    ```
+##### JSON Example
 
-3.  **Run Make (Build):**
-
-    ```
-    make
-    ```
-
-This will create two main products in the `build/` directory:
-
-  * `libjres_solver.dylib` (or `.so` on Linux): The shared library.
-  * `solver`: The CLI executable.
-
-## Running the CLI Client
-
-The `solver` executable is a client that uses the `jres_solver` library.
-
+```json
+{
+  "raceStartUTC": "2024-06-15T15:00:00",
+  "durationHours": 24,
+  "avgLapTimeInSeconds": 210.5,
+  "pitTimeInSeconds": 45.0,
+  "fuelTankSize": 100.0,
+  "fuelUsePerLap": 3.2,
+  "firstStintDriver": "Alice",
+  "teamMembers": [
+    {
+      "name": "Alice",
+      "isDriver": true,
+      "isSpotter": true,
+      "preferredStints": 2,
+      "minimumRestHours": 4
+    },
+    {
+      "name": "Bob",
+      "isDriver": true,
+      "isSpotter": false
+    }
+  ],
+  "availability": {
+    "Alice": {
+      "2024-06-15T18:00:00.000Z": "Unavailable",
+      "2024-06-15T19:00:00.000Z": "Preferred"
+    }
+  }
+}
 ```
-# Run with a file
-./solver -i ../data/race_data.json -s integrated
 
-# Pipe from stdin
-cat ../data/race_data.json | ./solver -s sequential --allow-no-spotter
+-----
 
-# Get help
-./solver --help
+### 3. Output JSON Specification
+
+The function returns a JSON string containing the solution or error details.
+
+#### Success Response
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `success` | Boolean | Always `true`. |
+| `solveDurationSeconds` | Number | Time taken by the C++ solver to reach the solution. |
+| `schedule` | Array | List of optimized stint assignments. |
+| `raceData` | Object | Echoes the input configuration for verification. |
+
+##### Schedule Entry Object
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `stint` | Integer | 1-based stint index. |
+| `driver` | String | Name of the assigned driver. |
+| `spotter` | String | Name of the assigned spotter (if Spotter Mode is active). |
+
+#### Error Response
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `success` | Boolean | Always `false`. |
+| `error` | String | Description of the failure (e.g., "Infeasible model", "Parse error"). |
+
+##### Example Output
+
+```json
+{
+  "success": true,
+  "solveDurationSeconds": 0.45,
+  "schedule": [
+    { "stint": 1, "driver": "Alice", "spotter": "Bob" },
+    { "stint": 2, "driver": "Alice", "spotter": "Bob" },
+    { "stint": 3, "driver": "Bob", "spotter": "Alice" }
+  ],
+  "raceData": { ... }
+}
 ```
