@@ -1,8 +1,8 @@
 # JRES Solver
 
-This library can be used to solve for optimal driver and spotter schedules for endurance racing events.  It uses the COIN-OR Cbc optimization library.
+This library can be used to solve for optimal driver and spotter schedules for endurance racing events. It uses the COIN-OR Cbc optimization library.
 
-It has been structured as a C-API library (`jres_solver`) and a simple CLI client (`solver`) that uses the library.
+It has been structured as a C-API library (`jres_solver`) and two CLI clients (`solver` and `formatter`) that use the library.
 
 >[!NOTE]
 >this is a C++ port and continuation of the python JRES Solver https://github.com/popmonkey/jres_solver
@@ -18,14 +18,15 @@ It has been structured as a C-API library (`jres_solver`) and a simple CLI clien
 │   ├── cxxopts/            # (Git Submodule) cxxopts header-only library
 │   └── json/               # (Git Submodule) nlohmann/json header-only library
 ├── command/
-│   └── /solver/.           # A CLI client implementation              
+│   ├── solver/             # The Solver CLI implementation
+│   └── formatter/          # The Formatter CLI implementation           
 ├── command/                # Tests
 └── CMakeLists.txt          # The main build script
 ```
 
 ## Bootstrap & Dependencies
 
-This project relies on `cmake` for building and `git` for dependency management (via submodules). The only external binary dependency is the Cbc library.
+This project relies on `cmake` for building and `git` for dependency management (via submodules). It requires `Cbc` (for optimization).
 
 ### 1. Clone & Init Submodules
 
@@ -37,30 +38,20 @@ cd jres_solver_cpp
 git submodule update --init --recursive
 ```
 
-### 2. Install Cbc
+### 2. Install Dependencies (macOS & Linux)
 
-The COIN-OR Cbc library must be installed on your system.
+#### Step A: Install Cbc
 
-#### macOS (Homebrew)
-
-This is the easiest method for macOS:
-
+**macOS (Homebrew)**
 ```
 brew install cbc
 ```
 
-#### Linux (apt)
-
+**Linux (apt)**
 ```
 sudo apt-get update
 sudo apt-get install coinor-cbc coinor-libclp-dev coinor-libcoinutils-dev coinor-libosi-dev
 ```
-
-*(Note: Package names may vary slightly by distribution).*
-
-#### Windows
-
-This is the most complex path. It's recommended to use a package manager like `vcpkg` to install `cbc` and all its dependencies, or to build from source using MSYS2.
 
 ## Building the Project
 
@@ -74,23 +65,13 @@ We use a standard out-of-source CMake build.
     ```
 
 2.  **Run CMake (Configure):**
-    You must provide a "hint" (the `CMAKE_PREFIX_PATH`) to tell CMake where your Cbc installation lives.
-
+    
     **On macOS (Homebrew on Apple Silicon):**
-
     ```
-    cmake .. -DCMAKE_PREFIX_PATH=/opt/homebrew
-    ```
-
-    **On macOS (Homebrew on Intel):**
-
-    ```
-    cmake .. -DCMAKE_PREFIX_PATH=/usr/local
+    cmake .. -DCMAKE_PREFIX_PATH="/opt/homebrew"
     ```
 
-    **On Linux (Standard):**
-    (CMake should find the system libraries automatically)
-
+    **On Linux/Intel macOS:**
     ```
     cmake ..
     ```
@@ -101,22 +82,28 @@ We use a standard out-of-source CMake build.
     make
     ```
 
-This will create two main products in the `build/` directory:
+This will create the products in the `build/` directory:
+  * `libjres_solver.dylib`: The shared library.
+  * `solver`: The optimization CLI.
+  * `formatter`: The output generation CLI.
 
-  * `libjres_solver.dylib` (or `.so` on Linux): The shared library.
-  * `solver`: The CLI executable.
+## Running the Tools
 
-## Running the CLI Client
-
-The `solver` executable is a client that uses the `jres_solver` library.
+### 1. The Solver
+The `solver` ingests JSON data and outputs a raw solution JSON.
 
 ```
 # Run with a file
-./solver -i ../data/race_data.json -s integrated
+./solver -i ../data/race_data.json -s integrated -o solution.json
+```
 
-# Pipe from stdin
-cat ../data/race_data.json | ./solver -s sequential --allow-no-spotter
+### 2. The Formatter
+The `formatter` takes the `solution.json` and converts it into human-readable formats (ZIP of CSVs, single CSV, Text).
 
-# Get help
-./solver --help
+```
+# Generate a ZIP containing detailed CSV schedules for every member
+./formatter -i solution.json -o schedule.zip --format zip
+
+# Generate a single master CSV
+./formatter -i solution.json -o schedule.csv --format csv
 ```
