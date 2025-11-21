@@ -20,6 +20,7 @@ add_executable(solver_tests
   test_spotter_modes.cpp
   test_constraints.cpp
   test_errors.cpp
+  test_diagnose.cpp
 )
 
 add_dependencies(solver_tests jres_solver)

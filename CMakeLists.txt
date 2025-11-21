@@ -136,7 +136,9 @@ target_include_directories(jres_utils PUBLIC
 # --- 2. JRES Solver Core (Shared/DLL) ---
 add_library(jres_solver SHARED
   src/jres_solver.cpp
-  src/jres_solver_impl.cpp
+  src/jres_solver_utils.cpp
+  src/jres_standard_solver.cpp
+  src/jres_diagnostic_solver.cpp
   src/jres_solver_types.cpp
 )
 if (WIN32)

@@ -5,9 +5,7 @@
  * This file defines the C-style interface for the solver,
  * allowing it to be called from other languages (C, Go, Python, etc.).
  *
- * The interface consists of two functions:
- * . solve_race_schedule: The main function to run the solver.
- * . free_solver_result: A function to free the memory allocated by the solver.
+ * The interface consists of functions to solve, diagnose, and manage memory.
  */
 
 #ifndef JRES_SOLVER_HPP
@@ -77,10 +75,28 @@ JRES_SOLVER_API int solve_race_schedule(const char* raceDataJson,
                         char** outputJson);
 
 /**
+ * @brief Runs the diagnostic solver to explain why a schedule is infeasible.
+ *
+ * This uses a relaxed model with penalties to find the minimum set of
+ * constraints that must be violated to make the schedule work.
+ *
+ * @param raceDataJson A UTF-8 JSON string containing the race data.
+ * @param options A struct containing the solver options.
+ * @param outputJson A pointer that will be set to a newly allocated string
+ * containing the JSON result. The result will contain a "diagnosis" array.
+ *
+ * @return 0 on success (diagnosis ran successfully).
+ * @return -1 on failure (internal error running diagnosis).
+ */
+JRES_SOLVER_API int diagnose_race_schedule(const char* raceDataJson,
+                        const JresSolverOptions& options,
+                        char** outputJson);
+
+/**
  * @brief Frees the memory of the JSON result string.
  *
  * Use this function to free the string allocated and returned by
- * solve_race_schedule().
+ * solve_race_schedule() or diagnose_race_schedule().
  *
  * @param resultJson The string to free.
  */
