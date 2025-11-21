@@ -62,7 +62,7 @@ namespace {
 
     // Scenario: Driver A has preferred Stints = 1.
     // Race is 3 stints. Driver must drive 3.
-    // Diagnosis should report a global Consecutive Warning.
+    // Diagnosis should report specific violation.
     const char* MAX_CONSECUTIVE_JSON = R"({
       "availability": {
         "Ayrton": { "1973-06-09T14:00:00.000Z": "Available" }
@@ -96,14 +96,16 @@ namespace {
         json diagnosis = resultJson["diagnosis"];
         ASSERT_FALSE(diagnosis.empty());
         
-        // New Output Format: "WARNING: Max consecutive stint limits were exceeded..."
+        // New Detailed Format: "Driver Ayrton exceeded max consecutive stint limit (Driven Stints: 1-3, Limit: 1)."
         bool found = false;
         for (const auto& issue : diagnosis) {
-            if (issue.get<std::string>().find("Max consecutive stint limits were exceeded") != std::string::npos) {
+            std::string msg = issue.get<std::string>();
+            if (msg.find("exceeded max consecutive stint limit") != std::string::npos &&
+                msg.find("Stints: 1-3") != std::string::npos) {
                 found = true;
                 break;
             }
         }
-        EXPECT_TRUE(found) << "Expected diagnosis to contain warning about consecutive limits.";
+        EXPECT_TRUE(found) << "Expected diagnosis to contain detailed consecutive warning.";
     }
 }

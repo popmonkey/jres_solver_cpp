@@ -17,7 +17,6 @@
 static std::string formatStintList(std::vector<int>& stints) {
     if (stints.empty()) return "";
     std::sort(stints.begin(), stints.end());
-    // Remove duplicates
     stints.erase(std::unique(stints.begin(), stints.end()), stints.end());
     
     std::stringstream ss;
@@ -54,6 +53,24 @@ json JresDiagnosticSolver::diagnose()
     std::map<std::pair<std::string, int>, int> assignVars;
     auto raceStartUTC = TimeHelpers::stringToTimePoint(m_ctx.raceData.raceStartUTC);
 
+    // --- Helper: Centralized Availability Logic ---
+    // Returns true if the driver is strictly available for the ENTIRE duration of stint 's'
+    auto isDriverAvailable = [&](const std::string& name, int s) -> bool {
+        auto stintStart = raceStartUTC + std::chrono::seconds(static_cast<long>(s * m_stintWithPitSeconds));
+        auto stintEnd = stintStart + std::chrono::seconds(static_cast<long>(m_stintWithPitSeconds));
+        auto stintEndCheck = stintEnd - std::chrono::seconds(1);
+        
+        std::string startKey = TimeHelpers::timePointToKey(stintStart);
+        std::string endKey = TimeHelpers::timePointToKey(stintEndCheck);
+        
+        if (m_ctx.raceData.availability.contains(name)) {
+            if (m_ctx.raceData.availability[name].value(startKey, "Unavailable") == "Unavailable") return false;
+            if (m_ctx.raceData.availability[name].value(endKey, "Unavailable") == "Unavailable") return false;
+            return true;
+        }
+        return false; // Default to unavailable if missing from map
+    };
+
     // =========================================================
     // 1. BUILD DIAGNOSTIC MODEL
     // =========================================================
@@ -66,22 +83,11 @@ json JresDiagnosticSolver::diagnose()
             solver.addCol(CoinPackedVector(), 0.0, 1.0, 0.0); 
             solver.setInteger(idx);
             
-            // Availability Logic
-            auto stintStart = raceStartUTC + std::chrono::seconds(static_cast<long>(s * m_stintWithPitSeconds));
-            auto stintEnd = stintStart + std::chrono::seconds(static_cast<long>(m_stintWithPitSeconds));
-            auto stintEndCheck = stintEnd - std::chrono::seconds(1);
-            
-            std::string startKey = TimeHelpers::timePointToKey(stintStart);
-            std::string endKey = TimeHelpers::timePointToKey(stintEndCheck);
-            
-            bool isUnavailable = false;
-            if (m_ctx.raceData.availability.contains(p.name)) {
-                if (m_ctx.raceData.availability[p.name].value(startKey, "Unavailable") == "Unavailable") isUnavailable = true;
-                if (m_ctx.raceData.availability[p.name].value(endKey, "Unavailable") == "Unavailable") isUnavailable = true;
-            } else { isUnavailable = true; }
-
-            if (isUnavailable) solver.setObjCoeff(idx, 100000.0); 
-            else solver.setObjCoeff(idx, 0.0); 
+            if (!isDriverAvailable(p.name, s)) {
+                solver.setObjCoeff(idx, 100000.0); // High cost penalty
+            } else {
+                solver.setObjCoeff(idx, 0.0); 
+            }
         }
     }
 
@@ -216,12 +222,12 @@ json JresDiagnosticSolver::diagnose()
 
     // --- Raw Data Collection ---
     std::vector<int> emptyStints;
-    std::vector<int> unavailableStints; // Which stints triggered an unavailability violation
-    std::vector<int> restViolationStints; // Which stints were driven in violation
+    std::vector<int> unavailableStints; 
     
     std::map<std::string, int> driverRestViolations;
-    std::map<std::string, int> driverConsecutiveViolations;
+    std::map<std::string, std::vector<std::pair<int, int>>> driverConsecutiveDetails;
     std::map<std::string, int> driverUnavailableCounts;
+    std::map<std::string, int> fairShareViolations;
     
     // 1. Coverage Check
     struct DiagEntry { std::vector<std::string> drivers; };
@@ -245,19 +251,7 @@ json JresDiagnosticSolver::diagnose()
         // Availability
         for (int s = 0; s < m_totalStints; ++s) {
             if (solution[assignVars.at({p.name, s})] > 0.5) {
-                auto stintStart = raceStartUTC + std::chrono::seconds(static_cast<long>(s * m_stintWithPitSeconds));
-                auto stintEnd = stintStart + std::chrono::seconds(static_cast<long>(m_stintWithPitSeconds));
-                auto stintEndCheck = stintEnd - std::chrono::seconds(1);
-                std::string startKey = TimeHelpers::timePointToKey(stintStart);
-                std::string endKey = TimeHelpers::timePointToKey(stintEndCheck);
-                
-                bool isUnavailable = false;
-                if (m_ctx.raceData.availability.contains(p.name)) {
-                    if (m_ctx.raceData.availability[p.name].value(startKey, "Unavailable") == "Unavailable") isUnavailable = true;
-                    if (m_ctx.raceData.availability[p.name].value(endKey, "Unavailable") == "Unavailable") isUnavailable = true;
-                } else { isUnavailable = true; }
-
-                if (isUnavailable) {
+                if (!isDriverAvailable(p.name, s)) {
                     driverUnavailableCounts[p.name]++;
                     unavailableStints.push_back(s + 1);
                 }
@@ -266,14 +260,21 @@ json JresDiagnosticSolver::diagnose()
 
         // Max Consecutive
         int consecutive = 0;
+        int startStint = -1;
         for (int s = 0; s < m_totalStints; ++s) {
-            if (solution[assignVars.at({p.name, s})] > 0.5) consecutive++;
-            else {
-                if (consecutive > p.preferredStints) driverConsecutiveViolations[p.name]++;
+            if (solution[assignVars.at({p.name, s})] > 0.5) {
+                if (consecutive == 0) startStint = s + 1;
+                consecutive++;
+            } else {
+                if (consecutive > p.preferredStints) {
+                    driverConsecutiveDetails[p.name].push_back({startStint, s});
+                }
                 consecutive = 0;
             }
         }
-        if (consecutive > p.preferredStints) driverConsecutiveViolations[p.name]++;
+        if (consecutive > p.preferredStints) {
+             driverConsecutiveDetails[p.name].push_back({startStint, m_totalStints});
+        }
 
         // Min Rest
         if (p.minimumRestHours > 0) {
@@ -285,11 +286,21 @@ json JresDiagnosticSolver::diagnose()
                         int stintsSinceLast = s - lastDrivenStint - 1;
                         if (stintsSinceLast >= 0 && stintsSinceLast < minRestStints) {
                              driverRestViolations[p.name]++;
-                             restViolationStints.push_back(s + 1);
                         }
                     }
                     lastDrivenStint = s;
                 }
+            }
+        }
+        
+        // Fair Share
+        if (minStintsPerParticipant > 0) {
+            int totalDriven = 0;
+            for (int s = 0; s < m_totalStints; ++s) {
+                if (solution[assignVars.at({p.name, s})] > 0.5) totalDriven++;
+            }
+            if (totalDriven < minStintsPerParticipant) {
+                fairShareViolations[p.name] = minStintsPerParticipant - totalDriven;
             }
         }
     }
@@ -307,13 +318,11 @@ json JresDiagnosticSolver::diagnose()
     for(auto const& [name, count] : driverRestViolations) totalRestViolations += count;
     
     if (totalRestViolations > 3) {
-        // If multiple drivers are violating rest, it's a systemic issue, not an individual one.
         int minRest = m_driverPool.empty() ? 0 : m_driverPool[0].minimumRestHours;
         issues.push_back("SYSTEMIC FAILURE: The 'Minimum Rest' setting (" + std::to_string(minRest) + 
                          "h) is causing widespread conflicts. The diagnostic solver had to violate rest rules " + 
                          std::to_string(totalRestViolations) + " times to fill the schedule. Suggestion: Reduce minimum rest or add more drivers.");
     } else {
-        // Report individual violators if count is low
         for(auto const& [name, count] : driverRestViolations) {
             if (count > 0) issues.push_back("Driver " + name + " violated rest rules " + std::to_string(count) + " times.");
         }
@@ -326,26 +335,56 @@ json JresDiagnosticSolver::diagnose()
                          ". Please verify driver availability during these times.");
     }
 
-    // D. Consecutive Warnings
-    int totalConsec = 0;
-    for(auto const& [name, count] : driverConsecutiveViolations) totalConsec += count;
-    if (totalConsec > 0) {
-        issues.push_back("WARNING: Max consecutive stint limits were exceeded " + std::to_string(totalConsec) + " times to maintain coverage.");
+    // D. Consecutive Warnings (With Context Check)
+    for (const auto& [name, ranges] : driverConsecutiveDetails) {
+        for (const auto& range : ranges) {
+            int start = range.first; // 1-based
+            int end = range.second;  // 1-based inclusize
+            
+            // Context Check: Was anyone else available?
+            bool alternativeExists = false;
+            for (int s = start - 1; s < end; ++s) { // Convert to 0-based for array access
+                for (const auto& other : m_driverPool) {
+                    if (other.name == name) continue;
+                    if (isDriverAvailable(other.name, s)) {
+                        alternativeExists = true; 
+                        break;
+                    }
+                }
+                if (alternativeExists) break;
+            }
+
+            std::string msg = "Driver " + name + " exceeded max consecutive stint limit (Driven Stints: " + 
+                              std::to_string(start) + "-" + std::to_string(end) + 
+                              ", Limit: " + std::to_string(m_driverPool[0].preferredStints) + ").";
+            
+            if (!alternativeExists) {
+                msg += " Note: No other drivers were available during this period.";
+            }
+            issues.push_back(msg);
+        }
     }
 
-    // E. First Stint
+    // E. Fair Share
+    for (const auto& [name, missing] : fairShareViolations) {
+        issues.push_back("Driver " + name + " is under-utilized by " + std::to_string(missing) + " stints (Fair share requires more driving).");
+    }
+
+    // F. First Stint
     if (!m_ctx.raceData.firstStintDriver.empty()) {
         std::string firstName = m_ctx.raceData.firstStintDriver;
         bool droveFirst = false;
         if (!schedule.empty()) {
             for (const auto& name : schedule[0].drivers) if (name == firstName) droveFirst = true;
         }
-        if (!droveFirst) {
-             issues.push_back("Constraint 'First Stint Driver: " + firstName + "' could not be met.");
+        auto it = std::find_if(m_driverPool.begin(), m_driverPool.end(), 
+                                [&](const TeamMember& m){ return m.name == firstName; });
+        if (it != m_driverPool.end() && !droveFirst) {
+             issues.push_back("Requested First Stint Driver '" + firstName + "' could not be assigned to Stint 1.");
         }
     }
 
-    // F. Fallback
+    // G. Fallback
     if (issues.empty()) {
         issues.push_back("Unknown infeasibility. The diagnostic solver found a valid relaxed schedule, but strict verification failed.");
     }
