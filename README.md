@@ -44,6 +44,14 @@ int solve_race_schedule(const char* raceDataJson,
                         const JresSolverOptions& options,
                         char** outputJson);
 
+// Diagnostic Solver Function
+// Runs a relaxed model to identify why a schedule is infeasible.
+// Returns 0 on success (diagnosis complete), -1 on internal failure.
+// outputJson will contain a "diagnosis" array with string explanations.
+int diagnose_race_schedule(const char* raceDataJson,
+                           const JresSolverOptions& options,
+                           char** outputJson);
+
 // Memory Cleanup
 void free_solver_result(char* resultJson);
 ```
@@ -158,6 +166,7 @@ The function returns a JSON string containing the solution or error details.
 | :--- | :--- | :--- |
 | `success` | Boolean | Always `false`. |
 | `error` | String | Description of the failure (e.g., "Infeasible model", "Parse error"). |
+| `diagnosis` | Array | (Diagnostic Mode Only) List of strings explaining why the schedule is infeasible. |
 
 ##### Example Output
 

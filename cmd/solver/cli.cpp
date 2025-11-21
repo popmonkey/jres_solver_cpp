@@ -10,6 +10,7 @@
 #include <string>
 #include <stdexcept>
 #include <sstream>
+#include <iomanip>
 
 #include "cxxopts.hpp"
 #include "nlohmann/json.hpp" 
@@ -25,7 +26,16 @@ int main(int argc, char **argv)
 {
     // --- 1. Parse Command-Line Arguments ---
     cxxopts::Options options("solver", "JRES endurance race solver.");
-    options.add_options()("i,input", "Path to the race data .json file. Reads from stdin if not provided.", cxxopts::value<std::string>())("o,output", "Optional. Path to save the schedule as a JSON file.", cxxopts::value<std::string>())("t,time-limit", "Maximum time in seconds to let the solver run.", cxxopts::value<int>()->default_value("30"))("q,quiet", "Suppress INFO logs and final schedule print-out.", cxxopts::value<bool>()->default_value("false"))("s,spotter-mode", "Method for scheduling spotters (none, integrated, sequential).", cxxopts::value<std::string>()->default_value("none"))("allow-no-spotter", "Allow stints to have no spotter assigned.", cxxopts::value<bool>()->default_value("false"))("g,optimality-gap", "Solver stops when the gap to optimal is less than this (e.g., 0.01 for 1%).", cxxopts::value<double>()->default_value("0.0"))("h,help", "Print usage.");
+    options.add_options()
+        ("i,input", "Path to the race data .json file. Reads from stdin if not provided.", cxxopts::value<std::string>())
+        ("o,output", "Optional. Path to save the schedule as a JSON file.", cxxopts::value<std::string>())
+        ("t,time-limit", "Maximum time in seconds to let the solver run.", cxxopts::value<int>()->default_value("30"))
+        ("q,quiet", "Suppress INFO logs and final schedule print-out.", cxxopts::value<bool>()->default_value("false"))
+        ("s,spotter-mode", "Method for scheduling spotters (none, integrated, sequential).", cxxopts::value<std::string>()->default_value("none"))
+        ("allow-no-spotter", "Allow stints to have no spotter assigned.", cxxopts::value<bool>()->default_value("false"))
+        ("g,optimality-gap", "Solver stops when the gap to optimal is less than this (e.g., 0.01 for 1%).", cxxopts::value<double>()->default_value("0.0"))
+        ("d,diagnose", "Run diagnostics to explain why a schedule is infeasible.", cxxopts::value<bool>()->default_value("false"))
+        ("h,help", "Print usage.");
 
     auto result = options.parse(argc, argv);
 
@@ -36,6 +46,7 @@ int main(int argc, char **argv)
     }
 
     bool quiet = result["quiet"].as<bool>();
+    bool runDiagnostics = result["diagnose"].as<bool>();
 
     // Load Input JSON Data into a std::string
     std::string raceDataJsonString;
@@ -94,7 +105,14 @@ int main(int argc, char **argv)
 
     // Call the Solver Library
     char* resultJsonCStr = nullptr;
-    int resultCode = solve_race_schedule(raceDataJsonString.c_str(), solverOptions, &resultJsonCStr);
+    int resultCode = 0;
+
+    if (runDiagnostics) {
+        if (!quiet) std::cout << "[App] Running in DIAGNOSTIC mode..." << std::endl;
+        resultCode = diagnose_race_schedule(raceDataJsonString.c_str(), solverOptions, &resultJsonCStr);
+    } else {
+        resultCode = solve_race_schedule(raceDataJsonString.c_str(), solverOptions, &resultJsonCStr);
+    }
 
     // Process Results
     if (resultJsonCStr == nullptr) {
@@ -108,34 +126,68 @@ int main(int argc, char **argv)
     try {
         json resultJson = json::parse(resultJsonString);
 
-        if (resultCode == 0) {
-            // Success
-            if (!quiet) {
-                // Print the schedule
-                std::cout << "\n--- 🏁 Race Schedule ---" << std::endl;
-                bool hasSpotters = (solverOptions.spotterMode != JRES_SPOTTER_MODE_NONE);
-                for (const auto& entry : resultJson["schedule"]) {
-                    std::stringstream ss;
-                    ss << "Stint " << std::setw(3) << entry["stint"].get<int>()
-                       << ": Driver: " << std::setw(15) << std::left << entry["driver"].get<std::string>();
-                    
-                    if (hasSpotters) {
-                        ss << " | Spotter: " << std::setw(15) << std::left << entry["spotter"].get<std::string>();
-                    }
-                    std::cout << ss.str() << std::endl;
-                }
-            }
-            // Save to file (if requested)
-            if (!outputPath.empty()) {
-                std::ofstream o(outputPath);
-                o << resultJsonString << std::endl;
+        if (runDiagnostics) {
+            // --- Diagnostic Output Handling ---
+            if (resultCode == 0) {
+                // Diagnosis ran successfully (even if constraints were violated)
                 if (!quiet) {
-                    std::cout << "\n[App] Schedule saved to " << outputPath << std::endl;
+                    std::cout << "\n--- ⚠️  Infeasibility Diagnosis ---" << std::endl;
+                    if (resultJson.contains("diagnosis")) {
+                        auto issues = resultJson["diagnosis"];
+                        if (issues.empty()) {
+                            std::cout << "The diagnostic solver found a solution, but no specific constraints were identified as the cause. This implies the schedule might actually be feasible in a relaxed context." << std::endl;
+                        } else {
+                            std::cout << "The solver identified the following blockers:" << std::endl;
+                            for (const auto& issue : issues) {
+                                std::cout << " - " << issue.get<std::string>() << std::endl;
+                            }
+                        }
+                    } else {
+                        std::cout << "Diagnosis completed but no 'diagnosis' key found in result." << std::endl;
+                    }
+                }
+            } else {
+                 // Engine failure
+                 std::cerr << "[Solver] Diagnostic Engine Error: " << resultJson.value("error", "Unknown error") << std::endl;
+            }
+        } 
+        else {
+            // --- Standard Schedule Output Handling ---
+            if (resultCode == 0) {
+                // Success
+                if (!quiet) {
+                    // Print the schedule
+                    std::cout << "\n--- 🏁 Race Schedule ---" << std::endl;
+                    bool hasSpotters = (solverOptions.spotterMode != JRES_SPOTTER_MODE_NONE);
+                    if (resultJson.contains("schedule")) {
+                        for (const auto& entry : resultJson["schedule"]) {
+                            std::stringstream ss;
+                            ss << "Stint " << std::setw(3) << entry["stint"].get<int>()
+                               << ": Driver: " << std::setw(15) << std::left << entry["driver"].get<std::string>();
+                            
+                            if (hasSpotters && entry.contains("spotter")) {
+                                ss << " | Spotter: " << std::setw(15) << std::left << entry["spotter"].get<std::string>();
+                            }
+                            std::cout << ss.str() << std::endl;
+                        }
+                    }
+                }
+            } else {
+                // Failure
+                std::cerr << "[Solver] Error: " << resultJson.value("error", "Unknown error") << std::endl;
+                if (!quiet) {
+                    std::cout << "\nTip: Try running with --diagnose to find out why." << std::endl;
                 }
             }
-        } else {
-            // Failure
-            std::cerr << "[Solver] Error: " << resultJson["error"].get<std::string>() << std::endl;
+        }
+
+        // Save to file (Common for both modes)
+        if (!outputPath.empty()) {
+            std::ofstream o(outputPath);
+            o << resultJsonString << std::endl;
+            if (!quiet) {
+                std::cout << "\n[App] Result saved to " << outputPath << std::endl;
+            }
         }
 
     } catch (const std::exception& e) {

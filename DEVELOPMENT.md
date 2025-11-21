@@ -12,15 +12,21 @@ It has been structured as a C-API library (`jres_solver`) and a simple CLI clien
 ```
 .
 ├── include/
-|   └── jres_solver/        # The public C-API header for the library
-├── src/                    # The C++ library implementation
+|   └── jres_solver/                # The public C-API header for the library
+├── src/                            # The C++ library implementation
+|   ├── jres_solver.cpp             # C-API Wrapper and Orchestrator
+|   ├── jres_solver_utils.cpp       # Shared utilities and Base Class
+|   ├── jres_standard_solver.cpp    # Optimized Strict Solver
+|   ├── jres_diagnostic_solver.cpp  # Relaxed Diagnostic Solver
+|   └── jres_solver_types.cpp       # JSON serialization logic
 ├── lib/
-│   ├── cxxopts/            # (Git Submodule) cxxopts header-only library
-│   └── json/               # (Git Submodule) nlohmann/json header-only library
-├── command/
-│   └── /solver/.           # A CLI client implementation              
-├── command/                # Tests
-└── CMakeLists.txt          # The main build script
+│   ├── cxxopts/                    # (Git Submodule) cxxopts header-only library
+│   └── json/                       # (Git Submodule) nlohmann/json header-only library
+├── cmd/
+│   ├── /solver/                    # A CLI solver
+│   └── /formatter/                 # A CLI formatter
+├── test/                           # Google Test suite
+└── CMakeLists.txt                  # The main build script
 ```
 
 ## Bootstrap & Dependencies
@@ -116,6 +122,9 @@ The `solver` executable is a client that uses the `jres_solver` library.
 
 # Pipe from stdin
 cat ../data/race_data.json | ./solver -s sequential --allow-no-spotter
+
+# Run diagnostics on a failing schedule
+./solver -i ../data/infeasible.json --diagnose
 
 # Get help
 ./solver --help

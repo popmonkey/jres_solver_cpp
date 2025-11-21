@@ -46,6 +46,7 @@ solver.exe [options]
 | `-s` | `--spotter-mode`     | Strategy for assigning spotters. Options: `none`, `integrated`, `sequential`.                 | `none`  |
 |      | `--allow-no-spotter` | Allow specific stints to have no spotter assigned (if spotter mode is active).                | `false` |
 | `-g` | `--optimality-gap`   | Stop solver when the solution is within this gap of perfection (e.g., `0.01` for 1%).         | `0.0`   |
+| `-d` | `--diagnose`         | Run in **Diagnostic Mode** to explain why a schedule is infeasible.                           | `false` |
 | `-h` | `--help`             | Print usage instructions.                                                                     |         |
 
 ### Examples
@@ -55,6 +56,13 @@ Solve a race configuration and save the result for formatting.
 
 ```sh
 ./solver -i race_config.json -o solution.json
+```
+
+**Diagnostic Run:**
+If a schedule fails to solve, run with `-d` to get a plain English explanation of the blockers (e.g., "Driver A violated minimum rest").
+
+```sh
+./solver -i race_config.json --diagnose
 ```
 
 **Advanced Optimization:**
