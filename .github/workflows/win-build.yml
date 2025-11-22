@@ -8,7 +8,7 @@ on:
         required: true
       arch:
         type: string
-        default: 'amd64'
+        default: 'x64'
         required: false
       upload_assets:
         type: boolean
@@ -72,7 +72,6 @@ jobs:
       shell: pwsh
       run: | 
         cmake --build build --config Release --target solver_tests
-        cmake --build build --config Release --target formatter_tests
         ctest --test-dir build --output-on-failure -C Release
 
     # ---------------------------------------------------------

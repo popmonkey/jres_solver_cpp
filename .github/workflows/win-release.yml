@@ -13,6 +13,6 @@ jobs:
     secrets: inherit
     with:
       version: ${{ github.ref_name }}
-      arch: 'amd64'
+      arch: 'x64'
       upload_assets: true
       upload_url: ${{ github.event.release.upload_url }}
