@@ -113,23 +113,23 @@ The `availability` object maps a **Team Member's Name** to a dictionary of **Tim
   "pitTimeInSeconds": 45.0,
   "fuelTankSize": 100.0,
   "fuelUsePerLap": 3.2,
-  "firstStintDriver": "Alice",
+  "firstStintDriver": "Nikki",
   "teamMembers": [
     {
-      "name": "Alice",
+      "name": "Nikki",
       "isDriver": true,
       "isSpotter": true,
       "preferredStints": 2,
       "minimumRestHours": 4
     },
     {
-      "name": "Bob",
+      "name": "Alain",
       "isDriver": true,
       "isSpotter": false
     }
   ],
   "availability": {
-    "Alice": {
+    "Nikki": {
       "2024-06-15T18:00:00.000Z": "Unavailable",
       "2024-06-15T19:00:00.000Z": "Preferred"
     }

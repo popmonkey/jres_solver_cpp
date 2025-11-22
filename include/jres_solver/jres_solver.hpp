@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file jres_solver.hpp
  * @brief Public C-API for the JRES Solver Library.
  *
@@ -10,8 +11,6 @@
 
 #ifndef JRES_SOLVER_HPP
 #define JRES_SOLVER_HPP
-
-// === CRITICAL FIX: CROSS-PLATFORM EXPORT MACRO DEFINITION ===
 
 #if defined(_WIN32)
     // Windows/MSVC: Use __declspec(dllexport/dllimport)
@@ -25,7 +24,6 @@
     // This allows the shared library (.dylib/.so) to function correctly.
     #define JRES_SOLVER_API __attribute__((visibility("default")))
 #endif
-// =============================================
 
 
 // Use standard C-style linking for compatibility

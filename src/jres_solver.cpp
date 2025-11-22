@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file jres_solver.cpp
  * @brief JRES Solver Library C-API Wrapper
  */

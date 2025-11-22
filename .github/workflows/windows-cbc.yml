@@ -1,4 +1,4 @@
-name: Windows Build CBC (Static)
+name: Windows CBC Static Build
 
 on:
   workflow_dispatch:

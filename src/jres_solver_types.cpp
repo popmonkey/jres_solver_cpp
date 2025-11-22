@@ -1,4 +1,10 @@
-#include "jres_solver_types.hpp"
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_solver_types.cpp
+ * @brief Data types and JSON serialization/deserialization for JRES endurance race scheduling.
+ */
+
+ #include "jres_solver_types.hpp"
 
 // --- JSON Deserialization ---
 void from_json(const json &j, TeamMember &member)

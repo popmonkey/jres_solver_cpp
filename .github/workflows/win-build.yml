@@ -1,4 +1,4 @@
-name: Reusable Windows Build
+name: Windows [reusable] Build
 
 on:
   workflow_call:

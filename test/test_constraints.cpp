@@ -8,7 +8,6 @@
 using json = nlohmann::json;
 
 // --- Test: An infeasible race ---
-// This was moved from test_solver.cpp
 const char* INFEASIBLE_JSON = R"({
   "availability": {
     "Nikki": { "1973-06-09T14:00:00.000Z": "Unavailable" },

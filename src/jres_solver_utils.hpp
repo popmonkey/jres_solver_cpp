@@ -1,4 +1,10 @@
-#pragma once
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_solver_utils.hpp
+ * @brief Utility functions for JRES endurance race scheduling.
+ */
+
+ #pragma once
 
 #include "jres_solver_types.hpp"
 #include <string>
