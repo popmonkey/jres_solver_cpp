@@ -3,7 +3,13 @@ name: Unix [reusable] Build
 on:
   workflow_call:
     inputs:
+      version:
+        type: string
+        required: true
       name:
+        type: string
+        required: true
+      platform:
         type: string
         required: true
       os:
@@ -15,7 +21,6 @@ on:
       asset_ext:
         type: string
         required: true
-
       upload_assets:
         type: boolean
         required: true
@@ -33,13 +38,13 @@ jobs:
       # ---------------------------------------------------------
       - name: Print Build Info
         run: |
-          echo "Name:      ${{ inputs.name }}"
+          echo "Version:   ${{ inputs.version }}"
+          echo "Platform:  ${{ inputs.platform }}"
           echo "OS:        ${{ inputs.os }}"
           echo "Arch:      ${{ inputs.arch }}"
-          echo "Ext:       ${{ inputs.asset_ext }}"
 
       # ---------------------------------------------------------
-      # Checkout repo with submodules (cxxopts/json)
+      # Checkout repo with submodules
       # ---------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -47,11 +52,8 @@ jobs:
           submodules: true
           fetch-depth: 0
 
-      - name: List lib directory
-        run: ls -R lib || true
-
       # ---------------------------------------------------------
-      # CBC installation (Linux)
+      # CBC installation
       # ---------------------------------------------------------
       - name: Install CBC (Linux)
         if: inputs.os == 'ubuntu-latest'
@@ -59,39 +61,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y coinor-libcbc-dev
 
-      # ---------------------------------------------------------
-      # CBC installation (macOS)
-      # ---------------------------------------------------------
       - name: Install CBC (macOS)
         if: startsWith(inputs.os, 'macos')
         run: brew install cbc
 
-      # Apple Silicon Homebrew prefix
       - name: Set CMAKE_PREFIX_PATH (Apple Silicon)
         if: inputs.os == 'macos-14'
         run: echo "CMAKE_PREFIX_PATH=/opt/homebrew" >> $GITHUB_ENV
 
       # ---------------------------------------------------------
-      # Configure (normal platforms)
+      # Build
       # ---------------------------------------------------------
       - name: Configure CMake
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
-      # ---------------------------------------------------------
-      # Build library + solver
-      # ---------------------------------------------------------
       - name: Build Project
         run: cmake --build build --config Release
 
-      # ---------------------------------------------------------
-      # Build tests
-      # ---------------------------------------------------------
       - name: Build Tests
         run: cmake --build build --config Release --target solver_tests
 
-      # ---------------------------------------------------------
-      # Run tests
-      # ---------------------------------------------------------
       - name: Run Tests
         run: ctest --test-dir build --output-on-failure -C Release
 
@@ -99,21 +88,31 @@ jobs:
       # Package binaries
       # ---------------------------------------------------------
       - name: Set Asset Name
-        run: echo "ASSET_NAME=jres-solver-${{ inputs.name }}.${{ inputs.asset_ext }}" >> $GITHUB_ENV
+        # Naming Convention: jres-solver-[version]-[platform]-[arch].tar.gz
+        run: echo "ASSET_NAME=jres-solver-${{ inputs.version }}-${{ inputs.platform }}-${{ inputs.arch }}.${{ inputs.asset_ext }}" >> $GITHUB_ENV
 
-      - name: Package (tar.gz for macOS/Linux)
+      - name: Package (tar.gz)
         run: |
           cd build
-          # Include solver + shared library; ignore missing *.so or *.dylib automatically
+          # Package solver and libs
           tar -czvf "../${{ env.ASSET_NAME }}" \
             solver \
             libjres_solver.* \
             2>/dev/null || true
 
       # ---------------------------------------------------------
-      # Upload to release (if enabled)
+      # Generate Signature (Checksum)
       # ---------------------------------------------------------
-      - name: Upload Release Asset
+      - name: Generate Checksum
+        run: |
+          # Generate SHA256 checksum for the tarball
+          shasum -a 256 ${{ env.ASSET_NAME }} > ${{ env.ASSET_NAME }}.sha256
+          cat ${{ env.ASSET_NAME }}.sha256
+
+      # ---------------------------------------------------------
+      # Upload Artifacts
+      # ---------------------------------------------------------
+      - name: Upload Release Asset (Binary)
         if: inputs.upload_assets == true
         uses: actions/upload-release-asset@v1
         env:
@@ -122,4 +121,15 @@ jobs:
           upload_url: ${{ inputs.upload_url }}
           asset_path: ./${{ env.ASSET_NAME }}
           asset_name: ${{ env.ASSET_NAME }}
-          asset_content_type: application/octet-stream
+          asset_content_type: application/gzip
+
+      - name: Upload Release Asset (Checksum)
+        if: inputs.upload_assets == true
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ inputs.upload_url }}
+          asset_path: ./${{ env.ASSET_NAME }}.sha256
+          asset_name: ${{ env.ASSET_NAME }}.sha256
+          asset_content_type: text/plain

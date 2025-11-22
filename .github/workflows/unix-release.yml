@@ -12,14 +12,16 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: "Linux (x64)",              os: ubuntu-latest, arch: x64,  asset_ext: tar.gz }
-          - { name: "macOS Intel (x64)",        os: macos-latest,  arch: x64,  asset_ext: tar.gz }
-          - { name: "macOS Apple Silicon (arm64)", os: macos-14,   arch: arm64, asset_ext: tar.gz }
+          - { name: "Linux (x64)",                platform: linux,   os: ubuntu-latest, arch: amd64, asset_ext: tar.gz }
+          - { name: "macOS Intel (x64)",          platform: darwin,  os: macos-latest,  arch: amd64, asset_ext: tar.gz }
+          - { name: "macOS Apple Silicon (arm64)", platform: darwin,  os: macos-14,      arch: arm64, asset_ext: tar.gz }
 
     uses: ./.github/workflows/unix-build.yml
     secrets: inherit
     with:
+      version:    ${{ github.ref_name }}
       name:       ${{ matrix.name }}
+      platform:   ${{ matrix.platform }}
       os:         ${{ matrix.os }}
       arch:       ${{ matrix.arch }}
       asset_ext:  ${{ matrix.asset_ext }}
