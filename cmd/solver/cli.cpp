@@ -1,5 +1,6 @@
 /**
- * @file cli.cpp
+ * @author popmonkey+jres@gmail.com
+ * @file cmd/solver/cli.cpp
  * @brief An example CLI client for the JRES Solver Library.
  *
  * This application is an example `JresSolver` library client.
@@ -24,7 +25,7 @@ using json = nlohmann::json;
  */
 int main(int argc, char **argv)
 {
-    // --- 1. Parse Command-Line Arguments ---
+    // --- Parse Command-Line Arguments ---
     cxxopts::Options options("solver", "JRES endurance race solver.");
     options.add_options()
         ("i,input", "Path to the race data .json file. Reads from stdin if not provided.", cxxopts::value<std::string>())

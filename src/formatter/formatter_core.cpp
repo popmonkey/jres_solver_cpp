@@ -1,3 +1,9 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/formatter/formatter_core.cpp
+ * @brief Core logic for formatting
+ */
+
 #include "formatter/formatter_core.hpp" 
 
 #include "utils/date_utils.hpp"

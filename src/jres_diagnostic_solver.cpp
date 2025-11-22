@@ -1,4 +1,10 @@
-#include "jres_diagnostic_solver.hpp"
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_diagnostic_solver.cpp
+ * @brief Diagnostic solver implementation for JRES endurance race scheduling.
+ */
+
+ #include "jres_diagnostic_solver.hpp"
 
 // --- COIN-OR Includes ---
 #include "OsiClpSolverInterface.hpp"

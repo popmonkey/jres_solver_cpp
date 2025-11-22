@@ -1,4 +1,10 @@
-#include "jres_solver_utils.hpp"
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_solver_utils.cpp
+ * @brief Utility functions for JRES endurance race scheduling.
+ */
+
+ #include "jres_solver_utils.hpp"
 #include <cmath>
 #include <iomanip>
 #include <sstream>

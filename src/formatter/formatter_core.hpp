@@ -1,4 +1,10 @@
-#pragma once
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/formatter/formatter_core.hpp
+ * @brief Core header for JRES Schedule Formatter
+ */
+
+ #pragma once
 
 #include <string>
 #include <vector>

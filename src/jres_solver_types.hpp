@@ -1,3 +1,9 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_solver_types.hpp
+ * @brief Data types and JSON serialization/deserialization for JRES endurance race scheduling.
+ */
+
 #pragma once
 
 #include <string>

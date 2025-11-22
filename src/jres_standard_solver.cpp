@@ -1,4 +1,10 @@
-#include "jres_standard_solver.hpp"
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_standard_solver.cpp
+ * @brief Standard solver implementation for JRES endurance race scheduling.
+ */
+
+ #include "jres_standard_solver.hpp"
 
 // --- COIN-OR Includes ---
 #include "OsiClpSolverInterface.hpp"
@@ -144,8 +150,6 @@ json JresStandardSolver::solve()
     } 
     else if (m_ctx.spotterMode == SpotterMode::Sequential && !m_spotterPool.empty())
     {
-        // ... Sequential Spotter Logic (Copy from original if needed, simplified here for brevity) ...
-        // For strict separation, I've included the sequential logic block below
         std::unique_ptr<OsiClpSolverInterface> spotterSolver(new OsiClpSolverInterface);
         spotterSolver->setObjSense(1.0);
         CbcModel spotterCbcModel(*spotterSolver);
@@ -219,7 +223,6 @@ ParticipantModel JresStandardSolver::add_participant_model(
     double stintWithPitSeconds,
     int stintLaps)
 {
-    // ... (Identical implementation from original JresSolverImpl) ...
     ParticipantModel p_model(prefix);
     if (participants.empty()) return p_model;
 

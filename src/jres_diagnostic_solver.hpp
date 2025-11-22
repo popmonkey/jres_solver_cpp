@@ -1,3 +1,9 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_diagnostic_solver.hpp
+ * @brief Diagnostic solver header for JRES endurance race scheduling.
+ */
+
 #pragma once
 
 #include "jres_solver_utils.hpp"

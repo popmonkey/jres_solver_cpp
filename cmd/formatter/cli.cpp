@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file cmd/formatter/cli.cpp
+ * @brief Command-line interface for JRES Schedule Formatter
+ */
 #include <cxxopts.hpp>
 #include <nlohmann/json.hpp>
 #include <iostream>

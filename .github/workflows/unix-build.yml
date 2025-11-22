@@ -1,4 +1,4 @@
-name: Reusable Unix Build
+name: Unix [reusable] Build
 
 on:
   workflow_call:
