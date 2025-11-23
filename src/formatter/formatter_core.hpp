@@ -10,7 +10,7 @@
 #include <vector>
 #include <map>
 #include <nlohmann/json.hpp>
-#include "utils/date_utils.hpp" // Needed for DateTime in structs
+#include "utils/date_utils.hpp" 
 
 namespace jres {
 
@@ -22,11 +22,19 @@ namespace jres {
     };
 
     // --- Core File Generation Function ---
-    void write_output(const nlohmann::json& solved_data, const std::string& output_file, const std::string& format);
+    void write_output(const nlohmann::json& solved_data, 
+                      const std::string& output_file, 
+                      const std::string& format);
 
     // --- Exposed Helpers (for Testing) ---
 
     std::string generate_schedule_csv_string(
+        const std::vector<nlohmann::json>& schedule, 
+        bool has_spotters
+    );
+
+    // New Helper for ASCII table generation
+    std::string generate_schedule_ascii_table(
         const std::vector<nlohmann::json>& schedule, 
         bool has_spotters
     );
@@ -37,7 +45,6 @@ namespace jres {
         bool has_spotters
     );
     
-    // Expose this complex logic for unit testing
     std::map<std::string, std::vector<ItineraryItem>> generate_member_itineraries(
         const std::vector<nlohmann::json>& schedule, 
         const nlohmann::json& data, 

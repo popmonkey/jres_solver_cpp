@@ -2,6 +2,9 @@
 
 This suite consists of two command-line tools designed to generate and format driver schedules for endurance racing events.
 
+> [!NOTE]
+Currently the easiest way to generate input for the tools (and library) is to use [the JRES Availability Planner spreadsheet](https://docs.google.com/spreadsheets/d/1jI2mtS0R8dtT7gnAtxIkMfLRcRnqWuXaFc0xvM96Smw/edit?usp=sharing)
+
 ## Platform Support
 
 These tools run on **Linux**, **macOS**, and **Windows**.
@@ -105,18 +108,18 @@ jres_formatter.exe -i <solution.json> -o <output_path> [options]
 | :--- | :--- | :--- | :--- | :--- |
 | `-i` | `--input` | Path to the solved schedule JSON (output from `jres_solver`). | **Yes** | |
 | `-o` | `--output` | Path for the resulting file (e.g., `schedule.zip`). | **Yes** | |
-| `-f` | `--format` | The desired output format. Options: `zip`, `csv`, `txt`. | No | `zip` |
+| `-f` | `--format` | The desired output format (`zip`, `csv`, `txt`). If omitted, format is determined by output filename extension. | No | *Auto* |
 | `-h` | `--help` | Print usage instructions. | No | |
 
 ### Supported Formats
 
-* **`zip`**: Creates a compressed archive containing multiple CSV views (e.g., per-driver schedules, team overview).
 * **`csv`**: Creates a single master schedule CSV.
 * **`txt`**: Creates a human-readable text summary.
+* **`zip`**: Creates a compressed archive containing multiple CSV views (e.g., per-driver schedules, team overview, plus the text summary).
 
 ### Examples
 
-**Generate a ZIP package (Default):**
+**Generate a ZIP package:**
 
 ```sh
 ./jres_formatter -i solution.json -o race_schedule.zip
@@ -125,7 +128,7 @@ jres_formatter.exe -i <solution.json> -o <output_path> [options]
 **Generate a Text Summary:**
 
 ```sh
-./jres_formatter -i solution.json -o summary.txt -f txt
+./jres_formatter -i solution.json -o summary.txt
 ```
 
 ---
@@ -141,7 +144,7 @@ Here is how you would go from a raw configuration file to a final distributable 
 ./jres_solver -i race_24h_config.json -o solved_schedule.json -t 60
 
 # Step 2: Format the solution into a ZIP file
-./jres_formatter -i solved_schedule.json -o team_schedule.zip -f zip
+./jres_formatter -i solved_schedule.json -o team_schedule.zip
 ```
 
 ### Windows (Command Prompt)
@@ -153,5 +156,5 @@ REM Step 1: Solve
 jres_solver.exe -i race_24h_config.json -o solved_schedule.json -t 60
 
 REM Step 2: Format
-jres_formatter.exe -i solved_schedule.json -o team_schedule.zip -f zip
+jres_formatter.exe -i solved_schedule.json -o team_schedule.zip
 ```
