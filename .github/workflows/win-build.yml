@@ -98,8 +98,10 @@ jobs:
         echo "SAFE_ARCH=$safeArch" >> $env:GITHUB_ENV
 
     - name: Set Asset Name
-      # Naming Convention: jres-solver-[version]-windows-[arch].zip
-      run: echo "ASSET_NAME=jres-solver-${{ env.SAFE_VERSION }}-${{ env.SAFE_PLATFORM }}-${{ env.SAFE_ARCH }}.${{ inputs.asset_ext }}" >> $env:GITHUB_ENV
+      shell: pwsh
+      run: | 
+        $assetName = "jres-solver-${{ env.SAFE_VERSION }}-windows-${{ env.SAFE_ARCH }}.zip"
+        echo "ASSET_NAME=$assetName" >> $env:GITHUB_ENV
 
     - name: Create Release Zip
       shell: pwsh
