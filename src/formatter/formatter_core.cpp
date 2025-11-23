@@ -38,7 +38,6 @@ std::map<std::string, std::vector<ItineraryItem>> jres::generate_member_itinerar
     std::map<std::string, std::vector<DutyBlock>> raw_duties;
     std::map<std::string, int> tz_map;
 
-    // Initialize
     if (data.contains("teamMembers")) {
         for (const auto& m : data["teamMembers"]) {
             std::string name = m.value("name", "Unknown");
@@ -47,7 +46,6 @@ std::map<std::string, std::vector<ItineraryItem>> jres::generate_member_itinerar
         }
     }
 
-    // Collect Duties
     for (const auto& entry : schedule) {
         DateTime start = DateTime::parse(entry.value("startTimeUTC", ""));
         DateTime end = DateTime::parse(entry.value("endTimeUTC", ""));
@@ -75,7 +73,6 @@ std::map<std::string, std::vector<ItineraryItem>> jres::generate_member_itinerar
     }
 
     DateTime race_start_utc = DateTime::parse(data.value("raceStartUTC", "1970-01-01T00:00:00Z"));
-    
     std::map<std::string, std::vector<ItineraryItem>> final_itineraries;
 
     for (auto& [name, duties] : raw_duties) {
@@ -85,7 +82,6 @@ std::map<std::string, std::vector<ItineraryItem>> jres::generate_member_itinerar
             return a.start_utc < b.start_utc;
         });
 
-        // Consolidate
         std::vector<DutyBlock> consolidated;
         if (!duties.empty()) {
             DutyBlock current = duties[0];
@@ -106,7 +102,6 @@ std::map<std::string, std::vector<ItineraryItem>> jres::generate_member_itinerar
             consolidated.push_back(current);
         }
 
-        // Transform to Local Time
         int tz_offset = tz_map[name];
         DateTime last_duty_end_local = race_start_utc.add_hours(tz_offset);
 
@@ -130,9 +125,7 @@ std::map<std::string, std::vector<ItineraryItem>> jres::generate_member_itinerar
             last_duty_end_local = end_local;
         }
         
-        // We need duration for the final rest check
         double duration_h = data.value("durationHours", 24.0);
-        // Use long long explicitly to avoid ambiguity with overloaded add_seconds/add_hours
         DateTime race_end_local = race_start_utc
             .add_hours(static_cast<int>(duration_h))
             .add_seconds(static_cast<long long>((duration_h - static_cast<int>(duration_h)) * 3600))
@@ -162,6 +155,77 @@ std::string jres::generate_schedule_csv_string(const std::vector<json>& schedule
         }
         oss << "," << entry.value("laps", 0) << "\n";
     }
+    return oss.str();
+}
+
+// --- NEW FUNCTION: ASCII Table Generator ---
+std::string jres::generate_schedule_ascii_table(const std::vector<json>& schedule, bool has_spotters) {
+    if (schedule.empty()) return "No schedule data.\n";
+
+    // 1. Calculate Widths (initialize with header lengths)
+    size_t w_stint = 5;  // "Stint"
+    size_t w_start = 13; // "Start (UTC)"
+    size_t w_end = 11;   // "End (UTC)"
+    size_t w_driver = 6; // "Driver"
+    size_t w_spot = 7;   // "Spotter"
+    size_t w_laps = 4;   // "Laps"
+
+    for (const auto& entry : schedule) {
+        std::string s_stint = std::to_string(entry.value("stint", 0));
+        w_stint = std::max(w_stint, s_stint.length());
+
+        std::string s_driver = entry.value("driver", "N/A");
+        w_driver = std::max(w_driver, s_driver.length());
+        
+        std::string s_laps = std::to_string(entry.value("laps", 0));
+        w_laps = std::max(w_laps, s_laps.length());
+
+        std::string s_start = entry.value("startTimeUTC", "");
+        w_start = std::max(w_start, s_start.length());
+        
+        std::string s_end = entry.value("endTimeUTC", "");
+        w_end = std::max(w_end, s_end.length());
+
+        if (has_spotters) {
+             std::string s_spot = entry.value("spotter", "N/A");
+             w_spot = std::max(w_spot, s_spot.length());
+        }
+    }
+
+    // Add slight padding
+    size_t pad = 2;
+    w_stint += pad; w_start += pad; w_end += pad; w_driver += pad; w_spot += pad; w_laps += pad;
+
+    std::ostringstream oss;
+    
+    // 2. Header
+    oss << std::left 
+        << std::setw(w_stint) << "Stint"
+        << std::setw(w_start) << "Start (UTC)"
+        << std::setw(w_end)   << "End (UTC)"
+        << std::setw(w_driver) << "Driver";
+    if (has_spotters) oss << std::setw(w_spot) << "Spotter";
+    oss << std::setw(w_laps) << "Laps" << "\n";
+
+    // 3. Divider
+    size_t total_width = w_stint + w_start + w_end + w_driver + (has_spotters ? w_spot : 0) + w_laps;
+    oss << std::string(total_width, '-') << "\n";
+
+    // 4. Data
+    for (const auto& entry : schedule) {
+        oss << std::left 
+            << std::setw(w_stint) << entry.value("stint", 0)
+            << std::setw(w_start) << entry.value("startTimeUTC", "")
+            << std::setw(w_end)   << entry.value("endTimeUTC", "")
+            << std::setw(w_driver) << entry.value("driver", "N/A");
+        
+        if (has_spotters) {
+             oss << std::setw(w_spot) << (entry.contains("spotter") ? entry.value("spotter", "N/A") : "N/A");
+        }
+        
+        oss << std::setw(w_laps) << entry.value("laps", 0) << "\n";
+    }
+
     return oss.str();
 }
 
@@ -200,22 +264,15 @@ std::string generate_itinerary_csv_string(const std::vector<ItineraryItem>& itin
     return oss.str();
 }
 
-// --- Writers ---
-
-void _write_to_csv_file(const std::vector<json>& schedule, const std::string& filename, bool has_spotters) {
-    std::ofstream f(filename);
-    f << jres::generate_schedule_csv_string(schedule, has_spotters);
-}
-
-void _write_to_txt(
+// --- FULL TEXT REPORT ---
+std::string generate_full_text_report(
     const std::vector<json>& schedule, 
     const std::map<std::string, std::pair<int, int>>& driver_stats,
     const std::map<std::string, int>& spotter_stats,
     const std::map<std::string, std::vector<ItineraryItem>>& itineraries,
-    const std::string& filename,
     bool has_spotters
 ) {
-    std::ofstream f(filename);
+    std::ostringstream f;
     f << "--- DRIVER SUMMARY ---\n";
     for (const auto& [name, stats] : driver_stats) {
         f << name << ": " << stats.first << " stints, " << stats.second << " laps\n";
@@ -229,7 +286,8 @@ void _write_to_txt(
     }
 
     f << "\n--- SCHEDULE ---\n";
-    f << jres::generate_schedule_csv_string(schedule, has_spotters);
+    // UPDATED: Now uses ASCII table
+    f << jres::generate_schedule_ascii_table(schedule, has_spotters);
     
     f << "\n--- ITINERARIES ---\n";
     for (const auto& [name, items] : itineraries) {
@@ -241,6 +299,21 @@ void _write_to_txt(
                << " (" << DateTime::format_duration((long long)dur) << "): " << item.activity << "\n";
         }
     }
+    return f.str();
+}
+
+// --- Writers ---
+
+void _write_to_txt(
+    const std::vector<json>& schedule, 
+    const std::map<std::string, std::pair<int, int>>& driver_stats,
+    const std::map<std::string, int>& spotter_stats,
+    const std::map<std::string, std::vector<ItineraryItem>>& itineraries,
+    const std::string& filename,
+    bool has_spotters
+) {
+    std::ofstream f(filename);
+    f << generate_full_text_report(schedule, driver_stats, spotter_stats, itineraries, has_spotters);
 }
 
 void _write_to_zip(
@@ -255,6 +328,9 @@ void _write_to_zip(
     zip.add_file("master_schedule.csv", jres::generate_schedule_csv_string(schedule, has_spotters));
     zip.add_file("summaries.csv", jres::generate_summary_csv_string(driver_stats, spotter_stats, has_spotters));
 
+    // UPDATED: Always include summary in ZIP
+    zip.add_file("summary.txt", generate_full_text_report(schedule, driver_stats, spotter_stats, itineraries, has_spotters));
+
     for (const auto& [name, itinerary] : itineraries) {
         if (itinerary.empty()) continue;
         std::string safe_name = name;
@@ -265,14 +341,22 @@ void _write_to_zip(
     zip.close();
 }
 
-void jres::write_output(const json& solved_data, const std::string& output_file, const std::string& format) {
+void _write_to_csv_file(const std::vector<json>& schedule, const std::string& filename, bool has_spotters) {
+    std::ofstream f(filename);
+    f << jres::generate_schedule_csv_string(schedule, has_spotters);
+}
+
+void jres::write_output(
+    const json& solved_data, 
+    const std::string& output_file, 
+    const std::string& format
+) {
     // SAFETY: Check keys before accessing
     if (!solved_data.contains("schedule") || !solved_data.contains("raceData")) {
         std::cerr << "Error: JSON missing 'schedule' or 'raceData' keys." << std::endl;
         return;
     }
 
-    // NOTE: The schedule now comes Pre-Enriched from the Solver!
     const auto& schedule = solved_data["schedule"];
     const auto& data = solved_data["raceData"];
     
@@ -294,7 +378,7 @@ void jres::write_output(const json& solved_data, const std::string& output_file,
         sched_vec.push_back(item);
         
         std::string driver = item.value("driver", "N/A");
-        int laps = item.value("laps", 0); // Read directly!
+        int laps = item.value("laps", 0); 
         
         if (driver != "N/A") {
              if (driver_stats.find(driver) == driver_stats.end()) driver_stats[driver] = {0, 0};
