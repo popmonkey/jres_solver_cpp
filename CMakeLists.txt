@@ -8,6 +8,65 @@ project(JresSolver CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# ==============================================================================
+#  VERSION STRATEGY (Hierarchy of Truth)
+# ==============================================================================
+set(JRES_VERSION_STRING "0.0.0-dev") # Default fallback
+
+# 1. Override (Passed by CI via -DJRES_VERSION=...)
+if(DEFINED JRES_VERSION)
+    set(JRES_VERSION_STRING "${JRES_VERSION}")
+
+# 2. Git (Local Development)
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+    find_package(Git)
+    if(GIT_FOUND)
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} describe --tags --always --dirty
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            OUTPUT_VARIABLE GIT_DESCRIBE_VERSION
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(GIT_DESCRIBE_VERSION)
+            set(JRES_VERSION_STRING "${GIT_DESCRIBE_VERSION}")
+        endif()
+    endif()
+endif()
+
+message(STATUS "Building JRES Solver Version: ${JRES_VERSION_STRING}")
+
+# Parse Major.Minor.Patch for C++ Defines and Windows RC
+# Default to 0.0.0 if the string is complex (like "v1.0-beta")
+set(JRES_VERSION_MAJOR 0)
+set(JRES_VERSION_MINOR 0)
+set(JRES_VERSION_PATCH 0)
+
+if(JRES_VERSION_STRING MATCHES "^v?([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+    set(JRES_VERSION_MAJOR ${CMAKE_MATCH_1})
+    set(JRES_VERSION_MINOR ${CMAKE_MATCH_2})
+    set(JRES_VERSION_PATCH ${CMAKE_MATCH_3})
+endif()
+
+# ==============================================================================
+#  FILE GENERATION
+# ==============================================================================
+
+# 1. Generate version.h
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/version.h
+)
+
+# 2. Generate resource.rc (Windows Only)
+set(VERSION_RC "")
+if(WIN32)
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/resource.rc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/resource.rc
+    )
+    set(VERSION_RC ${CMAKE_CURRENT_BINARY_DIR}/generated/resource.rc)
+endif()
+
 # Set the public include directory for the library
 set(JRES_SOLVER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -21,10 +80,8 @@ if(WIN32)
         message(FATAL_ERROR "CBC_DIR was not provided by the workflow")
     endif()
     
-    # These must be absolute paths
     set(CBC_OVERRIDE_INCLUDE "${CBC_DIR}/x64-windows-static/include/coin-or")
     set(CBC_OVERRIDE_LIB     "${CBC_DIR}/x64-windows-static/lib")
-
     set(CBC_INCLUDE_DIRS "${CBC_OVERRIDE_INCLUDE}")
 
     set(CLP_LIBRARY        "${CBC_OVERRIDE_LIB}/Clp.lib")
@@ -36,56 +93,27 @@ if(WIN32)
 # macOS + Linux
 else()
     message(STATUS "Configuring CBC using system installation")
-
-    find_path(CLP_INCLUDE_DIR 
-        NAMES OsiClpSolverInterface.hpp 
-        PATH_SUFFIXES clp/coin coin
-    )
-
-    find_path(COINUTILS_INCLUDE_DIR 
-        NAMES CoinPragma.hpp 
-        PATH_SUFFIXES coinutils/coin coin
-    )
-
-    find_path(OSI_INCLUDE_DIR 
-        NAMES OsiSolverInterface.hpp 
-        PATH_SUFFIXES osi/coin coin
-    )
-
-    find_path(CBC_INCLUDE_DIR_MAIN 
-        NAMES CbcModel.hpp 
-        PATH_SUFFIXES cbc/coin coin
-    )
+    # ... (Your existing find_path code remains unchanged) ...
+    find_path(CLP_INCLUDE_DIR NAMES OsiClpSolverInterface.hpp PATH_SUFFIXES clp/coin coin)
+    find_path(COINUTILS_INCLUDE_DIR NAMES CoinPragma.hpp PATH_SUFFIXES coinutils/coin coin)
+    find_path(OSI_INCLUDE_DIR NAMES OsiSolverInterface.hpp PATH_SUFFIXES osi/coin coin)
+    find_path(CBC_INCLUDE_DIR_MAIN NAMES CbcModel.hpp PATH_SUFFIXES cbc/coin coin)
 
     find_library(CLP_LIBRARY         NAMES Clp)
     find_library(COINUTILS_LIBRARY   NAMES CoinUtils)
     find_library(OSI_LIBRARY         NAMES Osi)
     find_library(OSICLP_LIBRARY      NAMES OsiClp)
     find_library(CBC_LIBRARY         NAMES Cbc)
-
 endif()
 
 # Merge sets (Linux/macOS only)
 if(NOT WIN32)
-    set(CBC_INCLUDE_DIRS 
-        ${CLP_INCLUDE_DIR} 
-        ${COINUTILS_INCLUDE_DIR} 
-        ${OSI_INCLUDE_DIR} 
-        ${CBC_INCLUDE_DIR_MAIN}
-    )
+    set(CBC_INCLUDE_DIRS ${CLP_INCLUDE_DIR} ${COINUTILS_INCLUDE_DIR} ${OSI_INCLUDE_DIR} ${CBC_INCLUDE_DIR_MAIN})
 endif()
 
-set(CBC_LIBRARIES 
-    ${CBC_LIBRARY} 
-    ${OSICLP_LIBRARY} 
-    ${OSI_LIBRARY} 
-    ${CLP_LIBRARY} 
-    ${COINUTILS_LIBRARY} 
-    ${CGL_LIBRARY}
-)
+set(CBC_LIBRARIES ${CBC_LIBRARY} ${OSICLP_LIBRARY} ${OSI_LIBRARY} ${CLP_LIBRARY} ${COINUTILS_LIBRARY})
 
 if (WIN32)
-  # Append all transitive dependencies for Windows static link (Fixes LNK2019)
   list(APPEND CBC_LIBRARIES 
     "${CBC_OVERRIDE_LIB}/Cgl.lib" 
     "${CBC_OVERRIDE_LIB}/OsiCbc.lib" 
@@ -95,15 +123,7 @@ if (WIN32)
     "${CBC_OVERRIDE_LIB}/bz2.lib" 
     "${CBC_OVERRIDE_LIB}/zlib.lib"
   )
-endif()
-
-if (WIN32)
-  add_definitions(
-    -DCLP_STATIC 
-    -DCBC_STATIC 
-    -DOSI_STATIC 
-    -DCOINUTILS_STATIC
-  )
+  add_definitions(-DCLP_STATIC -DCBC_STATIC -DOSI_STATIC -DCOINUTILS_STATIC)
 endif()
 
 if (MSVC)
@@ -112,26 +132,14 @@ endif()
 
 # Helper libraries
 add_library(nlohmann_json INTERFACE)
-target_include_directories(nlohmann_json INTERFACE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/lib/json/single_include
-)
+target_include_directories(nlohmann_json INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/lib/json/single_include)
 
 add_library(cxxopts INTERFACE)
-target_include_directories(cxxopts INTERFACE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/lib/cxxopts/include
-)
-
+target_include_directories(cxxopts INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/lib/cxxopts/include)
 
 # --- 1. JRES Utils (Static) ---
-# Contains DateUtils and ZipWriter
-add_library(jres_utils STATIC
-    src/utils/date_utils.cpp
-    src/utils/zip_writer.cpp
-)
-target_include_directories(jres_utils PUBLIC 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-
+add_library(jres_utils STATIC src/utils/date_utils.cpp src/utils/zip_writer.cpp)
+target_include_directories(jres_utils PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- 2. JRES Solver Core (Shared/DLL) ---
 add_library(jres_solver SHARED
@@ -141,70 +149,62 @@ add_library(jres_solver SHARED
   src/jres_diagnostic_solver.cpp
   src/jres_solver_types.cpp
 )
-if (WIN32)
-  target_compile_definitions(jres_solver PRIVATE JRES_SOLVER_EXPORTS)
+
+# IMPORTANT: Embed Version Resource on Windows for the DLL
+if(WIN32)
+    target_sources(jres_solver PRIVATE ${VERSION_RC})
+    target_compile_definitions(jres_solver PRIVATE JRES_SOLVER_EXPORTS)
 endif()
 
 target_include_directories(jres_solver PUBLIC 
     ${JRES_SOLVER_INCLUDE_DIR} 
     ${CBC_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_BINARY_DIR}/generated # <--- Allow finding version.h
 )
 
-target_link_libraries(jres_solver PRIVATE 
-    nlohmann_json 
-    ${CBC_LIBRARIES}
-)
-
+target_link_libraries(jres_solver PRIVATE nlohmann_json ${CBC_LIBRARIES})
 
 # --- 3. Solver CLI ---
 add_executable(solver cmd/solver/cli.cpp)
+
+# IMPORTANT: Embed Version Resource on Windows for the EXE
+if(WIN32)
+    target_sources(solver PRIVATE ${VERSION_RC})
+endif()
+
 target_include_directories(solver PRIVATE 
     ${CBC_INCLUDE_DIRS} 
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/cxxopts/include
+    ${CMAKE_CURRENT_BINARY_DIR}/generated # <--- Allow finding version.h
 )
 
 add_dependencies(solver jres_solver)
 
 if (WIN32)
-  target_link_directories(solver PRIVATE 
-    ${CMAKE_BINARY_DIR}/Release
-  )
+  target_link_directories(solver PRIVATE ${CMAKE_BINARY_DIR}/Release)
 endif()
 
-target_link_libraries(solver PRIVATE 
-    jres_solver 
-    cxxopts 
-    nlohmann_json
-)
+target_link_libraries(solver PRIVATE jres_solver cxxopts nlohmann_json)
 
-
-# --- 4. JRES Formatter Logic (Static Lib) ---
-# We split this out so we can link it to both the CLI and the Tests
-add_library(jres_formatter_lib STATIC
-    src/formatter/formatter_core.cpp
-)
-# Links to utils (for Zip/Date) and Json
-target_link_libraries(jres_formatter_lib PUBLIC 
-    jres_utils 
-    nlohmann_json
-)
-
-target_include_directories(jres_formatter_lib PUBLIC 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-
+# --- 4. JRES Formatter Logic ---
+add_library(jres_formatter_lib STATIC src/formatter/formatter_core.cpp)
+target_link_libraries(jres_formatter_lib PUBLIC jres_utils nlohmann_json)
+target_include_directories(jres_formatter_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- 5. Formatter CLI ---
 add_executable(formatter cmd/formatter/cli.cpp)
+
+# IMPORTANT: Embed Version Resource on Windows for the Formatter EXE
+if(WIN32)
+    target_sources(formatter PRIVATE ${VERSION_RC})
+endif()
+
 target_include_directories(formatter PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/cxxopts/include
+    ${CMAKE_CURRENT_BINARY_DIR}/generated # <--- Allow finding version.h
 )
 
-target_link_libraries(formatter PRIVATE 
-    jres_formatter_lib 
-    cxxopts
-)
-
+target_link_libraries(formatter PRIVATE jres_formatter_lib cxxopts)
 
 # --- 6. Tests ---
 enable_testing()

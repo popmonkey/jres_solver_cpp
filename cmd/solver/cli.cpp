@@ -18,6 +18,8 @@
 
 #include "jres_solver/jres_solver.hpp"
 
+#include "version.h"
+
 using json = nlohmann::json;
 
 /**
@@ -36,9 +38,17 @@ int main(int argc, char **argv)
         ("allow-no-spotter", "Allow stints to have no spotter assigned.", cxxopts::value<bool>()->default_value("false"))
         ("g,optimality-gap", "Solver stops when the gap to optimal is less than this (e.g., 0.01 for 1%).", cxxopts::value<double>()->default_value("0.0"))
         ("d,diagnose", "Run diagnostics to explain why a schedule is infeasible.", cxxopts::value<bool>()->default_value("false"))
+        ("v,version", "Print version information and exit.")
         ("h,help", "Print usage.");
 
     auto result = options.parse(argc, argv);
+
+    // --- Check for Version Flag ---
+    if (result.count("version"))
+    {
+        std::cout << "JRES Solver Version: " << JRES_VERSION_STRING << std::endl;
+        return 0;
+    }
 
     if (result.count("help"))
     {
@@ -48,6 +58,10 @@ int main(int argc, char **argv)
 
     bool quiet = result["quiet"].as<bool>();
     bool runDiagnostics = result["diagnose"].as<bool>();
+
+    if (!quiet) {
+        std::cout << "[App] JRES Solver " << JRES_VERSION_STRING << std::endl;
+    }
 
     // Load Input JSON Data into a std::string
     std::string raceDataJsonString;

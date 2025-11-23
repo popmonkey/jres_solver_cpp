@@ -1,0 +1,41 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include <windows.h>
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION @JRES_VERSION_MAJOR@,@JRES_VERSION_MINOR@,@JRES_VERSION_PATCH@,0
+ PRODUCTVERSION @JRES_VERSION_MAJOR@,@JRES_VERSION_MINOR@,@JRES_VERSION_PATCH@,0
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            // "CompanyName" is the standard field for Author/Organization
+            VALUE "CompanyName", "popmonkey+jres@gmail.com" 
+            
+            VALUE "FileDescription", "JRES Endurance Race Solver"
+            VALUE "FileVersion", "@JRES_VERSION_STRING@"
+            VALUE "InternalName", "jres_solver"
+            VALUE "LegalCopyright", "Copyright (C) 2025"
+            VALUE "OriginalFilename", "solver.exe"
+            VALUE "ProductName", "JRES Solver"
+            VALUE "ProductVersion", "@JRES_VERSION_STRING@"
+            
+            // "Comments" is visible in Windows Properties and good for extra credits
+            VALUE "Comments", "Solver Engine for Endurance Racing Strategy"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
