@@ -67,23 +67,37 @@ jobs:
         cmake --build build --config Release --target jres_solver
         cmake --build build --config Release --target solver
         cmake --build build --config Release --target formatter
-
     - name: Run Tests
       shell: pwsh
       run: | 
         cmake --build build --config Release --target solver_tests
+        cmake --build build --config Release --target formatter_tests
         ctest --test-dir build --output-on-failure -C Release
 
     # ---------------------------------------------------------
     # Package binaries (Zip for Windows)
     # ---------------------------------------------------------
+
+    - name: Sanitize Inputs
+      run: |
+        # Helper function block not strictly needed for one-liners, 
+        # but doing it inline is cleaner for GitHub Actions env vars
+        
+        $safeVersion = "${{ inputs.version }}".ToLower() -replace '[^a-z0-9-]', '_'
+        $safePlatform = "${{ inputs.platform }}".ToLower() -replace '[^a-z0-9-]', '_'
+        $safeArch = "${{ inputs.arch }}".ToLower() -replace '[^a-z0-9-]', '_'
+        
+        echo "SAFE_VERSION=$safeVersion" >> $env:GITHUB_ENV
+        echo "SAFE_PLATFORM=$safePlatform" >> $env:GITHUB_ENV
+        echo "SAFE_ARCH=$safeArch" >> $env:GITHUB_ENV
+
+    - name: Set Asset Name
+      # Naming Convention: jres-solver-[version]-windows-[arch].zip
+      run: echo "ASSET_NAME=jres-solver-${{ env.SAFE_VERSION }}-${{ env.SAFE_PLATFORM }}-${{ env.SAFE_ARCH }}.${{ inputs.asset_ext }}" >> $env:GITHUB_ENV
+
     - name: Create Release Zip
       shell: pwsh
       run: |
-        # Naming Convention: jres-solver-[version]-windows-[arch].zip
-        $ver = "${{ inputs.version }}"
-        $arch = "${{ inputs.arch }}" 
-        $assetName = "jres-solver-${ver}-windows-${arch}.zip"
         echo "ASSET_NAME=$assetName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         
         $source = "${{ github.workspace }}\build\Release"
