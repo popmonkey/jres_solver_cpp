@@ -11,6 +11,8 @@
 
 #include "formatter/formatter_core.hpp"
 
+#include "version.h"
+
 using json = nlohmann::json;
 
 int main(int argc, char* argv[]) {
@@ -20,16 +22,26 @@ int main(int argc, char* argv[]) {
         ("i,input", "Input JSON file (solved schedule)", cxxopts::value<std::string>())
         ("o,output", "Output file path", cxxopts::value<std::string>())
         ("f,format", "Output format (zip, csv, txt)", cxxopts::value<std::string>()->default_value("zip"))
+        ("v,version", "Print version information and exit.")
         ("h,help", "Print usage")
     ;
 
     try {
         auto result = options.parse(argc, argv);
 
+        // --- Check for Version Flag ---
+        if (result.count("version"))
+        {
+            std::cout << "JRES Solver Version: " << JRES_VERSION_STRING << std::endl;
+            return 0;
+        }
+
         if (result.count("help")) {
             std::cout << options.help() << std::endl;
             return 0;
         }
+
+        std::cout << "[App] JRES Solver " << JRES_VERSION_STRING << std::endl;
 
         if (!result.count("input")) {
             std::cerr << "Error: Input file is required (-i)" << std::endl;

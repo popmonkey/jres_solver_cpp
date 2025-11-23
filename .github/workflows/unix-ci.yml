@@ -25,6 +25,8 @@ jobs:
     secrets: inherit
     with:
       name: "Linux (x64)"
+      version: ${{ github.ref_name }}
+      platform: "linux"
       os: ubuntu-latest
       arch: x64
       asset_ext: tar.gz
@@ -36,6 +38,8 @@ jobs:
     secrets: inherit
     with:
       name: "macOS Intel (x64)"
+      version: ${{ github.ref_name }}
+      platform: "darwin"
       os: macos-latest
       arch: x64
       asset_ext: tar.gz
@@ -47,6 +51,8 @@ jobs:
     secrets: inherit
     with:
       name: "macOS Apple Silicon (arm64)"
+      version: ${{ github.ref_name }}
+      platform: "darwin"
       os: macos-14
       arch: arm64
       asset_ext: tar.gz
