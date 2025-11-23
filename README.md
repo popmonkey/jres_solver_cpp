@@ -182,3 +182,7 @@ The function returns a JSON string containing the solution or error details.
   "raceData": { ... }
 }
 ```
+
+---
+
+_Created by popmonkey, Gemini 2.5, Gemini 3.0, and ChatGPT 5.1_
