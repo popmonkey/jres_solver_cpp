@@ -106,9 +106,10 @@ jobs:
       - name: Package (tar.gz)
         run: |
           cd build
-          # Package solver and libs
+          # Package commands and libs
           tar -czvf "../${{ env.ASSET_NAME }}" \
             solver \
+            formatter \
             libjres_solver.* \
             2>/dev/null || true
 
