@@ -67,6 +67,19 @@ jobs:
         cmake --build build --config Release --target jres_solver
         cmake --build build --config Release --target solver
         cmake --build build --config Release --target formatter
+
+    - name: Add Build Dir to PATH
+      shell: pwsh
+      run: |
+        $dll_path = "${{ github.workspace }}\build\Release"
+        echo "PATH=$dll_path;$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+    - name: Run Tests
+      shell: pwsh
+      run: | 
+        cmake --build build --config Release --target solver_tests
+        # ... rest of your test script        
+
     - name: Run Tests
       shell: pwsh
       run: | 
