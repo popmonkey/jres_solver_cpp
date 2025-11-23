@@ -29,7 +29,6 @@ int main(int argc, char* argv[]) {
     try {
         auto result = options.parse(argc, argv);
 
-        // --- Check for Version Flag ---
         if (result.count("version"))
         {
             std::cout << "JRES Solver Version: " << JRES_VERSION_STRING << std::endl;

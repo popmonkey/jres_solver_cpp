@@ -1,5 +1,3 @@
-// test/test_errors.cpp
-
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"
@@ -13,10 +11,10 @@ namespace {
     //  Missing closing brace
      const char* MALFORMED_JSON = R"({
     "availability": {
-        "Nikki": { "1973-06-09T14:00:00.000Z": "Available" }
+        "Niki": { "1973-06-09T14:00:00.000Z": "Available" }
     },
     "teamMembers": [
-        { "name": "Nikki", "isDriver": true }
+        { "name": "Niki", "isDriver": true }
     ]
     )";
 
@@ -49,7 +47,7 @@ namespace {
     // "teamMembers" key is missing
     const char* MISSING_KEY_JSON = R"({
     "availability": {
-        "Nikki": { "1973-06-09T14:00:00.000Z": "Available" }
+        "Niki": { "1973-06-09T14:00:00.000Z": "Available" }
     },
     "durationHours": 0.5,
     "raceStartUTC": "1973-06-09T14:37:00.000Z",

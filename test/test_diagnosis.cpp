@@ -1,5 +1,3 @@
-// test/test_diagnosis.cpp
-
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"
@@ -48,7 +46,6 @@ namespace {
         json diagnosis = resultJson["diagnosis"];
         ASSERT_FALSE(diagnosis.empty());
         
-        // New Output Format: "AVAILABILITY GAP: Drivers were forced to drive..."
         bool found = false;
         for (const auto& issue : diagnosis) {
             std::string msg = issue.get<std::string>();

@@ -113,10 +113,10 @@ The `availability` object maps a **Team Member's Name** to a dictionary of **Tim
   "pitTimeInSeconds": 45.0,
   "fuelTankSize": 100.0,
   "fuelUsePerLap": 3.2,
-  "firstStintDriver": "Nikki",
+  "firstStintDriver": "Niki",
   "teamMembers": [
     {
-      "name": "Nikki",
+      "name": "Niki",
       "isDriver": true,
       "isSpotter": true,
       "preferredStints": 2,
@@ -129,7 +129,7 @@ The `availability` object maps a **Team Member's Name** to a dictionary of **Tim
     }
   ],
   "availability": {
-    "Nikki": {
+    "Niki": {
       "2024-06-15T18:00:00.000Z": "Unavailable",
       "2024-06-15T19:00:00.000Z": "Preferred"
     }
@@ -182,3 +182,7 @@ The function returns a JSON string containing the solution or error details.
   "raceData": { ... }
 }
 ```
+
+---
+
+_Created by popmonkey, Gemini 2.5, Gemini 3.0, and ChatGPT 5.1_

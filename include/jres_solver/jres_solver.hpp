@@ -45,7 +45,7 @@ enum JresSpotterMode {
  */
 struct JresSolverOptions {
     int timeLimit;               // Maximum time in seconds to let the solver run
-    JresSpotterMode spotterMode; // "none", "integrated", or "sequential"
+    JresSpotterMode spotterMode; // Type of spotter scheduling to use
     bool allowNoSpotter;         // Allow stints to have no spotter assigned
     double optimalityGap;        // e.g., 0.01 for 1%
     bool quiet;                  // Suppress console logging from the library
