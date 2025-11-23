@@ -1,7 +1,7 @@
 {
   "success": true,
   "availability": {
-    "Nikki": {
+    "Niki": {
       "1973-06-09T14:00:00.000Z": "Available",
       "1973-06-09T15:00:00.000Z": "Available",
       "1973-06-09T16:00:00.000Z": "Available",
@@ -172,7 +172,7 @@
   },
   "teamMembers": [
     {
-      "name": "Nikki",
+      "name": "Niki",
       "timezone": "1",
       "isDriver": true,
       "isSpotter": true,

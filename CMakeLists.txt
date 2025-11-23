@@ -93,7 +93,6 @@ if(WIN32)
 # macOS + Linux
 else()
     message(STATUS "Configuring CBC using system installation")
-    # ... (Your existing find_path code remains unchanged) ...
     find_path(CLP_INCLUDE_DIR NAMES OsiClpSolverInterface.hpp PATH_SUFFIXES clp/coin coin)
     find_path(COINUTILS_INCLUDE_DIR NAMES CoinPragma.hpp PATH_SUFFIXES coinutils/coin coin)
     find_path(OSI_INCLUDE_DIR NAMES OsiSolverInterface.hpp PATH_SUFFIXES osi/coin coin)
@@ -159,7 +158,7 @@ endif()
 target_include_directories(jres_solver PUBLIC 
     ${JRES_SOLVER_INCLUDE_DIR} 
     ${CBC_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_BINARY_DIR}/generated # <--- Allow finding version.h
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
 target_link_libraries(jres_solver PRIVATE nlohmann_json ${CBC_LIBRARIES})
@@ -175,7 +174,7 @@ endif()
 target_include_directories(solver PRIVATE 
     ${CBC_INCLUDE_DIRS} 
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/cxxopts/include
-    ${CMAKE_CURRENT_BINARY_DIR}/generated # <--- Allow finding version.h
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
 add_dependencies(solver jres_solver)
@@ -201,7 +200,7 @@ endif()
 
 target_include_directories(formatter PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/cxxopts/include
-    ${CMAKE_CURRENT_BINARY_DIR}/generated # <--- Allow finding version.h
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
 target_link_libraries(formatter PRIVATE jres_formatter_lib cxxopts)

@@ -1,5 +1,3 @@
-// test/test_constraints.cpp
-
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"
@@ -10,11 +8,11 @@ using json = nlohmann::json;
 // --- Test: An infeasible race ---
 const char* INFEASIBLE_JSON = R"({
   "availability": {
-    "Nikki": { "1973-06-09T14:00:00.000Z": "Unavailable" },
+    "Niki": { "1973-06-09T14:00:00.000Z": "Unavailable" },
     "Ayrton": { "1973-06-09T14:00:00.000Z": "Unavailable" }
   },
   "teamMembers": [
-    { "name": "Nikki", "isDriver": true },
+    { "name": "Niki", "isDriver": true },
     { "name": "Ayrton", "isDriver": true }
   ],
   "durationHours": 0.5,

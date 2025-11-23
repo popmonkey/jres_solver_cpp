@@ -1,5 +1,3 @@
-// test/test_spotter_modes.cpp
-
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"
@@ -11,7 +9,7 @@ namespace {
   // --- Test 1: Basic Integrated Solve (Moved from test_solver.cpp) ---
   const char* SOLVABLE_JSON = R"({
     "availability": {
-      "Nikki": {
+      "Niki": {
         "1973-06-09T14:00:00.000Z": "Unavailable",
         "1973-06-09T15:00:00.000Z": "Available",
         "1973-06-09T16:00:00.000Z": "Available"
@@ -28,7 +26,7 @@ namespace {
       }
     },
     "teamMembers": [
-      { "name": "Nikki", "isDriver": true, "isSpotter": true, "preferredStints": 2 },
+      { "name": "Niki", "isDriver": true, "isSpotter": true, "preferredStints": 2 },
       { "name": "Ayrton", "isDriver": true, "isSpotter": true, "preferredStints": 2 },
       { "name": "Alain", "isDriver": false, "isSpotter": true, "preferredStints": 2 }
     ],
@@ -61,7 +59,7 @@ namespace {
       ASSERT_EQ(resultJson["schedule"].size(), 2);
       
       // Stint 1 (idx 0):
-      // Nikki is unavailable ("14:00"). Ayrton must drive.
+      // Niki is unavailable ("14:00"). Ayrton must drive.
       // Alain must spot (Ayrton is driving).
       EXPECT_EQ(resultJson["schedule"][0]["driver"].get<std::string>(), "Ayrton");
       EXPECT_EQ(resultJson["schedule"][0]["spotter"].get<std::string>(), "Alain");
@@ -188,18 +186,18 @@ namespace {
   const char* NO_SPOTTERS_JSON = R"({
     "availability": {
       "Ayrton": { "1970-01-01T10:00:00.000Z": "Available" },
-      "Nikki": { "1970-01-01T10:00:00.000Z": "Unavailable" }
+      "Niki": { "1970-01-01T10:00:00.000Z": "Unavailable" }
     },
     "teamMembers": [
       { "name": "Ayrton", "isDriver": true, "isSpotter": false },
-      { "name": "Nikki", "isDriver": false, "isSpotter": true }
+      { "name": "Niki", "isDriver": false, "isSpotter": true }
     ],
     "durationHours": 0.5,
     "raceStartUTC": "1970-01-01T10:00:00.000Z",
     "avgLapTimeInSeconds": 120, "fuelTankSize": 100, "fuelUsePerLap": 5, "pitTimeInSeconds": 60
   })";
   // Note: 1 stint. Ayrton (driver) is available.
-  // Nikki (spotter) is unavailable.
+  // Niki (spotter) is unavailable.
 
   TEST(SpotterModeTest, AllowNoSpotterIntegrated) {
       JresSolverOptions options;
@@ -262,18 +260,18 @@ namespace {
   const char* SEQ_INFEASIBLE_JSON = R"({
     "availability": {
       "Ayrton": { "1970-01-01T10:00:00.000Z": "Available" },
-      "Nikki": { "1970-01-01T10:00:00.000Z": "Unavailable" }
+      "Niki": { "1970-01-01T10:00:00.000Z": "Unavailable" }
     },
     "teamMembers": [
       { "name": "Ayrton", "isDriver": true, "isSpotter": false },
-      { "name": "Nikki", "isDriver": false, "isSpotter": true }
+      { "name": "Niki", "isDriver": false, "isSpotter": true }
     ],
     "durationHours": 0.5,
     "raceStartUTC": "1970-01-01T10:00:00.000Z",
     "avgLapTimeInSeconds": 120, "fuelTankSize": 100, "fuelUsePerLap": 5, "pitTimeInSeconds": 60
   })";
   // Note: 1 stint. Ayrton (driver) is available.
-  // Nikki (spotter) is unavailable. `allowNoSpotter` is FALSE.
+  // Niki (spotter) is unavailable. `allowNoSpotter` is FALSE.
 }
 
 TEST(SpotterModeTest, SequentialInfeasibleSpotter) {
