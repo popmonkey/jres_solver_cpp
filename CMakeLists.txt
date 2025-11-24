@@ -125,6 +125,21 @@ if (WIN32)
   add_definitions(-DCLP_STATIC -DCBC_STATIC -DOSI_STATIC -DCOINUTILS_STATIC)
 endif()
 
+# ==============================================================================
+#  RPATH SETTINGS (Crucial for Portable Binaries)
+# ==============================================================================
+# 1. Make sure RPATH is set even when building locally (not just on 'make install')
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+
+# 2. Define the relative path based on OS
+if(APPLE)
+    # macOS: @loader_path means "directory containing the binary"
+    set(CMAKE_INSTALL_RPATH "@loader_path")
+elseif(UNIX)
+    # Linux: $ORIGIN means "directory containing the binary"
+    set(CMAKE_INSTALL_RPATH "$ORIGIN")
+endif()
+
 if (MSVC)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
