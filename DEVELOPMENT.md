@@ -2,10 +2,10 @@
 
 This library can be used to solve for optimal driver and spotter schedules for endurance racing events.  It uses the COIN-OR Cbc optimization library.
 
-It has been structured as a C-API library (`jres_solver`) and a simple CLI client (`solver`) that uses the library.
+It has been structured as a C-API library (`jres_solver`) and a simple CLI client (`jres_solver`) that uses the library.
 
 >[!NOTE]
->this is a C++ port and continuation of the python JRES Solver https://github.com/popmonkey/jres_solver
+>this is a C++ port of the python Solver [https://github.com/popmonkey/jres_solver](https://github.com/popmonkey/jres_solver)
 
 ## Project Structure
 
@@ -110,22 +110,22 @@ We use a standard out-of-source CMake build.
 This will create two main products in the `build/` directory:
 
   * `libjres_solver.dylib` (or `.so` on Linux): The shared library.
-  * `solver`: The CLI executable.
+  * `jres_solver`: The CLI executable.
 
 ## Running the CLI Client
 
-The `solver` executable is a client that uses the `jres_solver` library.
+The `jres_solver` executable is a client that uses the `jres_solver` library.
 
 ```
 # Run with a file
-./solver -i ../data/race_data.json -s integrated
+./jres_solver -i ../data/race_data.json -s integrated
 
 # Pipe from stdin
-cat ../data/race_data.json | ./solver -s sequential --allow-no-spotter
+cat ../data/race_data.json | ./jres_solver -s sequential --allow-no-spotter
 
 # Run diagnostics on a failing schedule
-./solver -i ../data/infeasible.json --diagnose
+./jres_solver -i ../data/infeasible.json --diagnose
 
 # Get help
-./solver --help
+./jres_solver --help
 ```

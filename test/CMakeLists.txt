@@ -23,7 +23,7 @@ add_executable(solver_tests
   test_diagnosis.cpp
 )
 
-add_dependencies(solver_tests jres_solver)
+add_dependencies(solver_tests jres_solver_lib)
 
 if (WIN32)
   target_link_directories(solver_tests PRIVATE 
@@ -32,7 +32,7 @@ if (WIN32)
 endif()
 
 target_link_libraries(solver_tests PRIVATE
-  jres_solver
+  jres_solver_lib
   gtest_main
   nlohmann_json
 )

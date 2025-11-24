@@ -8,15 +8,15 @@ These tools run on **Linux**, **macOS**, and **Windows**.
 
 ### Windows Specific Requirement
 
-On Windows, the `solver` application is built as a thin executable that relies on a shared library. You must ensure the following DLL is present in the same directory as the executable (or in your system `%PATH%`):
+On Windows, the `jres_solver` application is built as a thin executable that relies on a shared library. You must ensure the following DLL is present in the same directory as the executable (or in your system `%PATH%`):
 
 * **`jres_solver.dll`**
 
-The `formatter` tool is statically linked and does not require this DLL.
+The `jres_formatter` tool is statically linked and does not require this DLL.
 
 ---
 
-## 1. Solver (`solver`)
+## 1. Solver (`jres_solver`)
 
 The **Solver** is the core engine. It accepts raw race data (track info, driver constraints, car specs) and calculates the optimal driver schedule.
 
@@ -24,10 +24,10 @@ The **Solver** is the core engine. It accepts raw race data (track info, driver 
 
 ```sh
 # Linux / macOS
-./solver [options]
+./jres_solver [options]
 
 # Windows
-solver.exe [options]
+jres_solver.exe [options]
 ```
 
 ### Input/Output Behavior
@@ -55,21 +55,21 @@ solver.exe [options]
 Solve a race configuration and save the result for formatting.
 
 ```sh
-./solver -i race_config.json -o solution.json
+./jres_solver -i race_config.json -o solution.json
 ```
 
 **Diagnostic Run:**
 If a schedule fails to solve, run with `-d` to get a plain English explanation of the blockers (e.g., "Driver A violated minimum rest").
 
 ```sh
-./solver -i race_config.json --diagnose
+./jres_solver -i race_config.json --diagnose
 ```
 
 **Advanced Optimization:**
 Run for up to 5 minutes (`300s`), use `integrated` spotter logic, and allow a 1% margin of error for faster results.
 
 ```sh
-./solver -i race_config.json -o solution.json -t 300 --spotter-mode integrated --optimality-gap 0.01
+./jres_solver -i race_config.json -o solution.json -t 300 --spotter-mode integrated --optimality-gap 0.01
 ```
 
 **Pipeline Usage:**
@@ -77,15 +77,15 @@ Pipe a JSON generator directly into the solver.
 
 ```sh
 # Linux / macOS
-cat race_data.json | ./solver -o solution.json
+cat race_data.json | ./jres_solver -o solution.json
 
 # Windows PowerShell
-Get-Content race_data.json | .\solver.exe -o solution.json
+Get-Content race_data.json | .\jres_solver.exe -o solution.json
 ```
 
 ---
 
-## 2. Formatter (`formatter`)
+## 2. Formatter (`jres_formatter`)
 
 The **Formatter** takes the raw JSON solution produced by the Solver and converts it into human-readable files or importable data formats.
 
@@ -93,17 +93,17 @@ The **Formatter** takes the raw JSON solution produced by the Solver and convert
 
 ```sh
 # Linux / macOS
-./formatter -i <solution.json> -o <output_path> [options]
+./jres_formatter -i <solution.json> -o <output_path> [options]
 
 # Windows
-formatter.exe -i <solution.json> -o <output_path> [options]
+jres_formatter.exe -i <solution.json> -o <output_path> [options]
 ```
 
 ### Options
 
 | Flag | Long Flag | Description | Required | Default |
 | :--- | :--- | :--- | :--- | :--- |
-| `-i` | `--input` | Path to the solved schedule JSON (output from `solver`). | **Yes** | |
+| `-i` | `--input` | Path to the solved schedule JSON (output from `jres_solver`). | **Yes** | |
 | `-o` | `--output` | Path for the resulting file (e.g., `schedule.zip`). | **Yes** | |
 | `-f` | `--format` | The desired output format. Options: `zip`, `csv`, `txt`. | No | `zip` |
 | `-h` | `--help` | Print usage instructions. | No | |
@@ -119,13 +119,13 @@ formatter.exe -i <solution.json> -o <output_path> [options]
 **Generate a ZIP package (Default):**
 
 ```sh
-./formatter -i solution.json -o race_schedule.zip
+./jres_formatter -i solution.json -o race_schedule.zip
 ```
 
 **Generate a Text Summary:**
 
 ```sh
-./formatter -i solution.json -o summary.txt -f txt
+./jres_formatter -i solution.json -o summary.txt -f txt
 ```
 
 ---
@@ -138,10 +138,10 @@ Here is how you would go from a raw configuration file to a final distributable 
 
 ```sh
 # Step 1: Solve the schedule (allowing 60 seconds for calculation)
-./solver -i race_24h_config.json -o solved_schedule.json -t 60
+./jres_solver -i race_24h_config.json -o solved_schedule.json -t 60
 
 # Step 2: Format the solution into a ZIP file
-./formatter -i solved_schedule.json -o team_schedule.zip -f zip
+./jres_formatter -i solved_schedule.json -o team_schedule.zip -f zip
 ```
 
 ### Windows (Command Prompt)
@@ -150,8 +150,8 @@ Here is how you would go from a raw configuration file to a final distributable 
 REM Ensure jres_solver.dll is in the current folder
 
 REM Step 1: Solve
-solver.exe -i race_24h_config.json -o solved_schedule.json -t 60
+jres_solver.exe -i race_24h_config.json -o solved_schedule.json -t 60
 
 REM Step 2: Format
-formatter.exe -i solved_schedule.json -o team_schedule.zip -f zip
+jres_formatter.exe -i solved_schedule.json -o team_schedule.zip -f zip
 ```
