@@ -35,9 +35,9 @@ extern "C" {
  * @brief C-API enum for specifying the spotter scheduling mode.
  */
 enum JresSpotterMode {
-    JRES_SPOTTER_MODE_NONE,
-    JRES_SPOTTER_MODE_INTEGRATED,
-    JRES_SPOTTER_MODE_SEQUENTIAL
+    JRES_SPOTTER_MODE_NONE = 0,       // No Spotter schedule is solved for
+    JRES_SPOTTER_MODE_INTEGRATED = 1, // Driver and Spotter schedule is solved together
+    JRES_SPOTTER_MODE_SEQUENTIAL = 2  // Driver schedule is prioritized
 };
 
 /**

@@ -14,7 +14,7 @@ This library can be used to solve for optimal driver and spotter schedules for e
 
 **JresSolver** is a C++ library designed to optimize endurance racing schedules. It uses the **COIN-OR Cbc** Mixed Integer Programming (MIP) solver to assign drivers (and optional spotters) to race stints while satisfying constraints such as fuel usage, maximum drive times, minimum rest periods, and driver availability.
 
-### 1. Integration (C-API)
+### Integration (C-API)
 
 The library exposes a C-compatible API and can be bound to languages like C, C++, Go, Python, or Rust.
 
@@ -32,9 +32,9 @@ struct JresSolverOptions {
 
 // Enum for spotter modes
 enum JresSpotterMode {
-    JRES_SPOTTER_MODE_NONE = 0,
-    JRES_SPOTTER_MODE_INTEGRATED = 1,
-    JRES_SPOTTER_MODE_SEQUENTIAL = 2
+    JRES_SPOTTER_MODE_NONE = 0,       // No Spotter schedule is solved for
+    JRES_SPOTTER_MODE_INTEGRATED = 1, // Driver and Spotter schedule is solved together
+    JRES_SPOTTER_MODE_SEQUENTIAL = 2. // Driver schedule is prioritized
 };
 
 // Main Solver Function
@@ -58,7 +58,7 @@ void free_solver_result(char* resultJson);
 
 -----
 
-### 2. Input JSON Specification
+### Input JSON Specification
 
 The `raceDataJson` string passed to `solve_race_schedule` must strictly follow this schema.
 
@@ -139,7 +139,7 @@ The `availability` object maps a **Team Member's Name** to a dictionary of **Tim
 
 -----
 
-### 3. Output JSON Specification
+### Output JSON Specification
 
 The function returns a JSON string containing the solution or error details.
 
@@ -175,9 +175,9 @@ The function returns a JSON string containing the solution or error details.
   "success": true,
   "solveDurationSeconds": 0.45,
   "schedule": [
-    { "stint": 1, "driver": "Alice", "spotter": "Bob" },
-    { "stint": 2, "driver": "Alice", "spotter": "Bob" },
-    { "stint": 3, "driver": "Bob", "spotter": "Alice" }
+    { "stint": 1, "driver": "Niki", "spotter": "Alain" },
+    { "stint": 2, "driver": "Niki", "spotter": "Alain" },
+    { "stint": 3, "driver": "Alain", "spotter": "Niki" }
   ],
   "raceData": { ... }
 }

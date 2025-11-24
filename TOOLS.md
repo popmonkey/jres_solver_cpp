@@ -9,6 +9,15 @@ Currently the easiest way to generate input for the tools (and library) is to us
 
 These tools run on **Linux**, **macOS**, and **Windows**.
 
+### MacOS Specifics
+
+In addition to the download, the solver binaries are also available via Homebrew:
+
+```sh
+brew tap popmonkey/jres_solver
+brew install jres_solver
+```
+
 ### Windows Specific Requirement
 
 On Windows, the `jres_solver` application is built as a thin executable that relies on a shared library. You must ensure the following DLL is present in the same directory as the executable (or in your system `%PATH%`):
@@ -19,7 +28,7 @@ The `jres_formatter` tool is statically linked and does not require this DLL.
 
 ---
 
-## 1. Solver (`jres_solver`)
+## Solver (`jres_solver`)
 
 The **Solver** is the core engine. It accepts raw race data (track info, driver constraints, car specs) and calculates the optimal driver schedule.
 
@@ -51,6 +60,30 @@ jres_solver.exe [options]
 | `-g` | `--optimality-gap`   | Stop solver when the solution is within this gap of perfection (e.g., `0.01` for 1%).         | `0.0`   |
 | `-d` | `--diagnose`         | Run in **Diagnostic Mode** to explain why a schedule is infeasible.                           | `false` |
 | `-h` | `--help`             | Print usage instructions.                                                                     |         |
+
+### Spotter Modes
+
+#### Integrated Mode (`JRES_SPOTTER_MODE_INTEGRATED`)
+This mode solves for drivers and spotters simultaneously within a single Mixed-Integer Linear Programming (MILP) model.
+
+* **How it works:** The solver adds both driver and spotter variables to the same mathematical problem instance.
+* **Advantage:** This is the most optimal method. The solver can adjust the *driver* schedule to accommodate *spotter* availability (and vice-versa) to find the best global solution.
+
+#### Sequential Mode (`JRES_SPOTTER_MODE_SEQUENTIAL`)
+This mode utilizes a two-stage approach, prioritizing the driver schedule first.
+
+* **How it works:**
+    1.  The library solves the driver schedule completely using the main model.
+    2.  It then creates a **separate** solver instance specifically for spotters treating the driver schedule as an availability map.
+* **Advantage:** This ensures that driving duties always take priority and are optimal for the drivers, treating spotting as a secondary task to be filled with whoever is left.
+
+#### None (`JRES_SPOTTER_MODE_NONE`)
+This mode simply disables spotter scheduling entirely. The logic for generating spotter constraints is skipped, and the output JSON will exclude spotter assignments.
+
+#### Additional Configuration: "Allow No Spotter"
+For both **Integrated** and **Sequential** modes, this option modifies the coverage constraints.
+* **If False (Default):** The solver requires exactly one spotter per stint. If no one is available, the schedule is deemed infeasible.
+* **If True:** The solver allows gaps in the spotter schedule if no valid spotter can be found.
 
 ### Examples
 
@@ -88,7 +121,7 @@ Get-Content race_data.json | .\jres_solver.exe -o solution.json
 
 ---
 
-## 2. Formatter (`jres_formatter`)
+## Formatter (`jres_formatter`)
 
 The **Formatter** takes the raw JSON solution produced by the Solver and converts it into human-readable files or importable data formats.
 
