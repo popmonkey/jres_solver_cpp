@@ -103,13 +103,22 @@ jobs:
         # Naming Convention: jres-solver-[version]-[platform]-[arch].tar.gz
         run: echo "ASSET_NAME=jres-solver-${{ env.SAFE_VERSION }}-${{ env.SAFE_PLATFORM }}-${{ env.SAFE_ARCH }}.${{ inputs.asset_ext }}" >> $GITHUB_ENV
 
+      - name: Ad-hoc Sign Binary (macOS)
+        if: startsWith(inputs.os, 'macos')
+        run: |
+          # Use ad-hoc signature (-)
+          # Sign the re-named binaries (from OUTPUT_NAME property in CMake)
+          codesign --force --deep -s - build/jres_solver
+          codesign --force --deep -s - build/jres_formatter
+          codesign --force --deep -s - build/libjres_solver.dylib
+
       - name: Package (tar.gz)
         run: |
           cd build
-          # Package commands and libs
+          # Package commands and libs using the final filenames
           tar -czvf "../${{ env.ASSET_NAME }}" \
-            solver \
-            formatter \
+            jres_solver \
+            jres_formatter \
             libjres_solver.* \
             2>/dev/null || true
 

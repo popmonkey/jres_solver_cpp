@@ -141,30 +141,33 @@ add_library(jres_utils STATIC src/utils/date_utils.cpp src/utils/zip_writer.cpp)
 target_include_directories(jres_utils PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- 2. JRES Solver Core (Shared/DLL) ---
-add_library(jres_solver SHARED
+add_library(jres_solver_lib SHARED
   src/jres_solver.cpp
   src/jres_solver_utils.cpp
   src/jres_standard_solver.cpp
   src/jres_diagnostic_solver.cpp
   src/jres_solver_types.cpp
 )
+set_target_properties(jres_solver_lib PROPERTIES OUTPUT_NAME "jres_solver")
 
 # IMPORTANT: Embed Version Resource on Windows for the DLL
 if(WIN32)
-    target_sources(jres_solver PRIVATE ${VERSION_RC})
-    target_compile_definitions(jres_solver PRIVATE JRES_SOLVER_EXPORTS)
+    target_sources(jres_solver_lib PRIVATE ${VERSION_RC})
+    target_compile_definitions(jres_solver_lib PRIVATE JRES_SOLVER_EXPORTS)
 endif()
 
-target_include_directories(jres_solver PUBLIC 
+target_include_directories(jres_solver_lib PUBLIC 
     ${JRES_SOLVER_INCLUDE_DIR} 
     ${CBC_INCLUDE_DIRS}
     ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
-target_link_libraries(jres_solver PRIVATE nlohmann_json ${CBC_LIBRARIES})
+target_link_libraries(jres_solver_lib PRIVATE nlohmann_json ${CBC_LIBRARIES})
 
 # --- 3. Solver CLI ---
 add_executable(solver cmd/solver/cli.cpp)
+# Override the output filename to 'jres_solver' (e.g. jres_solver.exe)
+set_target_properties(solver PROPERTIES OUTPUT_NAME "jres_solver")
 
 # IMPORTANT: Embed Version Resource on Windows for the EXE
 if(WIN32)
@@ -177,13 +180,13 @@ target_include_directories(solver PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
-add_dependencies(solver jres_solver)
+add_dependencies(solver jres_solver_lib)
 
 if (WIN32)
   target_link_directories(solver PRIVATE ${CMAKE_BINARY_DIR}/Release)
 endif()
 
-target_link_libraries(solver PRIVATE jres_solver cxxopts nlohmann_json)
+target_link_libraries(solver PRIVATE jres_solver_lib cxxopts nlohmann_json)
 
 # --- 4. JRES Formatter Logic ---
 add_library(jres_formatter_lib STATIC src/formatter/formatter_core.cpp)
@@ -192,6 +195,8 @@ target_include_directories(jres_formatter_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 
 # --- 5. Formatter CLI ---
 add_executable(formatter cmd/formatter/cli.cpp)
+# Override the output filename to 'jres_formatter' (e.g. jres_formatter.exe)
+set_target_properties(formatter PROPERTIES OUTPUT_NAME "jres_formatter")
 
 # IMPORTANT: Embed Version Resource on Windows for the Formatter EXE
 if(WIN32)

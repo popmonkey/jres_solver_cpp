@@ -64,7 +64,8 @@ jobs:
     - name: Build Libraries & Executables
       shell: pwsh
       run: |
-        cmake --build build --config Release --target jres_solver
+        # Build targets by their internal CMake names
+        cmake --build build --config Release --target jres_solver_lib
         cmake --build build --config Release --target solver
         cmake --build build --config Release --target formatter
 
@@ -112,6 +113,7 @@ jobs:
         $source = "${{ github.workspace }}\build\Release"
         Write-Host "Zipping binaries from $source to $assetPath..."
         
+        # This will now pick up 'jres_solver.exe' and 'jres_formatter.exe'
         Get-ChildItem $source -Include *.exe, *.dll, *.lib -Recurse | Compress-Archive -DestinationPath $assetPath
 
     # ---------------------------------------------------------
