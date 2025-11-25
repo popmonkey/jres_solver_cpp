@@ -47,6 +47,13 @@ enum class SpotterMode {
     Sequential
 };
 
+// Map Enum to Strings for JSON
+NLOHMANN_JSON_SERIALIZE_ENUM( SpotterMode, {
+    {SpotterMode::None, "none"},
+    {SpotterMode::Integrated, "integrated"},
+    {SpotterMode::Sequential, "sequential"}
+})
+
 struct SolverContext
 {
     bool quiet;
@@ -73,3 +80,4 @@ void from_json(const json &j, RaceData &data);
 // --- JSON Serialization Declarations ---
 void to_json(json &j, const TeamMember &member);
 void to_json(json &j, const RaceData &data);
+void to_json(json &j, const SolverContext &ctx);

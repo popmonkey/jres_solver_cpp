@@ -170,6 +170,29 @@ int main(int argc, char **argv)
             if (resultCode == 0) {
                 // Success
                 if (!quiet) {
+                    
+                    // Print Metadata / Settings
+                    if (resultJson.contains("metadata")) {
+                        std::cout << "\n--- 🔧 Solver Settings ---" << std::endl;
+                        json meta = resultJson["metadata"];
+                        std::cout << "Time Limit: " << meta.value("timeLimit", 0) << "s | "
+                                  << "Gap: " << meta.value("optimalityGap", 0.0) << " | "
+                                  << "Spotter: " << meta.value("spotterMode", "unknown") << std::endl;
+                    }
+
+                    // Print Timing
+                    if (resultJson.contains("timing")) {
+                        std::cout << "\n--- ⏱️  Timing Performance ---" << std::endl;
+                        json t = resultJson["timing"];
+                        std::cout << std::fixed << std::setprecision(2);
+                        std::cout << "Setup/Model Build : " << std::setw(8) << t.value("setupMs", 0.0) << " ms" << std::endl;
+                        std::cout << "Driver Solve      : " << std::setw(8) << t.value("driverSolveMs", 0.0) << " ms" << std::endl;
+                        if (t.contains("spotterSolveMs")) {
+                        std::cout << "Spotter Solve     : " << std::setw(8) << t.value("spotterSolveMs", 0.0) << " ms" << std::endl;
+                        }
+                        std::cout << "Total Wall Time   : " << std::setw(8) << t.value("totalSeconds", 0.0) << " s" << std::endl;
+                    }
+
                     // Print the schedule
                     std::cout << "\n--- 🏁 Race Schedule ---" << std::endl;
                     bool hasSpotters = (solverOptions.spotterMode != JRES_SPOTTER_MODE_NONE);
