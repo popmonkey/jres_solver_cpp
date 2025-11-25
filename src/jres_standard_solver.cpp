@@ -155,7 +155,9 @@ json JresStandardSolver::solve()
         CbcModel spotterCbcModel(*spotterSolver);
         spotterCbcModel.setDblParam(CbcModel::CbcAllowableFractionGap, m_ctx.optimalityGap);
         spotterCbcModel.setDblParam(CbcModel::CbcMaximumSeconds, static_cast<double>(m_ctx.timeLimit));
-        spotterCbcModel.setLogLevel(m_ctx.quiet ? 0 : 1);
+
+        spotterSolver->setLogLevel(0);
+        spotterCbcModel.setLogLevel(0);
 
         ParticipantModel seqSpotterModel = add_participant_model(
             spotterCbcModel, m_spotterPool, "Spot", m_stintWithPitSeconds, m_stintLaps
