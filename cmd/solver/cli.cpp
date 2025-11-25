@@ -180,6 +180,17 @@ int main(int argc, char **argv)
                                   << "Spotter: " << meta.value("spotterMode", "unknown") << std::endl;
                     }
 
+                    // Print Complexity
+                    if (resultJson.contains("complexity")) {
+                        std::cout << "\n--- 🧠 Complexity ---" << std::endl;
+                        json c = resultJson["complexity"];
+                        std::cout << "Rows: " << c.value("modelRows", 0) << " | "
+                                  << "Cols: " << c.value("modelColumns", 0) << " | "
+                                  << "Nodes: " << c.value("searchNodes", 0) << std::endl;
+                        std::cout << "Big-M Rest Constraints: " << c.value("numRestConstraints", 0) << std::endl;
+                        std::cout << "Final Gap: " << c.value("finalGap", 0.0) << std::endl;
+                    }
+
                     // Print Timing
                     if (resultJson.contains("timing")) {
                         std::cout << "\n--- ⏱️  Timing Performance ---" << std::endl;

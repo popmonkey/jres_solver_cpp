@@ -73,6 +73,14 @@ struct ScheduleEntry {
     int laps;
 };
 
+struct ComplexityMetrics {
+    int modelColumns = 0;
+    int modelRows = 0;
+    int numRestConstraints = 0; // The "Big-M" metric
+    int searchNodes = 0;
+    double finalGap = 0.0;
+};
+
 // --- JSON Deserialization Declarations ---
 void from_json(const json &j, TeamMember &member);
 void from_json(const json &j, RaceData &data);
@@ -81,3 +89,4 @@ void from_json(const json &j, RaceData &data);
 void to_json(json &j, const TeamMember &member);
 void to_json(json &j, const RaceData &data);
 void to_json(json &j, const SolverContext &ctx);
+void to_json(json &j, const ComplexityMetrics &metrics);

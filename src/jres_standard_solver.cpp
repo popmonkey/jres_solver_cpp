@@ -35,6 +35,8 @@ json JresStandardSolver::solve()
 {
     using namespace std::chrono;
     auto startTotal = high_resolution_clock::now();
+    ComplexityMetrics metrics;
+
     double setupDurationMs = 0.0;
     double driverSolveDurationMs = 0.0;
     double spotterSolveDurationMs = 0.0;
@@ -99,15 +101,57 @@ json JresStandardSolver::solve()
         }
     }
 
+    // --- Metric Calculation (Static) ---
+    // Count "Big-M" Rest constraints generated (Approximation based on input logic)
+    auto countRestRows = [&](const std::vector<TeamMember>& pool) {
+        int count = 0;
+        for (const auto& p : pool) {
+            int minRestHours = p.minimumRestHours;
+            if (minRestHours > 0 && m_stintWithPitSeconds > 0) {
+                int minRestStints = static_cast<int>(std::floor((minRestHours * 3600) / m_stintWithPitSeconds));
+                if (minRestStints > 0 && minRestStints <= m_totalStints) {
+                   int possibleRestStarts = m_totalStints - minRestStints + 1;
+                   count += possibleRestStarts; // The enforceRestRows
+                   // We also add 1 aggregation row per person, but the "Big-M" complexity 
+                   // comes primarily from the conditional enforcement rows.
+                }
+            }
+        }
+        return count;
+    };
+    
+    metrics.numRestConstraints += countRestRows(m_driverPool);
+    if (m_ctx.spotterMode == SpotterMode::Integrated) {
+        metrics.numRestConstraints += countRestRows(m_spotterPool);
+    }
+    
+    // Capture sizes before solve
+    metrics.modelRows = m_mainModel->solver()->getNumRows();
+    metrics.modelColumns = m_mainModel->solver()->getNumCols();
+
     // End Setup Timer
     auto endSetup = high_resolution_clock::now();
     setupDurationMs = duration<double, std::milli>(endSetup - startTotal).count();
 
     // --- 5. Solve (Driver/Integrated) ---
     auto solveStart = high_resolution_clock::now();
+    
+    // Explicitly solve the root relaxation first to capture the "Root Gap"
+    // This serves as a proxy for complexity and avoids version-specific Cbc API calls like getBestPossibleObj()
+    m_mainSolver->initialSolve();
+    double rootRelaxation = m_mainSolver->getObjValue();
+
     m_mainModel->branchAndBound();
     auto solveEnd = high_resolution_clock::now();
     driverSolveDurationMs = duration<double, std::milli>(solveEnd - solveStart).count();
+
+    // --- Metric Calculation (Dynamic) ---
+    metrics.searchNodes = m_mainModel->getNodeCount();
+    double bestObj = m_mainModel->getObjValue();
+    
+    // We use the gap between the Root Relaxation and the Final Integer solution
+    // as our complexity metric.
+    metrics.finalGap = std::abs(bestObj - rootRelaxation);
 
     if (!m_mainModel->isProvenOptimal() && m_mainModel->isProvenInfeasible())
     {
@@ -120,6 +164,12 @@ json JresStandardSolver::solve()
     json metaJson;
     to_json(metaJson, m_ctx); // Use the to_json overload from types header
     outputJson["metadata"] = metaJson;
+    
+    // Add Complexity Metrics
+    json complexityJson;
+    to_json(complexityJson, metrics);
+    outputJson["complexity"] = complexityJson;
+
     outputJson["raceData"] = m_ctx.raceData;
 
     std::vector<ScheduleEntry> schedule;
@@ -200,6 +250,8 @@ json JresStandardSolver::solve()
             }
         }
 
+        // We do not add complexity metrics for the sequential spotter sub-solve
+        // to the main complexity object to keep it simple, but we could sum them if desired.
         spotterCbcModel.branchAndBound();
 
         if (spotterCbcModel.isProvenOptimal() || spotterCbcModel.isProvenInfeasible() == 0) {

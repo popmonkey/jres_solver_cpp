@@ -66,3 +66,14 @@ void to_json(json &j, const SolverContext &ctx)
         {"optimalityGap", ctx.optimalityGap}
     };
 }
+
+void to_json(json &j, const ComplexityMetrics &metrics)
+{
+    j = json{
+        {"modelColumns", metrics.modelColumns},
+        {"modelRows", metrics.modelRows},
+        {"numRestConstraints", metrics.numRestConstraints},
+        {"searchNodes", metrics.searchNodes},
+        {"finalGap", metrics.finalGap}
+    };
+}
