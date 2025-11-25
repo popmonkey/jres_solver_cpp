@@ -49,12 +49,13 @@ namespace {
         bool found = false;
         for (const auto& issue : diagnosis) {
             std::string msg = issue.get<std::string>();
-            if (msg.find("AVAILABILITY GAP") != std::string::npos) {
+            // Updated to match new solver output: "AVAILABILITY: Drivers forced..."
+            if (msg.find("AVAILABILITY:") != std::string::npos) {
                 found = true;
                 break;
             }
         }
-        EXPECT_TRUE(found) << "Expected diagnosis to contain 'AVAILABILITY GAP'";
+        EXPECT_TRUE(found) << "Expected diagnosis to contain 'AVAILABILITY:'";
     }
 
     // Scenario: Driver A has preferred Stints = 1.
@@ -93,12 +94,13 @@ namespace {
         json diagnosis = resultJson["diagnosis"];
         ASSERT_FALSE(diagnosis.empty());
         
-        // New Detailed Format: "Driver Ayrton exceeded max consecutive stint limit (Driven Stints: 1-3, Limit: 1)."
+        // Updated to match new solver output: 
+        // "Driver Ayrton exceeded max consecutive limit (Stints 1-3)."
         bool found = false;
         for (const auto& issue : diagnosis) {
             std::string msg = issue.get<std::string>();
-            if (msg.find("exceeded max consecutive stint limit") != std::string::npos &&
-                msg.find("Stints: 1-3") != std::string::npos) {
+            if (msg.find("exceeded max consecutive limit") != std::string::npos &&
+                msg.find("Stints 1-3") != std::string::npos) {
                 found = true;
                 break;
             }

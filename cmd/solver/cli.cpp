@@ -203,6 +203,14 @@ int main(int argc, char **argv)
                 std::cout << "\n[App] Result saved to " << outputPath << std::endl;
             }
         }
+        
+        // Print Timing
+        if (!quiet && resultCode == 0 && resultJson.contains("metadata") && resultJson["metadata"].contains("timing")) {
+             double totalSec = resultJson["metadata"]["timing"].value("totalSeconds", 0.0);
+             std::cout << "\n[App] Solver finished in " << std::fixed << std::setprecision(3) << totalSec << "s." << std::endl;
+        } else if (!quiet) {
+             std::cout << "[App] Solver finished." << std::endl;
+        }
 
     } catch (const std::exception& e) {
         std::cerr << "[App] Error processing solver result: " << e.what() << std::endl;
@@ -212,11 +220,6 @@ int main(int argc, char **argv)
 
     // Clean up
     free_solver_result(resultJsonCStr);
-
-    if (!quiet)
-    {
-        std::cout << "[App] Solver finished." << std::endl;
-    }
 
     return (resultCode == 0) ? 0 : 1;
 }

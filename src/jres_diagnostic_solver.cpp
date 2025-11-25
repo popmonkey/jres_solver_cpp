@@ -60,7 +60,6 @@ json JresDiagnosticSolver::diagnose()
     auto raceStartUTC = TimeHelpers::stringToTimePoint(m_ctx.raceData.raceStartUTC);
 
     // --- Helper: Centralized Availability Logic ---
-    // Returns true if the driver is strictly available for the ENTIRE duration of stint 's'
     auto isDriverAvailable = [&](const std::string& name, int s) -> bool {
         auto stintStart = raceStartUTC + std::chrono::seconds(static_cast<long>(s * m_stintWithPitSeconds));
         auto stintEnd = stintStart + std::chrono::seconds(static_cast<long>(m_stintWithPitSeconds));
@@ -74,8 +73,10 @@ json JresDiagnosticSolver::diagnose()
             if (m_ctx.raceData.availability[name].value(endKey, "Unavailable") == "Unavailable") return false;
             return true;
         }
-        return false; // Default to unavailable if missing from map
+        return false; 
     };
+
+    CoinBuild rows;
 
     // =========================================================
     // 1. BUILD DIAGNOSTIC MODEL
@@ -116,7 +117,7 @@ json JresDiagnosticSolver::diagnose()
         solver.setInteger(extraIdx);
         row.insert(extraIdx, -1.0); 
 
-        solver.addRow(row, 1.0, 1.0);
+        rows.addRow(row.getNumElements(), row.getIndices(), row.getElements(), 1.0, 1.0);
     }
 
     // --- C. Max Consecutive Stints ---
@@ -133,33 +134,47 @@ json JresDiagnosticSolver::diagnose()
             solver.setInteger(slackIdx);
 
             row.insert(slackIdx, -1.0); 
-            solver.addRow(row, -COIN_DBL_MAX, maxConsecutive);
+            rows.addRow(row.getNumElements(), row.getIndices(), row.getElements(), -COIN_DBL_MAX, maxConsecutive);
         }
     }
 
-    // --- D. Fair Share ---
+    // --- D. Fair Share (Updated to match Standard Solver) ---
     double totalLaps = m_totalStints * m_stintLaps;
     double equalShareLaps = totalLaps / m_driverPool.size();
+    double equalShareStints = (double)m_totalStints / m_driverPool.size();
+    
+    // Min Stints
     int minLapsPerParticipant = static_cast<int>(std::ceil(0.25 * equalShareLaps));
     double minStintsFloat = (m_stintLaps > 0) ? (double)minLapsPerParticipant / m_stintLaps : 0.0;
     int minStintsPerParticipant = static_cast<int>(std::ceil(minStintsFloat));
-    
     if (minStintsPerParticipant * m_driverPool.size() > m_totalStints) minStintsPerParticipant = 0;
 
-    if (minStintsPerParticipant > 0) {
-        for (const auto &p : m_driverPool) {
-            CoinPackedVector row;
-            for (int s = 0; s < m_totalStints; ++s) {
-                row.insert(assignVars.at({p.name, s}), 1.0);
-            }
+    // Max Stints (Average + 3)
+    int maxStintsPerParticipant = static_cast<int>(std::ceil(equalShareStints)) + 3;
 
+    for (const auto &p : m_driverPool) {
+        CoinPackedVector row;
+        for (int s = 0; s < m_totalStints; ++s) {
+            row.insert(assignVars.at({p.name, s}), 1.0);
+        }
+
+        // Min Slack
+        if (minStintsPerParticipant > 0) {
             int slackIdx = solver.getNumCols();
             solver.addCol(CoinPackedVector(), 0.0, (double)m_totalStints, 50000.0); 
             solver.setInteger(slackIdx);
-
-            row.insert(slackIdx, 1.0);
-            solver.addRow(row, minStintsPerParticipant, COIN_DBL_MAX);
+            CoinPackedVector minRow = row;
+            minRow.insert(slackIdx, 1.0);
+            rows.addRow(minRow.getNumElements(), minRow.getIndices(), minRow.getElements(), minStintsPerParticipant, COIN_DBL_MAX);
         }
+
+        // Max Slack
+        int maxSlackIdx = solver.getNumCols();
+        solver.addCol(CoinPackedVector(), 0.0, (double)m_totalStints, 50000.0);
+        solver.setInteger(maxSlackIdx);
+        CoinPackedVector maxRow = row;
+        maxRow.insert(maxSlackIdx, -1.0);
+        rows.addRow(maxRow.getNumElements(), maxRow.getIndices(), maxRow.getElements(), -COIN_DBL_MAX, maxStintsPerParticipant);
     }
 
     // --- E. Minimum Rest ---
@@ -181,7 +196,7 @@ json JresDiagnosticSolver::diagnose()
                             solver.setInteger(slackIdx);
 
                             row.insert(slackIdx, -1.0);
-                            solver.addRow(row, -COIN_DBL_MAX, 1.0);
+                            rows.addRow(row.getNumElements(), row.getIndices(), row.getElements(), -COIN_DBL_MAX, 1.0);
                         }
                     }
                 }
@@ -203,9 +218,12 @@ json JresDiagnosticSolver::diagnose()
             CoinPackedVector row;
             row.insert(workVarIdx, 1.0);
             row.insert(slackIdx, 1.0);
-            solver.addRow(row, 1.0, COIN_DBL_MAX);
+            rows.addRow(row.getNumElements(), row.getIndices(), row.getElements(), 1.0, COIN_DBL_MAX);
         }
     }
+
+    // Correctly invoke addRows via the base class to avoid hiding issues
+    static_cast<OsiSolverInterface*>(&solver)->addRows(rows);
 
     // =========================================================
     // 2. SOLVE
@@ -233,7 +251,8 @@ json JresDiagnosticSolver::diagnose()
     std::map<std::string, int> driverRestViolations;
     std::map<std::string, std::vector<std::pair<int, int>>> driverConsecutiveDetails;
     std::map<std::string, int> driverUnavailableCounts;
-    std::map<std::string, int> fairShareViolations;
+    std::map<std::string, int> fairShareMinViolations;
+    std::map<std::string, int> fairShareMaxViolations;
     
     // 1. Coverage Check
     struct DiagEntry { std::vector<std::string> drivers; };
@@ -299,24 +318,26 @@ json JresDiagnosticSolver::diagnose()
             }
         }
         
-        // Fair Share
-        if (minStintsPerParticipant > 0) {
-            int totalDriven = 0;
-            for (int s = 0; s < m_totalStints; ++s) {
-                if (solution[assignVars.at({p.name, s})] > 0.5) totalDriven++;
-            }
-            if (totalDriven < minStintsPerParticipant) {
-                fairShareViolations[p.name] = minStintsPerParticipant - totalDriven;
-            }
+        // Fair Share Check
+        int totalDriven = 0;
+        for (int s = 0; s < m_totalStints; ++s) {
+            if (solution[assignVars.at({p.name, s})] > 0.5) totalDriven++;
+        }
+        
+        if (minStintsPerParticipant > 0 && totalDriven < minStintsPerParticipant) {
+            fairShareMinViolations[p.name] = minStintsPerParticipant - totalDriven;
+        }
+        if (totalDriven > maxStintsPerParticipant) {
+            fairShareMaxViolations[p.name] = totalDriven - maxStintsPerParticipant;
         }
     }
 
     // --- SYNTHESIZE REPORT ---
 
-    // A. Critical Gaps (No Driver)
+    // A. Critical Gaps
     if (!emptyStints.empty()) {
         issues.push_back("CRITICAL: No drivers could be assigned to " + std::to_string(emptyStints.size()) + 
-                         " stints (" + formatStintList(emptyStints) + "). This usually means the total roster size is too small or constraints are too strict during these times.");
+                         " stints (" + formatStintList(emptyStints) + ").");
     }
 
     // B. Systemic Rest Violations
@@ -325,55 +346,33 @@ json JresDiagnosticSolver::diagnose()
     
     if (totalRestViolations > 3) {
         int minRest = m_driverPool.empty() ? 0 : m_driverPool[0].minimumRestHours;
-        issues.push_back("SYSTEMIC FAILURE: The 'Minimum Rest' setting (" + std::to_string(minRest) + 
-                         "h) is causing widespread conflicts. The diagnostic solver had to violate rest rules " + 
-                         std::to_string(totalRestViolations) + " times to fill the schedule. Suggestion: Reduce minimum rest or add more drivers.");
+        issues.push_back("SYSTEMIC FAILURE: 'Minimum Rest' (" + std::to_string(minRest) + 
+                         "h) caused " + std::to_string(totalRestViolations) + " conflicts.");
     } else {
         for(auto const& [name, count] : driverRestViolations) {
             if (count > 0) issues.push_back("Driver " + name + " violated rest rules " + std::to_string(count) + " times.");
         }
     }
 
-    // C. Availability Hotspots
+    // C. Availability
     if (!unavailableStints.empty()) {
-        std::string range = formatStintList(unavailableStints);
-        issues.push_back("AVAILABILITY GAP: Drivers were forced to drive during their unavailable blocks in stints: " + range + 
-                         ". Please verify driver availability during these times.");
+        issues.push_back("AVAILABILITY: Drivers forced to drive during unavailable times in stints: " + formatStintList(unavailableStints));
     }
 
-    // D. Consecutive Warnings (With Context Check)
+    // D. Consecutive
     for (const auto& [name, ranges] : driverConsecutiveDetails) {
         for (const auto& range : ranges) {
-            int start = range.first; // 1-based
-            int end = range.second;  // 1-based inclusize
-            
-            // Context Check: Was anyone else available?
-            bool alternativeExists = false;
-            for (int s = start - 1; s < end; ++s) { // Convert to 0-based for array access
-                for (const auto& other : m_driverPool) {
-                    if (other.name == name) continue;
-                    if (isDriverAvailable(other.name, s)) {
-                        alternativeExists = true; 
-                        break;
-                    }
-                }
-                if (alternativeExists) break;
-            }
-
-            std::string msg = "Driver " + name + " exceeded max consecutive stint limit (Driven Stints: " + 
-                              std::to_string(start) + "-" + std::to_string(end) + 
-                              ", Limit: " + std::to_string(m_driverPool[0].preferredStints) + ").";
-            
-            if (!alternativeExists) {
-                msg += " Note: No other drivers were available during this period.";
-            }
-            issues.push_back(msg);
+            issues.push_back("Driver " + name + " exceeded max consecutive limit (Stints " + 
+                              std::to_string(range.first) + "-" + std::to_string(range.second) + ").");
         }
     }
 
     // E. Fair Share
-    for (const auto& [name, missing] : fairShareViolations) {
-        issues.push_back("Driver " + name + " is under-utilized by " + std::to_string(missing) + " stints (Fair share requires more driving).");
+    for (const auto& [name, missing] : fairShareMinViolations) {
+        issues.push_back("Driver " + name + " is under-utilized by " + std::to_string(missing) + " stints.");
+    }
+    for (const auto& [name, over] : fairShareMaxViolations) {
+        issues.push_back("Driver " + name + " is over-utilized by " + std::to_string(over) + " stints (Exceeds fair share max).");
     }
 
     // F. First Stint
@@ -390,7 +389,6 @@ json JresDiagnosticSolver::diagnose()
         }
     }
 
-    // G. Fallback
     if (issues.empty()) {
         issues.push_back("Unknown infeasibility. The diagnostic solver found a valid relaxed schedule, but strict verification failed.");
     }
