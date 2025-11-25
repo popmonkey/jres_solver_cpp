@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 
 JresStandardSolver::JresStandardSolver(const SolverContext& ctx)
     : JresSolverBase(ctx)
@@ -32,6 +33,12 @@ JresStandardSolver::~JresStandardSolver() = default;
 
 json JresStandardSolver::solve()
 {
+    using namespace std::chrono;
+    auto startTotal = high_resolution_clock::now();
+    double setupDurationMs = 0.0;
+    double driverSolveDurationMs = 0.0;
+    double spotterSolveDurationMs = 0.0;
+
     // --- 1. Build Driver Model ---
     ParticipantModel driverModel = add_participant_model(
         *m_mainModel, m_driverPool, "Drive", m_stintWithPitSeconds, m_stintLaps
@@ -61,7 +68,7 @@ json JresStandardSolver::solve()
         }
     }
 
-    // --- 4. Add Spotter Model ---
+    // --- 4. Add Spotter Model (Integrated Mode) ---
     ParticipantModel spotterModel("Spot");
 
     if (m_ctx.spotterMode == SpotterMode::Integrated)
@@ -92,11 +99,15 @@ json JresStandardSolver::solve()
         }
     }
 
-    // --- 5. Solve ---
-    auto solveStart = std::chrono::high_resolution_clock::now();
+    // End Setup Timer
+    auto endSetup = high_resolution_clock::now();
+    setupDurationMs = duration<double, std::milli>(endSetup - startTotal).count();
+
+    // --- 5. Solve (Driver/Integrated) ---
+    auto solveStart = high_resolution_clock::now();
     m_mainModel->branchAndBound();
-    auto solveEnd = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> solveDuration = solveEnd - solveStart;
+    auto solveEnd = high_resolution_clock::now();
+    driverSolveDurationMs = duration<double, std::milli>(solveEnd - solveStart).count();
 
     if (!m_mainModel->isProvenOptimal() && m_mainModel->isProvenInfeasible())
     {
@@ -105,6 +116,10 @@ json JresStandardSolver::solve()
 
     // --- 6. Process Results ---
     json outputJson;
+    // Add Metadata
+    json metaJson;
+    to_json(metaJson, m_ctx); // Use the to_json overload from types header
+    outputJson["metadata"] = metaJson;
     outputJson["raceData"] = m_ctx.raceData;
 
     std::vector<ScheduleEntry> schedule;
@@ -150,6 +165,8 @@ json JresStandardSolver::solve()
     } 
     else if (m_ctx.spotterMode == SpotterMode::Sequential && !m_spotterPool.empty())
     {
+        auto spotterStart = high_resolution_clock::now();
+
         std::unique_ptr<OsiClpSolverInterface> spotterSolver(new OsiClpSolverInterface);
         spotterSolver->setObjSense(1.0);
         CbcModel spotterCbcModel(*spotterSolver);
@@ -194,9 +211,25 @@ json JresStandardSolver::solve()
                 }
             }
         }
+
+        auto spotterEnd = high_resolution_clock::now();
+        spotterSolveDurationMs = duration<double, std::milli>(spotterEnd - spotterStart).count();
     }
     
-    outputJson["solveDurationSeconds"] = solveDuration.count();
+    auto endTotal = high_resolution_clock::now();
+    double totalDurationSeconds = duration<double>(endTotal - startTotal).count();
+
+    // Timing Block
+    json timingJson;
+    timingJson["setupMs"] = setupDurationMs;
+    timingJson["driverSolveMs"] = driverSolveDurationMs;
+    if (m_ctx.spotterMode == SpotterMode::Sequential) {
+        timingJson["spotterSolveMs"] = spotterSolveDurationMs;
+    }
+    timingJson["totalSeconds"] = totalDurationSeconds;
+
+    outputJson["timing"] = timingJson;
+
     json scheduleJson = json::array();
     bool hasSpotters = (m_ctx.spotterMode != SpotterMode::None);
     for(const auto& entry : schedule) {

@@ -53,3 +53,16 @@ void to_json(json &j, const RaceData &data)
         {"availability", data.availability},
         {"firstStintDriver", data.firstStintDriver}};
 }
+
+void to_json(json &j, const SolverContext &ctx)
+{
+    // We intentionally do NOT include 'raceData' here to avoid 
+    // duplication in the final output, as this is used for the "metadata" block.
+    j = json{
+        {"quiet", ctx.quiet},
+        {"timeLimit", ctx.timeLimit},
+        {"spotterMode", ctx.spotterMode}, // Serializes to string via enum mapping
+        {"allowNoSpotter", ctx.allowNoSpotter},
+        {"optimalityGap", ctx.optimalityGap}
+    };
+}
