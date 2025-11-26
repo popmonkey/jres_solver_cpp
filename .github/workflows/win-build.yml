@@ -20,6 +20,11 @@ on:
 jobs:
   build-windows:
     runs-on: windows-2022
+    env:
+      # Match the tag/filename from your highs-artifacts.yml
+      HIGHS_TAG: highs-static-v1.12.0
+      HIGHS_ZIP: highs-v1.12.0-windows-x64.zip
+      HIGHS_DIR: ${{ github.workspace }}\highs
 
     steps:
     - name: Checkout repo (with submodules)
@@ -29,12 +34,23 @@ jobs:
         fetch-depth: 0 
 
     # ---------------------------------------------------------
-    # Install HiGHS via VCPKG
+    # Download Pre-built HiGHS (Static)
     # ---------------------------------------------------------
-    - name: Install HiGHS (vcpkg)
+    - name: Prepare HiGHS directory
       shell: pwsh
+      run: New-Item -ItemType Directory -Path "$env:HIGHS_DIR" | Out-Null
+
+    - name: Download HiGHS Artifact
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        vcpkg install highs:x64-windows-static
+        gh release download $env:HIGHS_TAG `
+          --pattern $env:HIGHS_ZIP `
+          --output "$env:HIGHS_DIR\highs.zip" `
+          --repo ${{ github.repository }}
+        
+        Expand-Archive -Path "$env:HIGHS_DIR\highs.zip" -DestinationPath "$env:HIGHS_DIR" -Force
 
     # ---------------------------------------------------------
     # Build
@@ -42,12 +58,12 @@ jobs:
     - name: Configure CMake (MSVC)
       shell: pwsh
       run: |
-        # Use vcpkg toolchain
+        # Point CMAKE_PREFIX_PATH to our downloaded HiGHS dir
+        # This triggers "Strategy 1" in CMakeLists.txt
         cmake -B build `
           -G "Visual Studio 17 2022" `
           -DCMAKE_BUILD_TYPE=Release `
-          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-          -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          -DCMAKE_PREFIX_PATH="$env:HIGHS_DIR"
 
     - name: Build Libraries & Executables
       shell: pwsh
@@ -75,11 +91,9 @@ jobs:
     - name: Sanitize Inputs
       run: |
         $safeVersion = "${{ inputs.version }}".ToLower() -replace '[^a-z0-9-]', '_'
-        $safePlatform = "${{ inputs.platform }}".ToLower() -replace '[^a-z0-9-]', '_'
         $safeArch = "${{ inputs.arch }}".ToLower() -replace '[^a-z0-9-]', '_'
         
         echo "SAFE_VERSION=$safeVersion" >> $env:GITHUB_ENV
-        echo "SAFE_PLATFORM=$safePlatform" >> $env:GITHUB_ENV
         echo "SAFE_ARCH=$safeArch" >> $env:GITHUB_ENV
 
     - name: Set Asset Name

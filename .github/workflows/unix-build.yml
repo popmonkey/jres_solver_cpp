@@ -31,21 +31,11 @@ on:
 jobs:
   build:
     runs-on: ${{ inputs.os }}
+    env:
+      HIGHS_TAG: highs-static-v1.12.0
+      HIGHS_DIR: ${{ github.workspace }}/highs
 
     steps:
-      # ---------------------------------------------------------
-      # Debug Info
-      # ---------------------------------------------------------
-      - name: Print Build Info
-        run: |
-          echo "Version:   ${{ inputs.version }}"
-          echo "Platform:  ${{ inputs.platform }}"
-          echo "OS:        ${{ inputs.os }}"
-          echo "Arch:      ${{ inputs.arch }}"
-
-      # ---------------------------------------------------------
-      # Checkout repo with submodules
-      # ---------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -53,36 +43,41 @@ jobs:
           fetch-depth: 0
 
       # ---------------------------------------------------------
-      # HiGHS installation
+      # Download Pre-built HiGHS
       # ---------------------------------------------------------
-      - name: Install HiGHS (Linux - Build from Source)
-        if: inputs.os == 'ubuntu-latest'
+      - name: Determine Artifact Name
+        id: artifact
         run: |
-          # Install deps
-          sudo apt-get update
-          sudo apt-get install -y cmake g++ git
+          if [[ "${{ inputs.os }}" == "ubuntu-latest" ]]; then
+            echo "zip_name=highs-v1.12.0-linux-x64.zip" >> $GITHUB_OUTPUT
+          elif [[ "${{ inputs.os }}" == "macos-13" ]]; then
+            echo "zip_name=highs-v1.12.0-macos-x64.zip" >> $GITHUB_OUTPUT
+          elif [[ "${{ inputs.os }}" == "macos-latest" ]]; then
+            echo "zip_name=highs-v1.12.0-macos-arm64.zip" >> $GITHUB_OUTPUT
+          else
+             echo "Unsupported OS" && exit 1
+          fi
+
+      - name: Download HiGHS Artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ${{ env.HIGHS_DIR }}
+          gh release download ${{ env.HIGHS_TAG }} \
+            --pattern ${{ steps.artifact.outputs.zip_name }} \
+            --output "${{ env.HIGHS_DIR }}/highs.zip" \
+            --repo ${{ github.repository }}
           
-          # Clone and Build HiGHS
-          git clone https://github.com/ERGO-Code/HiGHS.git
-          cd HiGHS
-          cmake -B build -DFAST_BUILD=ON
-          cmake --build build --parallel 2
-          sudo cmake --install build
-          cd ..
-
-      - name: Install HiGHS (macOS)
-        if: startsWith(inputs.os, 'macos')
-        run: brew install highs
-
-      - name: Set CMAKE_PREFIX_PATH (Apple Silicon)
-        if: inputs.os == 'macos-14'
-        run: echo "CMAKE_PREFIX_PATH=/opt/homebrew" >> $GITHUB_ENV
+          unzip "${{ env.HIGHS_DIR }}/highs.zip" -d ${{ env.HIGHS_DIR }}
 
       # ---------------------------------------------------------
       # Build
       # ---------------------------------------------------------
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${{ env.HIGHS_DIR }}"
 
       - name: Build Project
         run: cmake --build build --config Release
@@ -99,24 +94,17 @@ jobs:
 
       - name: Sanitize Inputs
         run: |
-          # Function to lowercase and replace invalid chars with _
-          sanitize() {
-            echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/_/g'
-          }
-
+          sanitize() { echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/_/g'; }
           echo "SAFE_VERSION=$(sanitize "${{ inputs.version }}")" >> $GITHUB_ENV
           echo "SAFE_PLATFORM=$(sanitize "${{ inputs.platform }}")" >> $GITHUB_ENV
           echo "SAFE_ARCH=$(sanitize "${{ inputs.arch }}")" >> $GITHUB_ENV
           
       - name: Set Asset Name
-        # Naming Convention: jres-solver-[version]-[platform]-[arch].tar.gz
         run: echo "ASSET_NAME=jres-solver-${{ env.SAFE_VERSION }}-${{ env.SAFE_PLATFORM }}-${{ env.SAFE_ARCH }}.${{ inputs.asset_ext }}" >> $GITHUB_ENV
 
       - name: Ad-hoc Sign Binary (macOS)
         if: startsWith(inputs.os, 'macos')
         run: |
-          # Use ad-hoc signature (-)
-          # Sign the re-named binaries (from OUTPUT_NAME property in CMake)
           codesign --force --deep -s - build/jres_solver
           codesign --force --deep -s - build/jres_formatter
           codesign --force --deep -s - build/libjres_solver.dylib
@@ -124,21 +112,15 @@ jobs:
       - name: Package (tar.gz)
         run: |
           cd build
-          # Package commands and libs using the final filenames
           tar -czvf "../${{ env.ASSET_NAME }}" \
             jres_solver \
             jres_formatter \
             libjres_solver.* \
             2>/dev/null || true
 
-      # ---------------------------------------------------------
-      # Generate Signature (Checksum)
-      # ---------------------------------------------------------
       - name: Generate Checksum
         run: |
-          # Generate SHA256 checksum for the tarball
           shasum -a 256 ${{ env.ASSET_NAME }} > ${{ env.ASSET_NAME }}.sha256
-          cat ${{ env.ASSET_NAME }}.sha256
 
       # ---------------------------------------------------------
       # Upload Artifacts
