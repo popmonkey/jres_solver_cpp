@@ -1,0 +1,94 @@
+name: Build HiGHS Static Artifacts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  HIGHS_VERSION: v1.12.0
+  RELEASE_TAG: highs-static-v1.12.0
+
+jobs:
+  build-highs:
+    name: Build ${{ matrix.platform_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x64
+            platform_name: linux-x64
+            cmake_args: "-DOPENMP=OFF"
+          - os: macos-13
+            arch: x64
+            platform_name: macos-x64
+            cmake_args: "-DOPENMP=OFF"
+          - os: macos-latest
+            arch: arm64
+            platform_name: macos-arm64
+            cmake_args: "-DOPENMP=OFF"
+          - os: windows-2022
+            arch: x64
+            platform_name: windows-x64
+            cmake_args: "-DOPENMP=OFF"
+
+    steps:
+    - name: Checkout HiGHS
+      uses: actions/checkout@v4
+      with:
+        repository: ERGO-Code/HiGHS
+        ref: ${{ env.HIGHS_VERSION }}
+
+    # --- Windows Specifics (MSVC Runtime) ---
+    - name: Configure CMake (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        cmake -B build `
+          -DFAST_BUILD=ON `
+          -DBUILD_SHARED_LIBS=OFF `
+          -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded" `
+          -DCMAKE_INSTALL_PREFIX="install" `
+          ${{ matrix.cmake_args }}
+
+    # --- Unix Specifics ---
+    - name: Configure CMake (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        cmake -B build \
+          -DFAST_BUILD=ON \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DCMAKE_INSTALL_PREFIX="install" \
+          -DCMAKE_BUILD_TYPE=Release \
+          ${{ matrix.cmake_args }}
+
+    - name: Build & Install
+      run: |
+        cmake --build build --config Release --parallel 4
+        cmake --install build --config Release
+
+    - name: Zip Artifacts (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $zipName = "highs-${{ env.HIGHS_VERSION }}-${{ matrix.platform_name }}.zip"
+        Compress-Archive -Path "install/*" -DestinationPath $zipName
+        echo "ARTIFACT_NAME=$zipName" >> $env:GITHUB_ENV
+
+    - name: Zip Artifacts (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        zipName="highs-${{ env.HIGHS_VERSION }}-${{ matrix.platform_name }}.zip"
+        cd install
+        zip -r "../$zipName" .
+        echo "ARTIFACT_NAME=$zipName" >> $GITHUB_ENV
+
+    - name: Upload to Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.RELEASE_TAG }}
+        files: ${{ env.ARTIFACT_NAME }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
