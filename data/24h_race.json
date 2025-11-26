@@ -177,7 +177,7 @@
       "isDriver": true,
       "isSpotter": true,
       "preferredStints": 1,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     },
     {
       "name": "Ayrton",
@@ -185,7 +185,7 @@
       "isDriver": true,
       "isSpotter": false,
       "preferredStints": 2,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     },
     {
       "name": "Jack",
@@ -193,7 +193,7 @@
       "isDriver": true,
       "isSpotter": true,
       "preferredStints": 3,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     },
     {
       "name": "James",
@@ -201,7 +201,7 @@
       "isDriver": true,
       "isSpotter": true,
       "preferredStints": 2,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     },
     {
       "name": "Mario",
@@ -209,7 +209,7 @@
       "isDriver": true,
       "isSpotter": true,
       "preferredStints": 1,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     },
     {
       "name": "Ricky",
@@ -217,7 +217,7 @@
       "isDriver": false,
       "isSpotter": true,
       "preferredStints": 2,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     }
   ],
   "durationHours": 24,
