@@ -4,13 +4,8 @@
  * @brief Diagnostic solver implementation for JRES endurance race scheduling.
  */
 
- #include "jres_diagnostic_solver.hpp"
-
-// --- COIN-OR Includes ---
-#include "OsiClpSolverInterface.hpp"
-#include "CbcModel.hpp"
-#include "CoinPackedVector.hpp"
-#include "CoinBuild.hpp"
+#include "jres_diagnostic_solver.hpp"
+#include "Highs.h"
 
 #include <algorithm>
 #include <cmath>
@@ -52,15 +47,17 @@ JresDiagnosticSolver::~JresDiagnosticSolver() = default;
 
 json JresDiagnosticSolver::diagnose()
 {
-    OsiClpSolverInterface solver;
-    solver.setObjSense(1.0); // Minimize Cost
-    solver.setLogLevel(0);
+    Highs solver;
+    solver.setOptionValue("output_flag", false);
+    
+    // We strictly minimize penalties
+    // HiGHS minimizes by default, but we can be explicit if needed.
+    // (No setObjSense needed, default is minimize)
 
     std::map<std::pair<std::string, int>, int> assignVars;
     auto raceStartUTC = TimeHelpers::stringToTimePoint(m_ctx.raceData.raceStartUTC);
 
     // --- Helper: Centralized Availability Logic ---
-    // Returns true if the driver is strictly available for the ENTIRE duration of stint 's'
     auto isDriverAvailable = [&](const std::string& name, int s) -> bool {
         auto stintStart = raceStartUTC + std::chrono::seconds(static_cast<long>(s * m_stintWithPitSeconds));
         auto stintEnd = stintStart + std::chrono::seconds(static_cast<long>(m_stintWithPitSeconds));
@@ -74,70 +71,92 @@ json JresDiagnosticSolver::diagnose()
             if (m_ctx.raceData.availability[name].value(endKey, "Unavailable") == "Unavailable") return false;
             return true;
         }
-        return false; // Default to unavailable if missing from map
+        return false;
     };
 
     // =========================================================
-    // 1. BUILD DIAGNOSTIC MODEL
+    // BUILD DIAGNOSTIC MODEL
     // =========================================================
 
-    // --- A. Driver Assignment Variables ---
+    // --- Driver Assignment Variables ---
     for (const auto& p : m_driverPool) {
         for (int s = 0; s < m_totalStints; ++s) {
-            int idx = solver.getNumCols();
+            int idx = solver.getNumCol();
             assignVars[{p.name, s}] = idx;
-            solver.addCol(CoinPackedVector(), 0.0, 1.0, 0.0); 
-            solver.setInteger(idx);
             
+            // Add binary variable [0, 1]
+            solver.addVar(0.0, 1.0);
+            solver.changeColIntegrality(idx, HighsVarType::kInteger);
+            
+            // If unavailable, add penalty to objective immediately
             if (!isDriverAvailable(p.name, s)) {
-                solver.setObjCoeff(idx, 100000.0); // High cost penalty
+                solver.changeColCost(idx, 100000.0); // High cost penalty
             } else {
-                solver.setObjCoeff(idx, 0.0); 
+                solver.changeColCost(idx, 0.0); 
             }
         }
     }
 
-    // --- B. Coverage Constraints (Exactly 1 Driver) ---
+    // --- Coverage Constraints (Exactly 1 Driver) ---
     for (int s = 0; s < m_totalStints; ++s) {
-        CoinPackedVector row;
+        std::vector<int> idx;
+        std::vector<double> val;
+
         for (const auto& p : m_driverPool) {
-            row.insert(assignVars.at({p.name, s}), 1.0);
+            idx.push_back(assignVars.at({p.name, s}));
+            val.push_back(1.0);
         }
 
-        // Slack: Missing Driver
-        int missingIdx = solver.getNumCols();
-        solver.addCol(CoinPackedVector(), 0.0, 1.0, 1000000.0);
-        solver.setInteger(missingIdx);
-        row.insert(missingIdx, 1.0); 
+        // Slack: Missing Driver (Allows sum to be 0 at high cost)
+        // equation: sum(drivers) + missing - extra = 1
+        // missing: cost 1M
+        int missingIdx = solver.getNumCol();
+        solver.addVar(0.0, 1.0);
+        solver.changeColIntegrality(missingIdx, HighsVarType::kInteger);
+        solver.changeColCost(missingIdx, 1000000.0);
+        idx.push_back(missingIdx);
+        val.push_back(1.0);
 
-        // Slack: Extra Driver
-        int extraIdx = solver.getNumCols();
-        solver.addCol(CoinPackedVector(), 0.0, 5.0, 500000.0);
-        solver.setInteger(extraIdx);
-        row.insert(extraIdx, -1.0); 
+        // Slack: Extra Driver (Allows sum > 1 at high cost)
+        // extra: cost 500k
+        int extraIdx = solver.getNumCol();
+        solver.addVar(0.0, 5.0); // Allow up to 5 extra drivers overlap?
+        solver.changeColIntegrality(extraIdx, HighsVarType::kInteger);
+        solver.changeColCost(extraIdx, 500000.0);
+        idx.push_back(extraIdx);
+        val.push_back(-1.0);
 
-        solver.addRow(row, 1.0, 1.0);
+        // Row == 1.0
+        solver.addRow(1.0, 1.0, (int)idx.size(), idx.data(), val.data());
     }
 
-    // --- C. Max Consecutive Stints ---
+    // --- Max Consecutive Stints ---
     for (const auto& p : m_driverPool) {
         int maxConsecutive = p.preferredStints;
         for (int s = 0; s < m_totalStints - maxConsecutive; ++s) {
-            CoinPackedVector row;
+            std::vector<int> idx;
+            std::vector<double> val;
+            
             for (int i = 0; i <= maxConsecutive; ++i) {
-                row.insert(assignVars.at({p.name, s + i}), 1.0);
+                idx.push_back(assignVars.at({p.name, s + i}));
+                val.push_back(1.0);
             }
 
-            int slackIdx = solver.getNumCols();
-            solver.addCol(CoinPackedVector(), 0.0, (double)(maxConsecutive + 1), 10000.0);
-            solver.setInteger(slackIdx);
+            // Slack Variable
+            int slackIdx = solver.getNumCol();
+            solver.addVar(0.0, (double)(maxConsecutive + 1));
+            solver.changeColIntegrality(slackIdx, HighsVarType::kInteger);
+            solver.changeColCost(slackIdx, 10000.0);
 
-            row.insert(slackIdx, -1.0); 
-            solver.addRow(row, -COIN_DBL_MAX, maxConsecutive);
+            // Constraint: Sum(window) - Slack <= Max
+            idx.push_back(slackIdx);
+            val.push_back(-1.0);
+            
+            solver.addRow(-kHighsInf, maxConsecutive, (int)idx.size(), idx.data(), val.data());
         }
     }
 
-    // --- D. Fair Share ---
+    // --- Fair Share ---
     double totalLaps = m_totalStints * m_stintLaps;
     double equalShareLaps = totalLaps / m_driverPool.size();
     int minLapsPerParticipant = static_cast<int>(std::ceil(0.25 * equalShareLaps));
@@ -148,21 +167,28 @@ json JresDiagnosticSolver::diagnose()
 
     if (minStintsPerParticipant > 0) {
         for (const auto &p : m_driverPool) {
-            CoinPackedVector row;
+            std::vector<int> idx;
+            std::vector<double> val;
+            
             for (int s = 0; s < m_totalStints; ++s) {
-                row.insert(assignVars.at({p.name, s}), 1.0);
+                idx.push_back(assignVars.at({p.name, s}));
+                val.push_back(1.0);
             }
 
-            int slackIdx = solver.getNumCols();
-            solver.addCol(CoinPackedVector(), 0.0, (double)m_totalStints, 50000.0); 
-            solver.setInteger(slackIdx);
+            int slackIdx = solver.getNumCol();
+            solver.addVar(0.0, (double)m_totalStints);
+            solver.changeColIntegrality(slackIdx, HighsVarType::kInteger);
+            solver.changeColCost(slackIdx, 50000.0);
 
-            row.insert(slackIdx, 1.0);
-            solver.addRow(row, minStintsPerParticipant, COIN_DBL_MAX);
+            // Constraint: Sum(TotalStints) + Slack >= Min
+            idx.push_back(slackIdx);
+            val.push_back(1.0);
+            
+            solver.addRow(minStintsPerParticipant, kHighsInf, (int)idx.size(), idx.data(), val.data());
         }
     }
 
-    // --- E. Minimum Rest ---
+    // --- Minimum Rest ---
     for (const auto &p : m_driverPool) {
         int minRestHours = p.minimumRestHours;
         if (minRestHours > 0 && m_stintWithPitSeconds > 0) {
@@ -172,16 +198,25 @@ json JresDiagnosticSolver::diagnose()
                 for (int s = 0; s < possibleRestStarts; ++s) {
                     for (int k = 1; k <= minRestStints; ++k) {
                         if (s + k < m_totalStints) {
-                            CoinPackedVector row;
-                            row.insert(assignVars.at({p.name, s}), 1.0);
-                            row.insert(assignVars.at({p.name, s + k}), 1.0);
+                            std::vector<int> idx;
+                            std::vector<double> val;
+                            
+                            idx.push_back(assignVars.at({p.name, s}));
+                            val.push_back(1.0);
+                            
+                            idx.push_back(assignVars.at({p.name, s + k}));
+                            val.push_back(1.0);
 
-                            int slackIdx = solver.getNumCols();
-                            solver.addCol(CoinPackedVector(), 0.0, 1.0, 50000.0);
-                            solver.setInteger(slackIdx);
+                            int slackIdx = solver.getNumCol();
+                            solver.addVar(0.0, 1.0);
+                            solver.changeColIntegrality(slackIdx, HighsVarType::kInteger);
+                            solver.changeColCost(slackIdx, 50000.0);
 
-                            row.insert(slackIdx, -1.0);
-                            solver.addRow(row, -COIN_DBL_MAX, 1.0);
+                            // Constraint: Stint[s] + Stint[s+k] - Slack <= 1
+                            idx.push_back(slackIdx);
+                            val.push_back(-1.0);
+                            
+                            solver.addRow(-kHighsInf, 1.0, (int)idx.size(), idx.data(), val.data());
                         }
                     }
                 }
@@ -189,42 +224,45 @@ json JresDiagnosticSolver::diagnose()
         }
     }
     
-    // --- F. First Stint Driver ---
+    // --- First Stint Driver ---
     if (!m_ctx.raceData.firstStintDriver.empty()) {
         std::string firstName = m_ctx.raceData.firstStintDriver;
         auto it = std::find_if(m_driverPool.begin(), m_driverPool.end(), 
                                 [&](const TeamMember& m){ return m.name == firstName; });
         if (it != m_driverPool.end()) {
             int workVarIdx = assignVars.at({firstName, 0});
-            int slackIdx = solver.getNumCols();
-            solver.addCol(CoinPackedVector(), 0.0, 1.0, 80000.0);
-            solver.setInteger(slackIdx);
+            int slackIdx = solver.getNumCol();
+            
+            solver.addVar(0.0, 1.0);
+            solver.changeColIntegrality(slackIdx, HighsVarType::kInteger);
+            solver.changeColCost(slackIdx, 80000.0);
 
-            CoinPackedVector row;
-            row.insert(workVarIdx, 1.0);
-            row.insert(slackIdx, 1.0);
-            solver.addRow(row, 1.0, COIN_DBL_MAX);
+            // Constraint: WorkVar + Slack >= 1
+            std::vector<int> idx = {workVarIdx, slackIdx};
+            std::vector<double> val = {1.0, 1.0};
+            solver.addRow(1.0, kHighsInf, 2, idx.data(), val.data());
         }
     }
 
     // =========================================================
-    // 2. SOLVE
+    // SOLVE
     // =========================================================
     
-    CbcModel model(solver);
     double diagnosticTimeLimit = std::max((double)m_ctx.timeLimit, 60.0);
-    model.setDblParam(CbcModel::CbcMaximumSeconds, diagnosticTimeLimit);
-    model.setDblParam(CbcModel::CbcAllowableFractionGap, m_ctx.optimalityGap);
-    model.setLogLevel(0);
+    if (m_ctx.timeLimit > 0) {
+        solver.setOptionValue("time_limit", diagnosticTimeLimit);
+    }
+    solver.setOptionValue("mip_rel_gap", m_ctx.optimalityGap);
     
-    model.branchAndBound();
+    solver.run();
 
     // =========================================================
-    // 3. INTELLIGENT REPORT GENERATION
+    // INTELLIGENT REPORT GENERATION
     // =========================================================
     
     json issues = json::array();
-    const double* solution = model.solver()->getColSolution();
+    const auto& solution = solver.getSolution();
+    const std::vector<double>& colValues = solution.col_value;
 
     // --- Raw Data Collection ---
     std::vector<int> emptyStints;
@@ -235,13 +273,13 @@ json JresDiagnosticSolver::diagnose()
     std::map<std::string, int> driverUnavailableCounts;
     std::map<std::string, int> fairShareViolations;
     
-    // 1. Coverage Check
+    // Coverage Check
     struct DiagEntry { std::vector<std::string> drivers; };
     std::vector<DiagEntry> schedule(m_totalStints);
 
     for (const auto& p : m_driverPool) {
         for (int s = 0; s < m_totalStints; ++s) {
-            if (solution[assignVars.at({p.name, s})] > 0.5) {
+            if (colValues[assignVars.at({p.name, s})] > 0.5) {
                 schedule[s].drivers.push_back(p.name);
             }
         }
@@ -251,12 +289,12 @@ json JresDiagnosticSolver::diagnose()
         if (schedule[s].drivers.empty()) emptyStints.push_back(s + 1);
     }
 
-    // 2. Rule Checks
+    // Rule Checks
     for (const auto& p : m_driverPool) {
         
         // Availability
         for (int s = 0; s < m_totalStints; ++s) {
-            if (solution[assignVars.at({p.name, s})] > 0.5) {
+            if (colValues[assignVars.at({p.name, s})] > 0.5) {
                 if (!isDriverAvailable(p.name, s)) {
                     driverUnavailableCounts[p.name]++;
                     unavailableStints.push_back(s + 1);
@@ -268,7 +306,7 @@ json JresDiagnosticSolver::diagnose()
         int consecutive = 0;
         int startStint = -1;
         for (int s = 0; s < m_totalStints; ++s) {
-            if (solution[assignVars.at({p.name, s})] > 0.5) {
+            if (colValues[assignVars.at({p.name, s})] > 0.5) {
                 if (consecutive == 0) startStint = s + 1;
                 consecutive++;
             } else {
@@ -287,7 +325,7 @@ json JresDiagnosticSolver::diagnose()
             int minRestStints = static_cast<int>(std::floor((p.minimumRestHours * 3600) / m_stintWithPitSeconds));
             int lastDrivenStint = -999;
             for (int s = 0; s < m_totalStints; ++s) {
-                if (solution[assignVars.at({p.name, s})] > 0.5) {
+                if (colValues[assignVars.at({p.name, s})] > 0.5) {
                     if (lastDrivenStint != -999) {
                         int stintsSinceLast = s - lastDrivenStint - 1;
                         if (stintsSinceLast >= 0 && stintsSinceLast < minRestStints) {
@@ -303,7 +341,7 @@ json JresDiagnosticSolver::diagnose()
         if (minStintsPerParticipant > 0) {
             int totalDriven = 0;
             for (int s = 0; s < m_totalStints; ++s) {
-                if (solution[assignVars.at({p.name, s})] > 0.5) totalDriven++;
+                if (colValues[assignVars.at({p.name, s})] > 0.5) totalDriven++;
             }
             if (totalDriven < minStintsPerParticipant) {
                 fairShareViolations[p.name] = minStintsPerParticipant - totalDriven;
@@ -313,13 +351,13 @@ json JresDiagnosticSolver::diagnose()
 
     // --- SYNTHESIZE REPORT ---
 
-    // A. Critical Gaps (No Driver)
+    // Critical Gaps (No Driver)
     if (!emptyStints.empty()) {
         issues.push_back("CRITICAL: No drivers could be assigned to " + std::to_string(emptyStints.size()) + 
                          " stints (" + formatStintList(emptyStints) + "). This usually means the total roster size is too small or constraints are too strict during these times.");
     }
 
-    // B. Systemic Rest Violations
+    // Systemic Rest Violations
     int totalRestViolations = 0;
     for(auto const& [name, count] : driverRestViolations) totalRestViolations += count;
     
@@ -334,14 +372,14 @@ json JresDiagnosticSolver::diagnose()
         }
     }
 
-    // C. Availability Hotspots
+    // Availability Hotspots
     if (!unavailableStints.empty()) {
         std::string range = formatStintList(unavailableStints);
         issues.push_back("AVAILABILITY GAP: Drivers were forced to drive during their unavailable blocks in stints: " + range + 
                          ". Please verify driver availability during these times.");
     }
 
-    // D. Consecutive Warnings (With Context Check)
+    // Consecutive Warnings (With Context Check)
     for (const auto& [name, ranges] : driverConsecutiveDetails) {
         for (const auto& range : ranges) {
             int start = range.first; // 1-based
@@ -371,12 +409,12 @@ json JresDiagnosticSolver::diagnose()
         }
     }
 
-    // E. Fair Share
+    // Fair Share
     for (const auto& [name, missing] : fairShareViolations) {
         issues.push_back("Driver " + name + " is under-utilized by " + std::to_string(missing) + " stints (Fair share requires more driving).");
     }
 
-    // F. First Stint
+    // First Stint
     if (!m_ctx.raceData.firstStintDriver.empty()) {
         std::string firstName = m_ctx.raceData.firstStintDriver;
         bool droveFirst = false;
@@ -390,7 +428,7 @@ json JresDiagnosticSolver::diagnose()
         }
     }
 
-    // G. Fallback
+    // Fallback
     if (issues.empty()) {
         issues.push_back("Unknown infeasibility. The diagnostic solver found a valid relaxed schedule, but strict verification failed.");
     }
