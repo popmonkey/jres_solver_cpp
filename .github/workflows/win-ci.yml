@@ -7,14 +7,14 @@ on:
       - '**.cpp'
       - '**.hpp'
       - '**/CMakeLists.txt'
-      - '.github/workflows/*.yml'
+      - '.github/workflows/win-*.yml'
   pull_request:
     branches: [ "main" ]
     paths:
       - '**.cpp'
       - '**.hpp'
       - '**/CMakeLists.txt'
-      - '.github/workflows/*.yml'
+      - '.github/workflows/win*.yml'
 
 permissions:
   contents: read
