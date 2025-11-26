@@ -53,17 +53,26 @@ jobs:
           fetch-depth: 0
 
       # ---------------------------------------------------------
-      # CBC installation
+      # HiGHS installation
       # ---------------------------------------------------------
-      - name: Install CBC (Linux)
+      - name: Install HiGHS (Linux - Build from Source)
         if: inputs.os == 'ubuntu-latest'
         run: |
+          # Install deps
           sudo apt-get update
-          sudo apt-get install -y coinor-libcbc-dev
+          sudo apt-get install -y cmake g++ git
+          
+          # Clone and Build HiGHS
+          git clone https://github.com/ERGO-Code/HiGHS.git
+          cd HiGHS
+          cmake -B build -DFAST_BUILD=ON
+          cmake --build build --parallel 2
+          sudo cmake --install build
+          cd ..
 
-      - name: Install CBC (macOS)
+      - name: Install HiGHS (macOS)
         if: startsWith(inputs.os, 'macos')
-        run: brew install cbc
+        run: brew install highs
 
       - name: Set CMAKE_PREFIX_PATH (Apple Silicon)
         if: inputs.os == 'macos-14'

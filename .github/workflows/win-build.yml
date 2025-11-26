@@ -21,12 +21,6 @@ jobs:
   build-windows:
     runs-on: windows-2022
 
-    env:
-      CBC_TAG: cbc-windows-static
-      CBC_ZIP: cbc-windows-x64-static.zip
-      CBC_DIR: ${{ github.workspace }}\cbc
-      VCPKG_INSTALLED: ${{ github.workspace }}\cbc\installed\x64-windows-static
-
     steps:
     - name: Checkout repo (with submodules)
       uses: actions/checkout@v4
@@ -34,37 +28,30 @@ jobs:
         submodules: true
         fetch-depth: 0 
 
-    - name: Prepare CBC directory
+    # ---------------------------------------------------------
+    # Install HiGHS via VCPKG
+    # ---------------------------------------------------------
+    - name: Install HiGHS (vcpkg)
       shell: pwsh
       run: |
-        if (Test-Path "$env:CBC_DIR") {
-          Remove-Item -Recurse -Force "$env:CBC_DIR"
-        }
-        New-Item -ItemType Directory -Path "$env:CBC_DIR" | Out-Null
+        vcpkg install highs:x64-windows-static
 
-    - name: Download CBC artifact from release
-      shell: pwsh
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        gh release download $env:CBC_TAG `
-          --pattern $env:CBC_ZIP `
-          --output "$env:CBC_DIR\cbc.zip" `
-          --repo $env:GITHUB_REPOSITORY
-        Expand-Archive -Path "$env:CBC_DIR\cbc.zip" -DestinationPath "$env:CBC_DIR" -Force
-
+    # ---------------------------------------------------------
+    # Build
+    # ---------------------------------------------------------
     - name: Configure CMake (MSVC)
       shell: pwsh
       run: |
+        # Use vcpkg toolchain
         cmake -B build `
           -G "Visual Studio 17 2022" `
           -DCMAKE_BUILD_TYPE=Release `
-          -DCBC_DIR="$env:CBC_DIR"
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+          -DVCPKG_TARGET_TRIPLET=x64-windows-static
 
     - name: Build Libraries & Executables
       shell: pwsh
       run: |
-        # Build targets by their internal CMake names
         cmake --build build --config Release --target jres_solver_lib
         cmake --build build --config Release --target solver
         cmake --build build --config Release --target formatter
@@ -87,9 +74,6 @@ jobs:
 
     - name: Sanitize Inputs
       run: |
-        # Helper function block not strictly needed for one-liners, 
-        # but doing it inline is cleaner for GitHub Actions env vars
-        
         $safeVersion = "${{ inputs.version }}".ToLower() -replace '[^a-z0-9-]', '_'
         $safePlatform = "${{ inputs.platform }}".ToLower() -replace '[^a-z0-9-]', '_'
         $safeArch = "${{ inputs.arch }}".ToLower() -replace '[^a-z0-9-]', '_'
@@ -107,13 +91,10 @@ jobs:
     - name: Create Release Zip
       shell: pwsh
       run: |
-        # Use the environment variable $env:ASSET_NAME you set earlier
         $assetPath = "$env:ASSET_NAME"
-        
         $source = "${{ github.workspace }}\build\Release"
         Write-Host "Zipping binaries from $source to $assetPath..."
         
-        # This will now pick up 'jres_solver.exe' and 'jres_formatter.exe'
         Get-ChildItem $source -Include *.exe, *.dll, *.lib -Recurse | Compress-Archive -DestinationPath $assetPath
 
     # ---------------------------------------------------------

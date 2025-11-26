@@ -13,11 +13,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # ==============================================================================
 set(JRES_VERSION_STRING "0.0.0-dev") # Default fallback
 
-# 1. Override (Passed by CI via -DJRES_VERSION=...)
+# Override (Passed by CI via -DJRES_VERSION=...)
 if(DEFINED JRES_VERSION)
     set(JRES_VERSION_STRING "${JRES_VERSION}")
 
-# 2. Git (Local Development)
+# Git (Local Development)
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
     find_package(Git)
     if(GIT_FOUND)
@@ -36,7 +36,6 @@ endif()
 message(STATUS "Building JRES Solver Version: ${JRES_VERSION_STRING}")
 
 # Parse Major.Minor.Patch for C++ Defines and Windows RC
-# Default to 0.0.0 if the string is complex (like "v1.0-beta")
 set(JRES_VERSION_MAJOR 0)
 set(JRES_VERSION_MINOR 0)
 set(JRES_VERSION_PATCH 0)
@@ -51,13 +50,13 @@ endif()
 #  FILE GENERATION
 # ==============================================================================
 
-# 1. Generate version.h
+# Generate version.h
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.h.in
     ${CMAKE_CURRENT_BINARY_DIR}/generated/version.h
 )
 
-# 2. Generate resource.rc (Windows Only)
+# Generate resource.rc (Windows Only)
 set(VERSION_RC "")
 if(WIN32)
     configure_file(
@@ -71,28 +70,28 @@ endif()
 set(JRES_SOLVER_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # ==============================================================================
-#  DEPENDENCIES
+#  DEPENDENCIES (HiGHS)
 # ==============================================================================
 
 message(STATUS "Configuring for HiGHS Solver...")
 
+# Attempt to find HiGHS via Config (Works for Homebrew & vcpkg)
 find_package(highs CONFIG)
 
 if(TARGET highs::highs)
     message(STATUS "Found HiGHS via Config")
     set(HIGHS_LIBRARIES highs::highs)
 else()
-    # Fallback: Manual discovery
+    # Fallback: Manual discovery (Useful for manual builds on Linux)
     message(STATUS "HiGHS Config not found, attempting manual search...")
-    
-    # Hints for Homebrew on macOS ARM
-    set(HIGHS_SEARCH_PATHS /opt/homebrew/include /usr/local/include)
     
     find_path(HIGHS_INCLUDE_DIR NAMES Highs.h PATH_SUFFIXES highs)
     find_library(HIGHS_LIBRARY NAMES highs)
     
     if(HIGHS_INCLUDE_DIR AND HIGHS_LIBRARY)
-        message(STATUS "Found HiGHS: ${HIGHS_LIBRARY}")
+        message(STATUS "Found HiGHS Library: ${HIGHS_LIBRARY}")
+        message(STATUS "Found HiGHS Include: ${HIGHS_INCLUDE_DIR}")
+        
         add_library(highs::highs UNKNOWN IMPORTED)
         set_target_properties(highs::highs PROPERTIES
             IMPORTED_LOCATION "${HIGHS_LIBRARY}"
@@ -100,7 +99,7 @@ else()
         )
         set(HIGHS_LIBRARIES highs::highs)
     else()
-        message(FATAL_ERROR "Could not find HiGHS library. Please install it (e.g., 'brew install highs').")
+        message(FATAL_ERROR "Could not find HiGHS library. Please install it (e.g., 'brew install highs' or via vcpkg).")
     endif()
 endif()
 
@@ -150,7 +149,6 @@ target_include_directories(jres_solver_lib PUBLIC
     ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
-# Link against HiGHS instead of CBC
 target_link_libraries(jres_solver_lib PRIVATE nlohmann_json ${HIGHS_LIBRARIES})
 
 # --- 3. Solver CLI ---
