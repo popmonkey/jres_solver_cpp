@@ -1,6 +1,6 @@
 # JRES Solver
 
-This library can be used to solve for optimal driver and spotter schedules for endurance racing events.  It uses the COIN-OR Cbc optimization library.
+This library can be used to solve for optimal driver and spotter schedules for endurance racing events. It uses the **HiGHS** optimization library.
 
 >[!NOTE]
 >this is based on the python JRES Solver https://github.com/popmonkey/jres_solver
@@ -12,7 +12,7 @@ This library can be used to solve for optimal driver and spotter schedules for e
 
 ## The Library
 
-**JresSolver** is a C++ library designed to optimize endurance racing schedules. It uses the **COIN-OR Cbc** Mixed Integer Programming (MIP) solver to assign drivers (and optional spotters) to race stints while satisfying constraints such as fuel usage, maximum drive times, minimum rest periods, and driver availability.
+**JresSolver** is a C++ library designed to optimize endurance racing schedules. It uses the **HiGHS** Mixed Integer Programming (MIP) solver to assign drivers (and optional spotters) to race stints while satisfying constraints such as fuel usage, maximum drive times, minimum rest periods, and driver availability.
 
 ### Integration (C-API)
 
@@ -34,7 +34,7 @@ struct JresSolverOptions {
 enum JresSpotterMode {
     JRES_SPOTTER_MODE_NONE = 0,       // No Spotter schedule is solved for
     JRES_SPOTTER_MODE_INTEGRATED = 1, // Driver and Spotter schedule is solved together
-    JRES_SPOTTER_MODE_SEQUENTIAL = 2. // Driver schedule is prioritized
+    JRES_SPOTTER_MODE_SEQUENTIAL = 2  // Driver schedule is prioritized
 };
 
 // Main Solver Function

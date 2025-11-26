@@ -7,14 +7,14 @@ on:
       - '**.cpp'
       - '**.hpp'
       - '**/CMakeLists.txt'
-      - '.github/workflows/*.yml'
+      - '.github/workflows/unix-*.yml'
   pull_request:
     branches: [ "main" ]
     paths:
       - '**.cpp'
       - '**.hpp'
       - '**/CMakeLists.txt'
-      - '.github/workflows/*.yml'
+      - '.github/workflows/unix-*.yml'
 
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       name: "macOS Intel (x64)"
       version: ${{ github.ref_name }}
       platform: "darwin"
-      os: macos-latest
+      os: macos-13
       arch: x64
       asset_ext: tar.gz
       upload_assets: false

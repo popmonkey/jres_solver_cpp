@@ -4,14 +4,13 @@
  * @brief Standard solver implementation for JRES endurance race scheduling.
  */
 
- #pragma once
+#pragma once
 
 #include "jres_solver_utils.hpp"
 #include <memory>
 
-// Forward declarations to keep headers clean
-class CbcModel;
-class OsiClpSolverInterface;
+// Forward declaration
+class Highs;
 
 class JresStandardSolver : public JresSolverBase
 {
@@ -24,12 +23,11 @@ public:
 private:
     // Helper to build the complex variable model for drivers/spotters
     ParticipantModel add_participant_model(
-        CbcModel &model,
+        Highs &highs,
         const std::vector<TeamMember> &participants,
         const std::string &prefix,
         double stintWithPitSeconds,
         int stintLaps);
 
-    std::unique_ptr<OsiClpSolverInterface> m_mainSolver;
-    std::unique_ptr<CbcModel> m_mainModel;
+    std::unique_ptr<Highs> m_highs;
 };

@@ -4,29 +4,30 @@
  * @brief Standard solver implementation for JRES endurance race scheduling.
  */
 
- #include "jres_standard_solver.hpp"
-
-// --- COIN-OR Includes ---
-#include "OsiClpSolverInterface.hpp"
-#include "CbcModel.hpp"
-#include "CoinPackedVector.hpp"
-#include "CoinBuild.hpp"
-
+#include "jres_standard_solver.hpp"
 #include <algorithm>
 #include <cmath>
 #include <chrono>
 
+// HiGHS is accessed via a single header
+#include "Highs.h"
+
 JresStandardSolver::JresStandardSolver(const SolverContext& ctx)
     : JresSolverBase(ctx)
 {
-    m_mainSolver = std::make_unique<OsiClpSolverInterface>();
-    m_mainSolver->setObjSense(1.0); // Minimize
-    m_mainModel = std::make_unique<CbcModel>(*m_mainSolver);
+    m_highs = std::make_unique<Highs>();
+    
+    // Set HiGHS Options
+    m_highs->setOptionValue("output_flag", false); // Equivalent to setLogLevel(0)
+    m_highs->setOptionValue("presolve", "on");
+    
+    // Time Limit
+    if (m_ctx.timeLimit > 0) {
+        m_highs->setOptionValue("time_limit", static_cast<double>(m_ctx.timeLimit));
+    }
 
-    m_mainModel->setDblParam(CbcModel::CbcAllowableFractionGap, m_ctx.optimalityGap);
-    m_mainModel->setDblParam(CbcModel::CbcMaximumSeconds, static_cast<double>(m_ctx.timeLimit));
-    m_mainModel->setLogLevel(0);
-    m_mainSolver->setLogLevel(0);
+    // GAP (mip_rel_gap)
+    m_highs->setOptionValue("mip_rel_gap", m_ctx.optimalityGap);
 }
 
 JresStandardSolver::~JresStandardSolver() = default;
@@ -41,20 +42,23 @@ json JresStandardSolver::solve()
     double driverSolveDurationMs = 0.0;
     double spotterSolveDurationMs = 0.0;
 
-    // --- 1. Build Driver Model ---
+    // --- Build Driver Model ---
     ParticipantModel driverModel = add_participant_model(
-        *m_mainModel, m_driverPool, "Drive", m_stintWithPitSeconds, m_stintLaps
+        *m_highs, m_driverPool, "Drive", m_stintWithPitSeconds, m_stintLaps
     );
 
-    // --- 2. Add Coverage Constraints ---
+    // --- Add Coverage Constraints (One driver per stint) ---
     for (int s = 0; s < m_totalStints; ++s)
     {
-        CoinPackedVector oneDriverRow;
+        std::vector<int> indices;
+        std::vector<double> values;
         for (const auto &p : m_driverPool)
         {
-            oneDriverRow.insert(driverModel.workVars.at({p.name, s}), 1.0);
+            indices.push_back(driverModel.workVars.at({p.name, s}));
+            values.push_back(1.0);
         }
-        m_mainModel->solver()->addRow(oneDriverRow, 1.0, 1.0);
+        // sum(drivers) == 1.0
+        m_highs->addRow(1.0, 1.0, (int)indices.size(), indices.data(), values.data());
     }
 
     // --- 3. Add First Stint Driver Constraint ---
@@ -66,7 +70,8 @@ json JresStandardSolver::solve()
         if (it != m_driverPool.end())
         {
             int varIdx = driverModel.workVars.at({firstName, 0});
-            m_mainModel->solver()->setColBounds(varIdx, 1.0, 1.0);
+            // Fix variable bounds to 1.0
+            m_highs->changeColBounds(varIdx, 1.0, 1.0);
         }
     }
 
@@ -79,102 +84,88 @@ json JresStandardSolver::solve()
             throw std::runtime_error("Spotter mode is 'integrated' but no spotters are available and 'allow-no-spotter' is false.");
         }
         spotterModel = add_participant_model(
-            *m_mainModel, m_spotterPool, "Spot", m_stintWithPitSeconds, m_stintLaps
+            *m_highs, m_spotterPool, "Spot", m_stintWithPitSeconds, m_stintLaps
         );
+
+        // Spotter Coverage
         for (int s = 0; s < m_totalStints; ++s) {
-            CoinPackedVector row;
+            std::vector<int> indices;
+            std::vector<double> values;
             for (const auto& p : m_spotterPool) {
-                row.insert(spotterModel.workVars.at({p.name, s}), 1.0);
+                indices.push_back(spotterModel.workVars.at({p.name, s}));
+                values.push_back(1.0);
             }
-            if (m_ctx.allowNoSpotter) m_mainModel->solver()->addRow(row, 0.0, 1.0);
-            else m_mainModel->solver()->addRow(row, 1.0, 1.0);
+            if (m_ctx.allowNoSpotter) {
+                m_highs->addRow(0.0, 1.0, (int)indices.size(), indices.data(), values.data());
+            } else {
+                m_highs->addRow(1.0, 1.0, (int)indices.size(), indices.data(), values.data());
+            }
         }
+
+        // Driver cannot spot for themselves simultaneously
         for (const auto& p : m_ctx.raceData.teamMembers) {
             if (p.isDriver && p.isSpotter) {
                 for (int s = 0; s < m_totalStints; ++s) {
-                    CoinPackedVector row;
-                    row.insert(driverModel.workVars.at({p.name, s}), 1.0);
-                    row.insert(spotterModel.workVars.at({p.name, s}), 1.0);
-                    m_mainModel->solver()->addRow(row, 0.0, 1.0);
+                    std::vector<int> idx = {
+                        driverModel.workVars.at({p.name, s}),
+                        spotterModel.workVars.at({p.name, s})
+                    };
+                    std::vector<double> val = {1.0, 1.0};
+                    // driver + spotter <= 1
+                    m_highs->addRow(0.0, 1.0, 2, idx.data(), val.data());
                 }
             }
         }
     }
 
     // --- Metric Calculation (Static) ---
-    // Count "Big-M" Rest constraints generated (Approximation based on input logic)
-    auto countRestRows = [&](const std::vector<TeamMember>& pool) {
-        int count = 0;
-        for (const auto& p : pool) {
-            int minRestHours = p.minimumRestHours;
-            if (minRestHours > 0 && m_stintWithPitSeconds > 0) {
-                int minRestStints = static_cast<int>(std::floor((minRestHours * 3600) / m_stintWithPitSeconds));
-                if (minRestStints > 0 && minRestStints <= m_totalStints) {
-                   int possibleRestStarts = m_totalStints - minRestStints + 1;
-                   count += possibleRestStarts; // The enforceRestRows
-                   // We also add 1 aggregation row per person, but the "Big-M" complexity 
-                   // comes primarily from the conditional enforcement rows.
-                }
-            }
-        }
-        return count;
-    };
     
-    metrics.numRestConstraints += countRestRows(m_driverPool);
-    if (m_ctx.spotterMode == SpotterMode::Integrated) {
-        metrics.numRestConstraints += countRestRows(m_spotterPool);
-    }
-    
-    // Capture sizes before solve
-    metrics.modelRows = m_mainModel->solver()->getNumRows();
-    metrics.modelColumns = m_mainModel->solver()->getNumCols();
+    metrics.modelRows = m_highs->getNumRows();
+    metrics.modelColumns = m_highs->getNumCol();
 
-    // End Setup Timer
     auto endSetup = high_resolution_clock::now();
     setupDurationMs = duration<double, std::milli>(endSetup - startTotal).count();
 
     // --- 5. Solve (Driver/Integrated) ---
     auto solveStart = high_resolution_clock::now();
     
-    // Explicitly solve the root relaxation first to capture the "Root Gap"
-    // This serves as a proxy for complexity and avoids version-specific Cbc API calls like getBestPossibleObj()
-    m_mainSolver->initialSolve();
-    double rootRelaxation = m_mainSolver->getObjValue();
-
-    m_mainModel->branchAndBound();
+    // HiGHS run() handles the full solve process
+    m_highs->run();
+    
     auto solveEnd = high_resolution_clock::now();
     driverSolveDurationMs = duration<double, std::milli>(solveEnd - solveStart).count();
 
     // --- Metric Calculation (Dynamic) ---
-    metrics.searchNodes = m_mainModel->getNodeCount();
-    double bestObj = m_mainModel->getObjValue();
-    
-    // We use the gap between the Root Relaxation and the Final Integer solution
-    // as our complexity metric.
-    metrics.finalGap = std::abs(bestObj - rootRelaxation);
+    const HighsInfo& info = m_highs->getInfo();
+    metrics.searchNodes = (int)info.mip_node_count; // int64_t to int
+    metrics.finalGap = info.mip_gap; // Relative gap
 
-    if (!m_mainModel->isProvenOptimal() && m_mainModel->isProvenInfeasible())
-    {
-        throw std::runtime_error("Model is infeasible. No solution exists.");
+    HighsModelStatus status = m_highs->getModelStatus();
+    if (status != HighsModelStatus::kOptimal && status != HighsModelStatus::kTimeLimit) {
+        // Strict check: if it's infeasible or unbounded
+        if (status == HighsModelStatus::kInfeasible) {
+            throw std::runtime_error("Model is infeasible. No solution exists.");
+        }
+        // Note: HiGHS might return kTimeLimit but still have a valid feasible solution
     }
 
     // --- 6. Process Results ---
     json outputJson;
-    // Add Metadata
     json metaJson;
-    to_json(metaJson, m_ctx); // Use the to_json overload from types header
+    to_json(metaJson, m_ctx);
     outputJson["metadata"] = metaJson;
     
-    // Add Complexity Metrics
     json complexityJson;
     to_json(complexityJson, metrics);
     outputJson["complexity"] = complexityJson;
-
     outputJson["raceData"] = m_ctx.raceData;
 
     std::vector<ScheduleEntry> schedule;
-    const double* mainSolution = m_mainModel->solver()->getColSolution();
     
+    // Get solution vector
+    const auto& solution = m_highs->getSolution();
+    const std::vector<double>& colValues = solution.col_value;
+
     auto currentTimePoint = TimeHelpers::stringToTimePoint(m_ctx.raceData.raceStartUTC);
     double stintDurationSeconds = m_stintLaps * m_ctx.raceData.avgLapTimeInSeconds;
     double pitSeconds = m_ctx.raceData.pitTimeInSeconds;
@@ -189,11 +180,10 @@ json JresStandardSolver::solve()
         entry.startTimeUTC = TimeHelpers::timePointToString(currentTimePoint);
         auto endTimePoint = currentTimePoint + std::chrono::seconds(static_cast<long>(stintDurationSeconds));
         entry.endTimeUTC = TimeHelpers::timePointToString(endTimePoint);
-        
         currentTimePoint = endTimePoint + std::chrono::seconds(static_cast<long>(pitSeconds));
 
         for (const auto& p : m_driverPool) {
-            if (mainSolution[driverModel.workVars.at({p.name, s})] > 0.5) {
+            if (colValues[driverModel.workVars.at({p.name, s})] > 0.5) {
                 entry.driver = p.name;
                 break;
             }
@@ -206,7 +196,7 @@ json JresStandardSolver::solve()
         for (int s = 0; s < m_totalStints; ++s) {
             if (m_spotterPool.empty()) break;
             for (const auto& p : m_spotterPool) {
-                if (mainSolution[spotterModel.workVars.at({p.name, s})] > 0.5) {
+                if (colValues[spotterModel.workVars.at({p.name, s})] > 0.5) {
                     schedule[s].spotter = p.name;
                     break;
                 }
@@ -217,28 +207,29 @@ json JresStandardSolver::solve()
     {
         auto spotterStart = high_resolution_clock::now();
 
-        std::unique_ptr<OsiClpSolverInterface> spotterSolver(new OsiClpSolverInterface);
-        spotterSolver->setObjSense(1.0);
-        CbcModel spotterCbcModel(*spotterSolver);
-        spotterCbcModel.setDblParam(CbcModel::CbcAllowableFractionGap, m_ctx.optimalityGap);
-        spotterCbcModel.setDblParam(CbcModel::CbcMaximumSeconds, static_cast<double>(m_ctx.timeLimit));
-
-        spotterSolver->setLogLevel(0);
-        spotterCbcModel.setLogLevel(0);
+        // Create a separate instance for the sequential spotter solve
+        Highs spotterSolver;
+        spotterSolver.setOptionValue("output_flag", false);
+        spotterSolver.setOptionValue("mip_rel_gap", m_ctx.optimalityGap);
+        if (m_ctx.timeLimit > 0) spotterSolver.setOptionValue("time_limit", static_cast<double>(m_ctx.timeLimit));
 
         ParticipantModel seqSpotterModel = add_participant_model(
-            spotterCbcModel, m_spotterPool, "Spot", m_stintWithPitSeconds, m_stintLaps
+            spotterSolver, m_spotterPool, "Spot", m_stintWithPitSeconds, m_stintLaps
         );
 
+        // Coverage Constraints for sequential
         for (int s = 0; s < m_totalStints; ++s) {
-            CoinPackedVector row;
+            std::vector<int> idx;
+            std::vector<double> val;
             for (const auto& p : m_spotterPool) {
-                row.insert(seqSpotterModel.workVars.at({p.name, s}), 1.0);
+                idx.push_back(seqSpotterModel.workVars.at({p.name, s}));
+                val.push_back(1.0);
             }
-            if (m_ctx.allowNoSpotter) spotterCbcModel.solver()->addRow(row, 0.0, 1.0);
-            else spotterCbcModel.solver()->addRow(row, 1.0, 1.0);
+            double lb = m_ctx.allowNoSpotter ? 0.0 : 1.0;
+            spotterSolver.addRow(lb, 1.0, (int)idx.size(), idx.data(), val.data());
         }
 
+        // Lock out the driver who is driving from spotting
         for (int s = 0; s < m_totalStints; ++s) {
             const std::string& driverName = schedule[s].driver;
             if (driverName == "N/A") continue;
@@ -246,19 +237,17 @@ json JresStandardSolver::solve()
                                  [&](const TeamMember& m){ return m.name == driverName; });
             if (it != m_spotterPool.end()) {
                 int varIdx = seqSpotterModel.workVars.at({driverName, s});
-                spotterCbcModel.solver()->setColBounds(varIdx, 0.0, 0.0);
+                spotterSolver.changeColBounds(varIdx, 0.0, 0.0);
             }
         }
 
-        // We do not add complexity metrics for the sequential spotter sub-solve
-        // to the main complexity object to keep it simple, but we could sum them if desired.
-        spotterCbcModel.branchAndBound();
+        spotterSolver.run();
 
-        if (spotterCbcModel.isProvenOptimal() || spotterCbcModel.isProvenInfeasible() == 0) {
-            const double* spotterSolution = spotterCbcModel.solver()->getColSolution();
-            for (int s = 0; s < m_totalStints; ++s) {
+        const auto& spotterSol = spotterSolver.getSolution();
+        if (spotterSolver.getModelStatus() != HighsModelStatus::kInfeasible) {
+             for (int s = 0; s < m_totalStints; ++s) {
                 for (const auto& p : m_spotterPool) {
-                    if (spotterSolution[seqSpotterModel.workVars.at({p.name, s})] > 0.5) {
+                    if (spotterSol.col_value[seqSpotterModel.workVars.at({p.name, s})] > 0.5) {
                         schedule[s].spotter = p.name;
                         break;
                     }
@@ -273,7 +262,7 @@ json JresStandardSolver::solve()
     auto endTotal = high_resolution_clock::now();
     double totalDurationSeconds = duration<double>(endTotal - startTotal).count();
 
-    // Timing Block
+    // Timing JSON
     json timingJson;
     timingJson["setupMs"] = setupDurationMs;
     timingJson["driverSolveMs"] = driverSolveDurationMs;
@@ -283,7 +272,6 @@ json JresStandardSolver::solve()
     timingJson["totalSeconds"] = totalDurationSeconds;
 
     outputJson["timing"] = timingJson;
-
     json scheduleJson = json::array();
     bool hasSpotters = (m_ctx.spotterMode != SpotterMode::None);
     for(const auto& entry : schedule) {
@@ -293,9 +281,7 @@ json JresStandardSolver::solve()
         entryJson["endTimeUTC"] = entry.endTimeUTC;
         entryJson["laps"] = entry.laps;
         entryJson["driver"] = entry.driver;
-        if (hasSpotters) {
-            entryJson["spotter"] = entry.spotter;
-        }
+        if (hasSpotters) entryJson["spotter"] = entry.spotter;
         scheduleJson.push_back(entryJson);
     }
     outputJson["schedule"] = scheduleJson;
@@ -304,7 +290,7 @@ json JresStandardSolver::solve()
 }
 
 ParticipantModel JresStandardSolver::add_participant_model(
-    CbcModel &model,
+    Highs &highs,
     const std::vector<TeamMember> &participants,
     const std::string &prefix,
     double stintWithPitSeconds,
@@ -315,54 +301,53 @@ ParticipantModel JresStandardSolver::add_participant_model(
 
     auto raceStartUTC = TimeHelpers::stringToTimePoint(m_ctx.raceData.raceStartUTC);
 
-    // Max/Min Vars
-    p_model.maxWorkStintsVar = model.solver()->getNumCols();
-    model.solver()->addCol(CoinPackedVector(), 0.0, COIN_DBL_MAX, 0.0);
-    model.solver()->setInteger(p_model.maxWorkStintsVar);
+    // Max/Min Work Stint Variables
+    // Highs: addVar(lb, ub) -> returns status, but index is implicit (current num cols)
+    
+    p_model.maxWorkStintsVar = highs.getNumCol();
+    highs.addVar(0.0, kHighsInf);
+    highs.changeColCost(p_model.maxWorkStintsVar, 1000.0);
+    highs.changeColIntegrality(p_model.maxWorkStintsVar, HighsVarType::kInteger);
 
-    p_model.minWorkStintsVar = model.solver()->getNumCols();
-    model.solver()->addCol(CoinPackedVector(), 0.0, COIN_DBL_MAX, 0.0);
-    model.solver()->setInteger(p_model.minWorkStintsVar);
+    p_model.minWorkStintsVar = highs.getNumCol();
+    highs.addVar(0.0, kHighsInf);
+    highs.changeColCost(p_model.minWorkStintsVar, -1000.0);
+    highs.changeColIntegrality(p_model.minWorkStintsVar, HighsVarType::kInteger);
 
     for (const auto &p : participants)
     {
         for (int s = 0; s < m_totalStints; ++s)
         {
-            int workVarIdx = model.solver()->getNumCols();
+            int workVarIdx = highs.getNumCol();
             p_model.workVars[{p.name, s}] = workVarIdx;
-            model.solver()->addCol(CoinPackedVector(), 0.0, 1.0, 0.0);
-            model.solver()->setInteger(workVarIdx);
-
-            if (s > 0)
-            {
-                int switchVarIdx = model.solver()->getNumCols();
-                p_model.switchVars[{p.name, s}] = switchVarIdx;
-                model.solver()->addCol(CoinPackedVector(), 0.0, 1.0, 0.0);
-                model.solver()->setInteger(switchVarIdx);
-            }
-        }
-    }
-
-    // Objective Coefficients
-    model.solver()->setObjCoeff(p_model.maxWorkStintsVar, 1000.0);
-    model.solver()->setObjCoeff(p_model.minWorkStintsVar, -1000.0);
-    for (const auto &pair : p_model.switchVars) model.solver()->setObjCoeff(pair.second, 100.0);
-
-    // Preferences
-    for (int s = 0; s < m_totalStints; ++s) {
-        auto stintStart = raceStartUTC + std::chrono::seconds(static_cast<long>(s * stintWithPitSeconds));
-        std::string availabilityKey = TimeHelpers::timePointToKey(stintStart);
-        for (const auto &p : participants) {
+            
+            // Calculate Preference Cost
+            double cost = 0.0;
+            auto stintStart = raceStartUTC + std::chrono::seconds(static_cast<long>(s * stintWithPitSeconds));
+            std::string availabilityKey = TimeHelpers::timePointToKey(stintStart);
             if (m_ctx.raceData.availability.contains(p.name) &&
                 m_ctx.raceData.availability[p.name].contains(availabilityKey) &&
                 m_ctx.raceData.availability[p.name][availabilityKey] == "Preferred")
             {
-                model.solver()->setObjCoeff(p_model.workVars.at({p.name, s}), -1.0);
+                cost = -1.0;
+            }
+
+            highs.addVar(0.0, 1.0); // Binary
+            highs.changeColCost(workVarIdx, cost);
+            highs.changeColIntegrality(workVarIdx, HighsVarType::kInteger);
+
+            if (s > 0)
+            {
+                int switchVarIdx = highs.getNumCol();
+                p_model.switchVars[{p.name, s}] = switchVarIdx;
+                highs.addVar(0.0, 1.0);
+                highs.changeColCost(switchVarIdx, 100.0);
+                highs.changeColIntegrality(switchVarIdx, HighsVarType::kInteger);
             }
         }
     }
 
-    // Constraints
+    // Constraints logic
     double totalLaps = m_totalStints * stintLaps;
     double equalShareLaps = totalLaps / participants.size();
     int minLapsPerParticipant = static_cast<int>(std::ceil(0.25 * equalShareLaps));
@@ -372,7 +357,7 @@ ParticipantModel JresStandardSolver::add_participant_model(
 
     for (const auto &p : participants)
     {
-        // Availability
+        // Availability Hard Constraints
         for (int s = 0; s < m_totalStints; ++s) {
             auto stintStart = raceStartUTC + std::chrono::seconds(static_cast<long>(s * stintWithPitSeconds));
             auto stintEnd = stintStart + std::chrono::seconds(static_cast<long>(stintWithPitSeconds));
@@ -388,70 +373,102 @@ ParticipantModel JresStandardSolver::add_participant_model(
             } else { isAvailable = false; }
 
             if (!isAvailable) {
-                model.solver()->setColBounds(p_model.workVars.at({p.name, s}), 0.0, 0.0);
+                highs.changeColBounds(p_model.workVars.at({p.name, s}), 0.0, 0.0);
             }
         }
 
-        // Switch Constraints
+        // Switch Constraints: Switch[s] >= Work[s] - Work[s-1]
+        // Rearranged: Switch[s] - Work[s] + Work[s-1] >= 0
         for (int s = 1; s < m_totalStints; ++s) {
-            CoinPackedVector row;
-            row.insert(p_model.switchVars.at({p.name, s}), 1.0);
-            row.insert(p_model.workVars.at({p.name, s}), -1.0);
-            row.insert(p_model.workVars.at({p.name, s - 1}), 1.0);
-            model.solver()->addRow(row, 0.0, COIN_DBL_MAX);
+            std::vector<int> idx = {
+                p_model.switchVars.at({p.name, s}),
+                p_model.workVars.at({p.name, s}),
+                p_model.workVars.at({p.name, s - 1})
+            };
+            std::vector<double> val = {1.0, -1.0, 1.0};
+            highs.addRow(0.0, kHighsInf, 3, idx.data(), val.data());
         }
 
-        // Max/Min/Fair Stints
-        CoinPackedVector totalStintsRow;
-        for (int s = 0; s < m_totalStints; ++s) totalStintsRow.insert(p_model.workVars.at({p.name, s}), 1.0);
+        // Max/Min Stints Linking
+        // Sum(Work) - Max <= 0
+        // Sum(Work) - Min >= 0
+        std::vector<int> totalStintsIdx;
+        std::vector<double> totalStintsVal;
+        for (int s = 0; s < m_totalStints; ++s) {
+            totalStintsIdx.push_back(p_model.workVars.at({p.name, s}));
+            totalStintsVal.push_back(1.0);
+        }
         
-        CoinPackedVector maxRow = totalStintsRow;
-        maxRow.insert(p_model.maxWorkStintsVar, -1.0);
-        model.solver()->addRow(maxRow, -COIN_DBL_MAX, 0.0);
+        // Max Row
+        {
+            auto idx = totalStintsIdx; 
+            idx.push_back(p_model.maxWorkStintsVar);
+            auto val = totalStintsVal; 
+            val.push_back(-1.0);
+            highs.addRow(-kHighsInf, 0.0, (int)idx.size(), idx.data(), val.data());
+        }
 
-        CoinPackedVector minRow = totalStintsRow;
-        minRow.insert(p_model.minWorkStintsVar, -1.0);
-        model.solver()->addRow(minRow, 0.0, COIN_DBL_MAX);
+        // Min Row
+        {
+            auto idx = totalStintsIdx; 
+            idx.push_back(p_model.minWorkStintsVar);
+            auto val = totalStintsVal; 
+            val.push_back(-1.0);
+            highs.addRow(0.0, kHighsInf, (int)idx.size(), idx.data(), val.data());
+        }
 
+        // Absolute Minimum Floor
         if (prefix == "Drive" && minStintsPerParticipant > 0) {
-            model.solver()->addRow(totalStintsRow, minStintsPerParticipant, COIN_DBL_MAX);
+            highs.addRow(minStintsPerParticipant, kHighsInf, (int)totalStintsIdx.size(), totalStintsIdx.data(), totalStintsVal.data());
         }
 
         // Max Consecutive
         int maxConsecutive = p.preferredStints;
         for (int s = 0; s < m_totalStints - maxConsecutive; ++s) {
-            CoinPackedVector consecutiveRow;
+            std::vector<int> consIdx;
+            std::vector<double> consVal;
             for (int i = 0; i <= maxConsecutive; ++i) {
-                consecutiveRow.insert(p_model.workVars.at({p.name, s + i}), 1.0);
+                consIdx.push_back(p_model.workVars.at({p.name, s + i}));
+                consVal.push_back(1.0);
             }
-            model.solver()->addRow(consecutiveRow, -COIN_DBL_MAX, maxConsecutive);
+            // Sum of window must be <= maxConsecutive
+            highs.addRow(-kHighsInf, maxConsecutive, (int)consIdx.size(), consIdx.data(), consVal.data());
         }
 
-        // Minimum Rest
+        // Minimum Rest (Big-M)
         int minRestHours = p.minimumRestHours;
         if (minRestHours > 0 && stintWithPitSeconds > 0) {
             int minRestStints = static_cast<int>(std::floor((minRestHours * 3600) / stintWithPitSeconds));
             if (minRestStints > 0 && minRestStints <= m_totalStints) {
                 std::vector<int> restAchievedVars;
-                CoinPackedVector oneRestRow;
+                std::vector<double> restAchievedVals;
+                
                 int possibleRestStarts = m_totalStints - minRestStints + 1;
                 for (int s = 0; s < possibleRestStarts; ++s) {
-                    int restVarIdx = model.solver()->getNumCols();
+                    int restVarIdx = highs.getNumCol();
                     restAchievedVars.push_back(restVarIdx);
-                    model.solver()->addCol(CoinPackedVector(), 0.0, 1.0, 0.0);
-                    model.solver()->setInteger(restVarIdx);
-                    oneRestRow.insert(restVarIdx, 1.0);
+                    restAchievedVals.push_back(1.0);
 
-                    CoinPackedVector enforceRestRow;
+                    highs.addVar(0.0, 1.0); // Binary indicator
+                    highs.changeColIntegrality(restVarIdx, HighsVarType::kInteger);
+
+                    // Constraint: Sum(Work in window) + M * RestVar <= M
+                    std::vector<int> enforceIdx;
+                    std::vector<double> enforceVal;
                     for (int i = 0; i < minRestStints; ++i) {
-                        enforceRestRow.insert(p_model.workVars.at({p.name, s + i}), 1.0);
+                        enforceIdx.push_back(p_model.workVars.at({p.name, s + i}));
+                        enforceVal.push_back(1.0);
                     }
                     double M = minRestStints + 1;
-                    enforceRestRow.insert(restVarIdx, M);
-                    model.solver()->addRow(enforceRestRow, -COIN_DBL_MAX, M);
+                    enforceIdx.push_back(restVarIdx);
+                    enforceVal.push_back(M);
+                    
+                    highs.addRow(-kHighsInf, M, (int)enforceIdx.size(), enforceIdx.data(), enforceVal.data());
                 }
-                if (oneRestRow.getNumElements() > 0) {
-                    model.solver()->addRow(oneRestRow, 1.0, COIN_DBL_MAX);
+                
+                // Must have at least one rest period
+                if (!restAchievedVars.empty()) {
+                    highs.addRow(1.0, kHighsInf, (int)restAchievedVars.size(), restAchievedVars.data(), restAchievedVals.data());
                 }
             }
         }

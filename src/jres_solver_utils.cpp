@@ -60,7 +60,7 @@ JresSolverBase::JresSolverBase(const SolverContext& ctx)
       m_totalStints(0),
       m_stintLaps(0)
 {
-    // 1. Calculate Race Parameters
+    // Calculate Race Parameters
     double lapTimeSeconds = m_ctx.raceData.avgLapTimeInSeconds;
     double pitTimeSeconds = m_ctx.raceData.pitTimeInSeconds;
     
@@ -83,7 +83,7 @@ JresSolverBase::JresSolverBase(const SolverContext& ctx)
         throw std::runtime_error("Invalid race parameters: totalStints must be > 0.");
     }
 
-    // 2. Filter Participant Pools
+    // Filter Participant Pools
     for (const auto& member : m_ctx.raceData.teamMembers) {
         if (member.isDriver) m_driverPool.push_back(member);
         if (member.isSpotter) m_spotterPool.push_back(member);

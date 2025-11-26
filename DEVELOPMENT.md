@@ -1,6 +1,6 @@
 # JRES Solver
 
-This library can be used to solve for optimal driver and spotter schedules for endurance racing events.  It uses the COIN-OR Cbc optimization library.
+This library can be used to solve for optimal driver and spotter schedules for endurance racing events. It uses the **HiGHS** optimization library.
 
 It has been structured as a C-API library (`jres_solver`) and a simple CLI client (`jres_solver`) that uses the library.
 
@@ -31,7 +31,7 @@ It has been structured as a C-API library (`jres_solver`) and a simple CLI clien
 
 ## Bootstrap & Dependencies
 
-This project relies on `cmake` for building and `git` for dependency management (via submodules). The only external binary dependency is the Cbc library.
+This project relies on `cmake` for building and `git` for dependency management (via submodules). The only external binary dependency is the **HiGHS** library.
 
 ### 1. Clone & Init Submodules
 
@@ -43,30 +43,37 @@ cd jres_solver_cpp
 git submodule update --init --recursive
 ```
 
-### 2. Install Cbc
+### 2. Install HiGHS
 
-The COIN-OR Cbc library must be installed on your system.
+The HiGHS library must be installed on your system.
 
 #### macOS (Homebrew)
 
 This is the easiest method for macOS:
 
 ```
-brew install cbc
+brew install highs
 ```
 
-#### Linux (apt)
+#### Linux
 
-```
-sudo apt-get update
-sudo apt-get install coinor-cbc coinor-libclp-dev coinor-libcoinutils-dev coinor-libosi-dev
-```
+HiGHS is modern and may not be in the default repositories of older Linux distributions. We recommend building from source:
 
-*(Note: Package names may vary slightly by distribution).*
+```bash
+git clone https://github.com/ERGO-Code/HiGHS.git
+cd HiGHS
+cmake -B build -DFAST_BUILD=ON
+cmake --build build
+sudo cmake --install build
+```
 
 #### Windows
 
-This is the most complex path. It's recommended to use a package manager like `vcpkg` to install `cbc` and all its dependencies, or to build from source using MSYS2.
+The recommended way to install HiGHS on Windows is via **vcpkg**:
+
+```powershell
+vcpkg install highs:x64-windows-static
+```
 
 ## Building the Project
 
@@ -80,37 +87,35 @@ We use a standard out-of-source CMake build.
     ```
 
 2.  **Run CMake (Configure):**
-    You must provide a "hint" (the `CMAKE_PREFIX_PATH`) to tell CMake where your Cbc installation lives.
 
-    **On macOS (Homebrew on Apple Silicon):**
-
+    **On macOS (Homebrew):**
+    
     ```
     cmake .. -DCMAKE_PREFIX_PATH=/opt/homebrew
     ```
 
-    **On macOS (Homebrew on Intel):**
-
-    ```
-    cmake .. -DCMAKE_PREFIX_PATH=/usr/local
-    ```
-
-    **On Linux (Standard):**
-    (CMake should find the system libraries automatically)
-
+    **On Linux:**
+    
     ```
     cmake ..
+    ```
+    
+    **On Windows (via vcpkg):**
+    
+    ```
+    cmake .. -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
     ```
 
 3.  **Run Make (Build):**
 
     ```
-    make
+    cmake --build .
     ```
 
 This will create two main products in the `build/` directory:
 
-  * `libjres_solver.dylib` (or `.so` on Linux): The shared library.
-  * `jres_solver`: The CLI executable.
+  * `libjres_solver.dylib` (or `.so` on Linux, `.dll` on Windows): The shared library.
+  * `jres_solver` (or `jres_solver.exe`): The CLI executable.
 
 ## Running the CLI Client
 

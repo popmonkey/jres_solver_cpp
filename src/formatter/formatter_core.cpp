@@ -162,7 +162,7 @@ std::string jres::generate_schedule_csv_string(const std::vector<json>& schedule
 std::string jres::generate_schedule_ascii_table(const std::vector<json>& schedule, bool has_spotters) {
     if (schedule.empty()) return "No schedule data.\n";
 
-    // 1. Calculate Widths (initialize with header lengths)
+    // Calculate Widths (initialize with header lengths)
     size_t w_stint = 5;  // "Stint"
     size_t w_start = 13; // "Start (UTC)"
     size_t w_end = 11;   // "End (UTC)"
@@ -198,7 +198,7 @@ std::string jres::generate_schedule_ascii_table(const std::vector<json>& schedul
 
     std::ostringstream oss;
     
-    // 2. Header
+    // Header
     oss << std::left 
         << std::setw(w_stint) << "Stint"
         << std::setw(w_start) << "Start (UTC)"
@@ -207,11 +207,11 @@ std::string jres::generate_schedule_ascii_table(const std::vector<json>& schedul
     if (has_spotters) oss << std::setw(w_spot) << "Spotter";
     oss << std::setw(w_laps) << "Laps" << "\n";
 
-    // 3. Divider
+    // Divider
     size_t total_width = w_stint + w_start + w_end + w_driver + (has_spotters ? w_spot : 0) + w_laps;
     oss << std::string(total_width, '-') << "\n";
 
-    // 4. Data
+    // Data
     for (const auto& entry : schedule) {
         oss << std::left 
             << std::setw(w_stint) << entry.value("stint", 0)
