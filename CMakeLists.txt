@@ -179,7 +179,10 @@ target_include_directories(jres_solver_lib PUBLIC
     ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
-target_link_libraries(jres_solver_lib PRIVATE nlohmann_json ${HIGHS_LIBRARIES})
+target_link_libraries(jres_solver_lib 
+    PRIVATE nlohmann_json 
+    PUBLIC ${HIGHS_LIBRARIES}
+)
 
 # --- Solver CLI ---
 add_executable(solver cmd/solver/cli.cpp)
