@@ -39,7 +39,6 @@ int solve_race_schedule(const char* raceDataJson,
     try {
         json rawJsonData = json::parse(raceDataJson);
         SolverContext ctx;
-        ctx.quiet = options.quiet;
         ctx.timeLimit = options.timeLimit;
         ctx.spotterMode = translate_spotter_mode(options.spotterMode);
         ctx.allowNoSpotter = options.allowNoSpotter;
@@ -69,7 +68,6 @@ int diagnose_race_schedule(const char* raceDataJson,
     try {
         json rawJsonData = json::parse(raceDataJson);
         SolverContext ctx;
-        ctx.quiet = options.quiet;
         ctx.timeLimit = options.timeLimit;
         ctx.spotterMode = translate_spotter_mode(options.spotterMode);
         ctx.allowNoSpotter = options.allowNoSpotter;

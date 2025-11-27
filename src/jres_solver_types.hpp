@@ -56,7 +56,6 @@ NLOHMANN_JSON_SERIALIZE_ENUM( SpotterMode, {
 
 struct SolverContext
 {
-    bool quiet;
     int timeLimit;
     SpotterMode spotterMode;
     bool allowNoSpotter;

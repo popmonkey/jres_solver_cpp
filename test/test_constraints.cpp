@@ -29,7 +29,6 @@ TEST(ConstraintTest, InfeasibleModel) {
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = false;
     options.optimalityGap = 0.0;
-    options.quiet = true;
 
     char* resultJsonCStr = nullptr;
     int resultCode = solve_race_schedule(INFEASIBLE_JSON, options, &resultJsonCStr);
@@ -76,7 +75,6 @@ TEST(ConstraintTest, PreferredSlot) {
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = false;
     options.optimalityGap = 0.0;
-    options.quiet = true;
 
     char* resultJsonCStr = nullptr;
     int resultCode = solve_race_schedule(PREFERRED_SLOT_JSON, options, &resultJsonCStr);

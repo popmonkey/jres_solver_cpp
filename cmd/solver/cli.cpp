@@ -32,11 +32,11 @@ int main(int argc, char **argv)
     options.add_options()
         ("i,input", "Path to the race data .json file. Reads from stdin if not provided.", cxxopts::value<std::string>())
         ("o,output", "Optional. Path to save the schedule as a JSON file.", cxxopts::value<std::string>())
-        ("t,time-limit", "Maximum time in seconds to let the solver run.", cxxopts::value<int>()->default_value("30"))
+        ("t,time-limit", "Maximum time in seconds to let the solver run.", cxxopts::value<int>()->default_value("5"))
         ("q,quiet", "Suppress INFO logs and final schedule print-out.", cxxopts::value<bool>()->default_value("false"))
         ("s,spotter-mode", "Method for scheduling spotters (none, integrated, sequential).", cxxopts::value<std::string>()->default_value("none"))
         ("allow-no-spotter", "Allow stints to have no spotter assigned.", cxxopts::value<bool>()->default_value("false"))
-        ("g,optimality-gap", "Solver stops when the gap to optimal is less than this (e.g., 0.01 for 1%).", cxxopts::value<double>()->default_value("0.0"))
+        ("g,optimality-gap", "Solver stops when the gap to optimal is less than this (e.g., 0.2 for 20%).", cxxopts::value<double>()->default_value("0.2"))
         ("d,diagnose", "Run diagnostics to explain why a schedule is infeasible.", cxxopts::value<bool>()->default_value("false"))
         ("v,version", "Print version information and exit.")
         ("h,help", "Print usage.");
@@ -97,7 +97,6 @@ int main(int argc, char **argv)
 
     // Build Solver Options Struct
     JresSolverOptions solverOptions;
-    solverOptions.quiet = quiet;
     solverOptions.timeLimit = result["time-limit"].as<int>();
     
     // --- Translate spotter-mode string to enum ---

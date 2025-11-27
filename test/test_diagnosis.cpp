@@ -28,7 +28,6 @@ namespace {
         JresSolverOptions options;
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_NONE;
-        options.quiet = true;
 
         char* resultJsonCStr = nullptr;
         int resultCode = diagnose_race_schedule(UNAVAILABLE_JSON, options, &resultJsonCStr);
@@ -80,7 +79,6 @@ namespace {
         JresSolverOptions options;
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_NONE;
-        options.quiet = true;
 
         char* resultJsonCStr = nullptr;
         int resultCode = diagnose_race_schedule(MAX_CONSECUTIVE_JSON, options, &resultJsonCStr);
