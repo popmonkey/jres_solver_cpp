@@ -80,6 +80,17 @@ struct ComplexityMetrics {
     double finalGap = 0.0;
 };
 
+/**
+ * @brief Custom exception that carries solver metadata for better error reporting.
+ */
+class SolverException : public std::runtime_error {
+public:
+    json metadata;
+    
+    SolverException(const std::string& message, const json& meta = json::object())
+        : std::runtime_error(message), metadata(meta) {}
+};
+
 // --- JSON Deserialization Declarations ---
 void from_json(const json &j, TeamMember &member);
 void from_json(const json &j, RaceData &data);

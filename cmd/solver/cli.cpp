@@ -166,43 +166,47 @@ int main(int argc, char **argv)
         } 
         else {
             // --- Standard Schedule Output Handling ---
+            if (!quiet) {
+                // Print Metadata / Settings
+                if (resultJson.contains("metadata")) {
+                    std::cout << "\n--- 🔧 Solver Settings ---" << std::endl;
+                    json meta = resultJson["metadata"];
+                    std::cout << "Time Limit: " << meta.value("timeLimit", 0) << "s | "
+                              << "Gap: " << meta.value("optimalityGap", 0.0) << " | "
+                              << "Spotter: " << meta.value("spotterMode", "unknown") << std::endl;
+                }
+
+                // Print Complexity (regardless of success/failure)
+                if (resultJson.contains("complexity")) {
+                    std::cout << "\n--- 🧠 Complexity ---" << std::endl;
+                    json c = resultJson["complexity"];
+                    std::cout << "Rows: " << c.value("modelRows", 0) << " | "
+                              << "Cols: " << c.value("modelColumns", 0) << " | "
+                              << "Nodes: " << c.value("searchNodes", 0) << std::endl;
+                    std::cout << "Big-M Rest Constraints: " << c.value("numRestConstraints", 0) << std::endl;
+                    if (!c["finalGap"].is_null()) {
+                        std::cout << "Final Gap: " << c.value("finalGap", 0.0) << std::endl;
+                    }
+                }
+
+                // Print Timing (regardless of success/failure)
+                if (resultJson.contains("timing")) {
+                    std::cout << "\n--- ⏱️  Timing Performance ---" << std::endl;
+                    json t = resultJson["timing"];
+                    std::cout << std::fixed << std::setprecision(2);
+                    std::cout << "Setup/Model Build : " << std::setw(8) << t.value("setupMs", 0.0) << " ms" << std::endl;
+                    std::cout << "Driver Solve      : " << std::setw(8) << t.value("driverSolveMs", 0.0) << " ms" << std::endl;
+                    if (t.contains("spotterSolveMs")) {
+                    std::cout << "Spotter Solve     : " << std::setw(8) << t.value("spotterSolveMs", 0.0) << " ms" << std::endl;
+                    }
+                    std::cout << "Total Wall Time   : " << std::setw(8) << t.value("totalSeconds", 0.0) << " s" << std::endl;
+                }
+            }
+
+            // Check if the solve was successful
             if (resultCode == 0) {
                 // Success
                 if (!quiet) {
-                    
-                    // Print Metadata / Settings
-                    if (resultJson.contains("metadata")) {
-                        std::cout << "\n--- 🔧 Solver Settings ---" << std::endl;
-                        json meta = resultJson["metadata"];
-                        std::cout << "Time Limit: " << meta.value("timeLimit", 0) << "s | "
-                                  << "Gap: " << meta.value("optimalityGap", 0.0) << " | "
-                                  << "Spotter: " << meta.value("spotterMode", "unknown") << std::endl;
-                    }
-
-                    // Print Complexity
-                    if (resultJson.contains("complexity")) {
-                        std::cout << "\n--- 🧠 Complexity ---" << std::endl;
-                        json c = resultJson["complexity"];
-                        std::cout << "Rows: " << c.value("modelRows", 0) << " | "
-                                  << "Cols: " << c.value("modelColumns", 0) << " | "
-                                  << "Nodes: " << c.value("searchNodes", 0) << std::endl;
-                        std::cout << "Big-M Rest Constraints: " << c.value("numRestConstraints", 0) << std::endl;
-                        std::cout << "Final Gap: " << c.value("finalGap", 0.0) << std::endl;
-                    }
-
-                    // Print Timing
-                    if (resultJson.contains("timing")) {
-                        std::cout << "\n--- ⏱️  Timing Performance ---" << std::endl;
-                        json t = resultJson["timing"];
-                        std::cout << std::fixed << std::setprecision(2);
-                        std::cout << "Setup/Model Build : " << std::setw(8) << t.value("setupMs", 0.0) << " ms" << std::endl;
-                        std::cout << "Driver Solve      : " << std::setw(8) << t.value("driverSolveMs", 0.0) << " ms" << std::endl;
-                        if (t.contains("spotterSolveMs")) {
-                        std::cout << "Spotter Solve     : " << std::setw(8) << t.value("spotterSolveMs", 0.0) << " ms" << std::endl;
-                        }
-                        std::cout << "Total Wall Time   : " << std::setw(8) << t.value("totalSeconds", 0.0) << " s" << std::endl;
-                    }
-
                     // Print the schedule
                     std::cout << "\n--- 🏁 Race Schedule ---" << std::endl;
                     bool hasSpotters = (solverOptions.spotterMode != JRES_SPOTTER_MODE_NONE);

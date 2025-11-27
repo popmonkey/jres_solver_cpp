@@ -141,15 +141,21 @@ json JresStandardSolver::solve()
     metrics.finalGap = info.mip_gap; // Relative gap
 
     HighsModelStatus status = m_highs->getModelStatus();
-    if (status != HighsModelStatus::kOptimal && status != HighsModelStatus::kTimeLimit) {
-        // Strict check: if it's infeasible or unbounded
-        if (status == HighsModelStatus::kInfeasible) {
-            throw std::runtime_error("Model is infeasible. No solution exists.");
-        }
-        // Note: HiGHS might return kTimeLimit but still have a valid feasible solution
-    }
+    
+    // --- Calculate Total Time ---
+    auto endTotal = high_resolution_clock::now();
+    double totalDurationSeconds = duration<double>(endTotal - startTotal).count();
 
-    // --- 6. Process Results ---
+    // --- Build Timing JSON (always include, even on failure) ---
+    json timingJson;
+    timingJson["setupMs"] = setupDurationMs;
+    timingJson["driverSolveMs"] = driverSolveDurationMs;
+    if (m_ctx.spotterMode == SpotterMode::Sequential) {
+        timingJson["spotterSolveMs"] = spotterSolveDurationMs;
+    }
+    timingJson["totalSeconds"] = totalDurationSeconds;
+
+    // --- Build base output JSON (always include, even on failure) ---
     json outputJson;
     json metaJson;
     to_json(metaJson, m_ctx);
@@ -158,7 +164,19 @@ json JresStandardSolver::solve()
     json complexityJson;
     to_json(complexityJson, metrics);
     outputJson["complexity"] = complexityJson;
+    outputJson["timing"] = timingJson;
     outputJson["raceData"] = m_ctx.raceData;
+
+    // Check for infeasibility - throw exception with metadata for error handler
+    if (status != HighsModelStatus::kOptimal && status != HighsModelStatus::kTimeLimit) {
+        // Strict check: if it's infeasible or unbounded
+        if (status == HighsModelStatus::kInfeasible) {
+            throw SolverException("Model is infeasible. No solution exists.", outputJson);
+        }
+        // Note: HiGHS might return kTimeLimit but still have a valid feasible solution
+    }
+
+    // --- 6. Process Results (only for successful solves) ---
 
     std::vector<ScheduleEntry> schedule;
     
@@ -257,21 +275,11 @@ json JresStandardSolver::solve()
 
         auto spotterEnd = high_resolution_clock::now();
         spotterSolveDurationMs = duration<double, std::milli>(spotterEnd - spotterStart).count();
-    }
-    
-    auto endTotal = high_resolution_clock::now();
-    double totalDurationSeconds = duration<double>(endTotal - startTotal).count();
-
-    // Timing JSON
-    json timingJson;
-    timingJson["setupMs"] = setupDurationMs;
-    timingJson["driverSolveMs"] = driverSolveDurationMs;
-    if (m_ctx.spotterMode == SpotterMode::Sequential) {
+        
+        // Update timing JSON with spotter solve time
         timingJson["spotterSolveMs"] = spotterSolveDurationMs;
     }
-    timingJson["totalSeconds"] = totalDurationSeconds;
 
-    outputJson["timing"] = timingJson;
     json scheduleJson = json::array();
     bool hasSpotters = (m_ctx.spotterMode != SpotterMode::None);
     for(const auto& entry : schedule) {
