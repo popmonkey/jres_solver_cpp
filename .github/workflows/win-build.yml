@@ -63,6 +63,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release `
           -DCMAKE_PREFIX_PATH="$env:HIGHS_DIR" `
           -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\dist" `
+          -DBUILD_SHARED_LIBS=OFF `
           -DJRES_VERSION="${{ inputs.version }}"
 
     - name: Add Build Dir to PATH
@@ -121,14 +122,9 @@ jobs:
         Copy-Item "dist\bin\jres_solver.exe" -Destination "$pkg\bin\"
         Copy-Item "dist\bin\jres_formatter.exe" -Destination "$pkg\bin\"
         
-        # Library (Handle DLLs and LIBs)
-        # Copy import libraries (.lib) to lib folder
+        # Library (static)
         if (Test-Path "dist\lib\jres_solver.lib") {
             Copy-Item "dist\lib\jres_solver.lib" -Destination "$pkg\lib\"
-        }
-        # Copy runtime libraries (.dll) to bin folder (typical windows convention)
-        if (Test-Path "dist\bin\jres_solver.dll") {
-            Copy-Item "dist\bin\jres_solver.dll" -Destination "$pkg\bin\"
         }
         
         # Specific Header
