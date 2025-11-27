@@ -52,7 +52,7 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           export TZ=Etc/UTC
           apt-get update
-          apt-get install -y cmake g++ git curl build-essential zip unzip
+          apt-get install -y cmake g++ git curl jq build-essential zip unzip
 
       # ---------------------------------------------------------
       # Checkout repo with submodules
@@ -76,17 +76,28 @@ jobs:
             exit 1
           fi
 
+      # No gh on Ubuntu:20.04 container so use curl
       - name: Download HiGHS Artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p ${{ env.HIGHS_DIR }}
+          echo "Resolving asset URL for ${{ steps.artifact.outputs.zip_name }}..."
+          RELEASE_JSON=$(curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ env.HIGHS_TAG }}")
+          ASSET_URL=$(echo "$RELEASE_JSON" | jq -r \
+            --arg NAME "${{ steps.artifact.outputs.zip_name }}" \
+            '.assets[] | select(.name == $NAME) | .url')
+          if [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
+            echo "Error: Could not find asset ${{ steps.artifact.outputs.zip_name }} in release ${{ env.HIGHS_TAG }}"
+            echo "$RELEASE_JSON" | jq -r '.assets[].name' || true
+            exit 1
+          fi
           echo "Downloading ${{ steps.artifact.outputs.zip_name }}..."
-          gh release download ${{ env.HIGHS_TAG }} \
-            --pattern ${{ steps.artifact.outputs.zip_name }} \
-            --output "${{ env.HIGHS_DIR }}/highs.zip" \
-            --repo ${{ github.repository }}
-          
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+               -H "Accept: application/octet-stream" \
+               -o "${{ env.HIGHS_DIR }}/highs.zip" "$ASSET_URL"
+
           unzip "${{ env.HIGHS_DIR }}/highs.zip" -d ${{ env.HIGHS_DIR }}
 
       # ---------------------------------------------------------
