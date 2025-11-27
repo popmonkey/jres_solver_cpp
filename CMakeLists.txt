@@ -8,6 +8,9 @@ project(JresSolver CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# Default to Shared libraries (Windows preference), but allow override
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
 # ==============================================================================
 #  VERSION STRATEGY
 # ==============================================================================
@@ -99,7 +102,7 @@ else()
 
     # HiGHS Build Options
     set(FAST_BUILD ON CACHE BOOL "" FORCE)
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE) # Always build HiGHS static
     set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
     set(HIGHS_GPL OFF CACHE BOOL "" FORCE)
     
@@ -151,8 +154,8 @@ target_include_directories(cxxopts INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/lib/cxx
 add_library(jres_utils STATIC src/utils/date_utils.cpp src/utils/zip_writer.cpp)
 target_include_directories(jres_utils PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-# --- JRES Solver Core (Shared/DLL) ---
-add_library(jres_solver_lib SHARED
+# --- JRES Solver Core (Shared or Static) ---
+add_library(jres_solver_lib 
   src/jres_solver.cpp
   src/jres_solver_utils.cpp
   src/jres_standard_solver.cpp
@@ -163,7 +166,10 @@ set_target_properties(jres_solver_lib PROPERTIES OUTPUT_NAME "jres_solver")
 
 if(WIN32)
     target_sources(jres_solver_lib PRIVATE ${VERSION_RC})
-    target_compile_definitions(jres_solver_lib PRIVATE JRES_SOLVER_EXPORTS)
+    # Only export symbols if we are actually building shared
+    if(BUILD_SHARED_LIBS)
+        target_compile_definitions(jres_solver_lib PRIVATE JRES_SOLVER_EXPORTS)
+    endif()
 endif()
 
 target_include_directories(jres_solver_lib PUBLIC 
@@ -214,6 +220,41 @@ target_include_directories(formatter PRIVATE
 
 target_link_libraries(formatter PRIVATE jres_formatter_lib cxxopts)
 
-# --- Tests ---
+# ==============================================================================
+#  LINUX PORTABILITY
+# ==============================================================================
+if(UNIX AND NOT APPLE)
+    # Statically link C++ runtime to avoid "GLIBCXX_..." version errors on older distros
+    target_link_options(solver PRIVATE -static-libgcc -static-libstdc++)
+    target_link_options(formatter PRIVATE -static-libgcc -static-libstdc++)
+    target_link_options(jres_solver_lib PRIVATE -static-libgcc -static-libstdc++)
+endif()
+
+# ==============================================================================
+#  INSTALLATION TARGETS
+# ==============================================================================
+include(GNUInstallDirs)
+
+# Install Libraries
+install(TARGETS jres_solver_lib
+    EXPORT JresTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+# Install Executables
+install(TARGETS solver formatter
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+# Install Headers
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+)
+
+# Install Tests
 enable_testing()
 add_subdirectory(test)

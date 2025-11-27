@@ -1,0 +1,192 @@
+name: Linux [reusable] Build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      name:
+        type: string
+        required: true
+      platform:
+        type: string
+        required: true
+      arch:
+        type: string
+        required: true
+      asset_ext:
+        type: string
+        required: true
+      upload_assets:
+        type: boolean
+        required: true
+      upload_url:
+        type: string
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ubuntu:20.04
+
+    env:
+      HIGHS_TAG: highs-static-v1.12.0
+      HIGHS_DIR: ${{ github.workspace }}/highs
+
+    steps:
+      # ---------------------------------------------------------
+      # Debug Info
+      # ---------------------------------------------------------
+      - name: Print Build Info
+        run: |
+          echo "Version:   ${{ inputs.version }}"
+          echo "Platform:  ${{ inputs.platform }}"
+          echo "Arch:      ${{ inputs.arch }}"
+
+      # ---------------------------------------------------------
+      # Install Build Tools (Modern CMake)
+      # ---------------------------------------------------------
+      - name: Install Build Tools
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          export TZ=Etc/UTC
+          apt-get update
+          
+          # Install python3-pip to get modern CMake, remove old cmake from apt
+          apt-get install -y python3-pip g++ git curl jq build-essential zip unzip
+          
+          # Install latest CMake (3.20+) via pip to support FetchContent features
+          pip3 install cmake
+          
+          # Verify version (Should be 3.2x or higher)
+          cmake --version
+
+      # ---------------------------------------------------------
+      # Checkout repo with submodules
+      # ---------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      # ---------------------------------------------------------
+      # Download Pre-built HiGHS
+      # ---------------------------------------------------------
+      - name: Determine Artifact Name
+        id: artifact
+        run: |
+          if [ "${{ inputs.platform }}" = "linux" ] && [ "${{ inputs.arch }}" = "x64" ]; then
+            echo "zip_name=highs-v1.12.0-linux-x64.zip" >> "$GITHUB_OUTPUT"
+          else
+            echo "Error: Unsupported Platform/Arch combination: ${{ inputs.platform }} ${{ inputs.arch }}"
+            exit 1
+          fi
+
+      # No gh on Ubuntu:20.04 container so use curl
+      - name: Download HiGHS Artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ${{ env.HIGHS_DIR }}
+          echo "Resolving asset URL for ${{ steps.artifact.outputs.zip_name }}..."
+          RELEASE_JSON=$(curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ env.HIGHS_TAG }}")
+          ASSET_URL=$(echo "$RELEASE_JSON" | jq -r \
+            --arg NAME "${{ steps.artifact.outputs.zip_name }}" \
+            '.assets[] | select(.name == $NAME) | .url')
+          if [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
+            echo "Error: Could not find asset ${{ steps.artifact.outputs.zip_name }} in release ${{ env.HIGHS_TAG }}"
+            echo "$RELEASE_JSON" | jq -r '.assets[].name' || true
+            exit 1
+          fi
+          echo "Downloading ${{ steps.artifact.outputs.zip_name }}..."
+          curl -sSL -H "Authorization: Bearer $GH_TOKEN" \
+               -H "Accept: application/octet-stream" \
+               -o "${{ env.HIGHS_DIR }}/highs.zip" "$ASSET_URL"
+
+          unzip "${{ env.HIGHS_DIR }}/highs.zip" -d ${{ env.HIGHS_DIR }}
+
+      # ---------------------------------------------------------
+      # Build
+      # ---------------------------------------------------------
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${{ env.HIGHS_DIR }}" \
+            -DBUILD_SHARED_LIBS=OFF
+
+      - name: Build Project
+        run: cmake --build build --config Release
+
+      - name: Build Tests
+        run: cmake --build build --config Release --target solver_tests
+
+      - name: Run Tests
+        run: ctest --test-dir build --output-on-failure -C Release
+
+      # ---------------------------------------------------------
+      # Install (Stage Files)
+      # ---------------------------------------------------------
+      - name: Stage Artifacts
+        run: cmake --install build --config Release --prefix dist
+
+      # ---------------------------------------------------------
+      # Package binaries
+      # ---------------------------------------------------------
+
+      - name: Sanitize Inputs
+        run: |
+          # Function to lowercase and replace invalid chars with _
+          sanitize() {
+            echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/_/g'
+          }
+
+          echo "SAFE_VERSION=$(sanitize "${{ inputs.version }}")" >> $GITHUB_ENV
+          echo "SAFE_PLATFORM=$(sanitize "${{ inputs.platform }}")" >> $GITHUB_ENV
+          echo "SAFE_ARCH=$(sanitize "${{ inputs.arch }}")" >> $GITHUB_ENV
+          
+      - name: Set Asset Name
+        run: echo "ASSET_NAME=jres-solver-${{ env.SAFE_VERSION }}-${{ env.SAFE_PLATFORM }}-${{ env.SAFE_ARCH }}.${{ inputs.asset_ext }}" >> $GITHUB_ENV
+
+      - name: Package (tar.gz)
+        run: |
+          # Archive the entire 'dist' folder content (bin, include, lib)
+          cd dist
+          tar -czvf "../${{ env.ASSET_NAME }}" .
+          
+      # ---------------------------------------------------------
+      # Generate Signature (Checksum)
+      # ---------------------------------------------------------
+      - name: Generate Checksum
+        run: |
+          # Generate SHA256 checksum for the tarball
+          shasum -a 256 ${{ env.ASSET_NAME }} > ${{ env.ASSET_NAME }}.sha256
+          cat ${{ env.ASSET_NAME }}.sha256
+
+      # ---------------------------------------------------------
+      # Upload Artifacts
+      # ---------------------------------------------------------
+      - name: Upload Release Asset (Binary)
+        if: inputs.upload_assets == true
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ inputs.upload_url }}
+          asset_path: ./${{ env.ASSET_NAME }}
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: application/gzip
+
+      - name: Upload Release Asset (Checksum)
+        if: inputs.upload_assets == true
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ inputs.upload_url }}
+          asset_path: ./${{ env.ASSET_NAME }}.sha256
+          asset_name: ${{ env.ASSET_NAME }}.sha256
+          asset_content_type: text/plain

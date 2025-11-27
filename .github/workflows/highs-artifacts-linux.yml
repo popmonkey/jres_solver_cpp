@@ -3,9 +3,65 @@ name: Build HiGHS Static Artifacts (Linux)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+env:
+  HIGHS_VERSION: v1.12.0
+  RELEASE_TAG: highs-static-v1.12.0
+
 jobs:
-  placeholder:
-    runs-on: ubuntu-latest
+  build-highs:
+    name: Build ${{ matrix.platform_name }}
+    runs-on: ubuntu-latest  # Use the fast runner...
+    container: ubuntu:20.04 # ...but build inside the old OS environment
+    
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            platform_name: linux-x64
+            cmake_args: "-DOPENMP=OFF"
+
     steps:
-      - name: Placeholder
-        run: echo "This is a placeholder. Switch to the feature branch to run the actual artifact build."
+    - name: Install Build Tools
+      run: |
+        export DEBIAN_FRONTEND=noninteractive
+        export TZ=Etc/UTC
+        apt-get update
+        apt-get install -y cmake g++ git curl build-essential zip unzip
+
+    - name: Checkout HiGHS
+      uses: actions/checkout@v4
+      with:
+        repository: ERGO-Code/HiGHS
+        ref: ${{ env.HIGHS_VERSION }}
+
+    - name: Configure CMake
+      run: |
+        cmake -B build \
+          -DFAST_BUILD=ON \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DCMAKE_INSTALL_PREFIX="install" \
+          -DCMAKE_BUILD_TYPE=Release \
+          ${{ matrix.cmake_args }}
+
+    - name: Build & Install
+      run: |
+        cmake --build build --config Release --parallel 4
+        cmake --install build --config Release
+
+    - name: Zip Artifacts
+      run: |
+        zipName="highs-${{ env.HIGHS_VERSION }}-${{ matrix.platform_name }}.zip"
+        cd install
+        zip -r "../$zipName" .
+        echo "ARTIFACT_NAME=$zipName" >> $GITHUB_ENV
+
+    - name: Upload to Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.RELEASE_TAG }}
+        files: ${{ env.ARTIFACT_NAME }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

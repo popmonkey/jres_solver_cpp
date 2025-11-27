@@ -4,6 +4,13 @@ cmake_minimum_required(VERSION 3.15)
 # --- Find Dependencies ---
 # GoogleTest
 include(FetchContent)
+
+# FORCE STATIC GOOGLETEST
+# We force Shared Libs OFF for GTest so we don't need to chase down gtest.dll
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static GTest" FORCE)
+# We force Shared CRT ON so it links correctly with the rest of the MSVC project (/MD)
+set(gtest_force_shared_crt ON CACHE BOOL "Force shared CRT" FORCE)
+
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip

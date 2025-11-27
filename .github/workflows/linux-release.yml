@@ -1,0 +1,26 @@
+name: Linux Release
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build-all:
+    strategy:
+      matrix:
+        include:
+          - { name: "Linux (x64)",                 platform: linux,   os: ubuntu-20.04,  arch: x64, asset_ext: tar.gz }
+
+    uses: ./.github/workflows/linux-build.yml
+    secrets: inherit
+    with:
+      version:    ${{ github.ref_name }}
+      name:       ${{ matrix.name }}
+      platform:   ${{ matrix.platform }}
+      arch:       ${{ matrix.arch }}
+      asset_ext:  ${{ matrix.asset_ext }}
+      upload_assets: true
+      upload_url:   ${{ github.event.release.upload_url }}
