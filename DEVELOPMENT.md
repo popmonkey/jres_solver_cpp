@@ -18,13 +18,15 @@ It has been structured as a C-API library (`jres_solver`) and a simple CLI clien
 |   ├── jres_solver_utils.cpp       # Shared utilities and Base Class
 |   ├── jres_standard_solver.cpp    # Optimized Strict Solver
 |   ├── jres_diagnostic_solver.cpp  # Relaxed Diagnostic Solver
-|   └── jres_solver_types.cpp       # JSON serialization logic
+|   ├── jres_solver_types.cpp       # JSON serialization logic
+|   ├── formatter/                  # Formatter implementation
+|   └── utils/                      # Utility functions
 ├── lib/
 │   ├── cxxopts/                    # (Git Submodule) cxxopts header-only library
 │   └── json/                       # (Git Submodule) nlohmann/json header-only library
 ├── cmd/
-│   ├── /solver/                    # A CLI solver
-│   └── /formatter/                 # A CLI formatter
+│   ├── solver/                     # A CLI solver
+│   └── formatter/                  # A CLI formatter
 ├── test/                           # Google Test suite
 └── CMakeLists.txt                  # The main build script
 ```
@@ -112,25 +114,37 @@ We use a standard out-of-source CMake build.
     cmake --build .
     ```
 
-This will create two main products in the `build/` directory:
+This will create the main products in the `build/` directory:
 
-  * `libjres_solver.dylib` (or `.so` on Linux, `.dll` on Windows): The shared library.
-  * `jres_solver` (or `jres_solver.exe`): The CLI executable.
+  * `libjres_solver.a` (or `.lib` on Windows): The static library.
+  * `jres_solver` (or `jres_solver.exe`): The solver CLI executable.
+  * `jres_formatter` (or `jres_formatter.exe`): The formatter CLI executable.
 
-## Running the CLI Client
+## Running the CLI Clients
+
+### Solver
 
 The `jres_solver` executable is a client that uses the `jres_solver` library.
 
 ```
 # Run with a file
-./jres_solver -i ../data/race_data.json -s integrated
+./jres_solver -i ../data/short_race.json -s integrated
 
 # Pipe from stdin
-cat ../data/race_data.json | ./jres_solver -s sequential --allow-no-spotter
+cat ../data/24h_race.json | ./jres_solver -s sequential --allow-no-spotter
 
 # Run diagnostics on a failing schedule
 ./jres_solver -i ../data/infeasible.json --diagnose
 
 # Get help
 ./jres_solver --help
+```
+
+### Formatter
+
+The `jres_formatter` executable formats solver output into various report formats.
+
+```
+# Get help
+./jres_formatter --help
 ```

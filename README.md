@@ -18,43 +18,55 @@ This library can be used to solve for optimal driver and spotter schedules for e
 
 The library exposes a C-compatible API and can be bound to languages like C, C++, Go, Python, or Rust.
 
-#### Header: `jres_solver.h`
+#### Basic Usage Example
 
 ```cpp
-// Structure defining solver configuration
-struct JresSolverOptions {
-    int timeLimit;               // Max runtime in seconds (e.g., 30)
-    JresSpotterMode spotterMode; // 0=None, 1=Integrated, 2=Sequential
-    bool allowNoSpotter;         // If true, stints can go without a spotter
-    double optimalityGap;        // Stop when solution is within this % of optimal (e.g., 0.05)
-    bool quiet;                  // If true, suppresses stdout logging
-};
+#include "jres_solver/jres_solver.hpp"
 
-// Enum for spotter modes
-enum JresSpotterMode {
-    JRES_SPOTTER_MODE_NONE = 0,       // No Spotter schedule is solved for
-    JRES_SPOTTER_MODE_INTEGRATED = 1, // Driver and Spotter schedule is solved together
-    JRES_SPOTTER_MODE_SEQUENTIAL = 2  // Driver schedule is prioritized
-};
+// Configure solver options
+JresSolverOptions options;
+options.timeLimit = 5;
+options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
+options.allowNoSpotter = false;
+options.optimalityGap = 0.2;
+options.quiet = false;
 
-// Main Solver Function
-// Returns 0 on success, -1 on failure.
-// outputJson is allocated by the library and must be freed by the caller.
-int solve_race_schedule(const char* raceDataJson,
-                        const JresSolverOptions& options,
-                        char** outputJson);
+// Solve with race data JSON string
+char* resultJson = nullptr;
+int status = solve_race_schedule(raceDataJson, options, &resultJson);
 
-// Diagnostic Solver Function
-// Runs a relaxed model to identify why a schedule is infeasible.
-// Returns 0 on success (diagnosis complete), -1 on internal failure.
-// outputJson will contain a "diagnosis" array with string explanations.
-int diagnose_race_schedule(const char* raceDataJson,
-                           const JresSolverOptions& options,
-                           char** outputJson);
-
-// Memory Cleanup
-void free_solver_result(char* resultJson);
+// Always free the result
+free_solver_result(resultJson);
 ```
+
+For a complete working example, see [`cmd/solver/cli.cpp`](./cmd/solver/cli.cpp).
+
+#### Solver vs. Diagnostic Mode
+
+- **`solve_race_schedule()`**: Finds an optimal schedule satisfying all constraints. Returns an error if no feasible solution exists.
+
+- **`diagnose_race_schedule()`**: When the solver fails, this runs a relaxed model to identify which constraints are causing the infeasibility.
+
+#### Controlling Solve Time
+
+The solver can take a very long time (or never complete) for complex schedules if not properly constrained. Use `timeLimit` and `optimalityGap` to prevent excessive runtimes:
+
+**Recommended defaults:** `timeLimit = 5` seconds, `optimalityGap = 0.2` (20%)
+
+- **`timeLimit`**: Maximum seconds the solver will run before returning the best solution found. This is a hard stop.
+
+- **`optimalityGap`**: Allows the solver to stop early when it finds a "good enough" solution within this percentage of the theoretical optimum. For example, `0.2` means the solver stops once it finds a solution within 20% of optimal.
+
+**Why a small optimality gap is expensive and unnecessary:**
+
+Mixed Integer Programming problems like race scheduling are NP-hard. The solver may find a good feasible solution quickly (in seconds), but proving that solution is within 1% of optimal can take exponentially longer—hours or even days. For practical scheduling:
+
+- A 20% gap solution is typically excellent and solves in seconds
+- A 5% gap might take 10-100x longer with minimal practical benefit
+- A 1% gap can be prohibitively expensive, often timing out
+- The "optimal" schedule and a 20% suboptimal schedule are often nearly identical in practice—swapping equivalent drivers or spotters
+
+The solver prioritizes hard constraints (rest times, fuel, availability) first. The optimality gap only affects soft preferences like minimizing consecutive stints. A 20% gap on these preferences is imperceptible in real-world use.
 
 -----
 
@@ -182,6 +194,7 @@ The function returns a JSON string containing the solution or error details.
   "raceData": { ... }
 }
 ```
+
 
 ---
 
