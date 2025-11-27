@@ -58,19 +58,16 @@ jobs:
     - name: Configure CMake (MSVC)
       shell: pwsh
       run: |
-        # Point CMAKE_PREFIX_PATH to our downloaded HiGHS dir
-        # This triggers "Strategy 1" in CMakeLists.txt
         cmake -B build `
           -G "Visual Studio 17 2022" `
           -DCMAKE_BUILD_TYPE=Release `
-          -DCMAKE_PREFIX_PATH="$env:HIGHS_DIR"
+          -DCMAKE_PREFIX_PATH="$env:HIGHS_DIR" `
+          -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\dist"
 
     - name: Build Libraries & Executables
       shell: pwsh
       run: |
-        cmake --build build --config Release --target jres_solver_lib
-        cmake --build build --config Release --target solver
-        cmake --build build --config Release --target formatter
+        cmake --build build --config Release
 
     - name: Add Build Dir to PATH
       shell: pwsh
@@ -83,6 +80,13 @@ jobs:
         cmake --build build --config Release --target solver_tests
         cmake --build build --config Release --target formatter_tests
         ctest --test-dir build --output-on-failure -C Release
+
+    # ---------------------------------------------------------
+    # Install (Stage Files)
+    # ---------------------------------------------------------
+    - name: Install Artifacts
+      shell: pwsh
+      run: cmake --install build --config Release
 
     # ---------------------------------------------------------
     # Package binaries (Zip for Windows)
@@ -106,10 +110,11 @@ jobs:
       shell: pwsh
       run: |
         $assetPath = "$env:ASSET_NAME"
-        $source = "${{ github.workspace }}\build\Release"
-        Write-Host "Zipping binaries from $source to $assetPath..."
+        $source = "${{ github.workspace }}\dist"
+        Write-Host "Zipping staged artifacts from $source..."
         
-        Get-ChildItem $source -Include *.exe, *.dll, *.lib -Recurse | Compress-Archive -DestinationPath $assetPath
+        # Compress the whole 'dist' folder structure (bin, lib, include)
+        Get-ChildItem $source -Recurse | Compress-Archive -DestinationPath $assetPath
 
     # ---------------------------------------------------------
     # Generate Signature (Checksum)

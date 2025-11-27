@@ -90,10 +90,11 @@ jobs:
       # ---------------------------------------------------------
       - name: Configure CMake
         run: |
-          # Point CMAKE_PREFIX_PATH to our downloaded HiGHS dir
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="${{ env.HIGHS_DIR }}"
+            -DCMAKE_PREFIX_PATH="${{ env.HIGHS_DIR }}" \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/dist" \
+            -DBUILD_SHARED_LIBS=OFF
 
       - name: Build Project
         run: cmake --build build --config Release
@@ -103,6 +104,12 @@ jobs:
 
       - name: Run Tests
         run: ctest --test-dir build --output-on-failure -C Release
+
+      # ---------------------------------------------------------
+      # Install (Stage Files)
+      # ---------------------------------------------------------
+      - name: Stage Artifacts
+        run: cmake --install build --config Release
 
       # ---------------------------------------------------------
       # Package binaries
@@ -120,28 +127,22 @@ jobs:
           echo "SAFE_ARCH=$(sanitize "${{ inputs.arch }}")" >> $GITHUB_ENV
           
       - name: Set Asset Name
-        # Naming Convention: jres-solver-[version]-[platform]-[arch].tar.gz
         run: echo "ASSET_NAME=jres-solver-${{ env.SAFE_VERSION }}-${{ env.SAFE_PLATFORM }}-${{ env.SAFE_ARCH }}.${{ inputs.asset_ext }}" >> $GITHUB_ENV
 
       - name: Ad-hoc Sign Binary (macOS)
         if: startsWith(inputs.os, 'macos')
         run: |
-          # Use ad-hoc signature (-)
-          # Sign the re-named binaries (from OUTPUT_NAME property in CMake)
-          codesign --force --deep -s - build/jres_solver
-          codesign --force --deep -s - build/jres_formatter
-          codesign --force --deep -s - build/libjres_solver.dylib
+          # Sign staged binaries in the /dist folder
+          codesign --force --deep -s - dist/bin/jres_solver
+          codesign --force --deep -s - dist/bin/jres_formatter
+          # No need to sign .a static libs
 
       - name: Package (tar.gz)
         run: |
-          cd build
-          # Package commands and libs using the final filenames
-          tar -czvf "../${{ env.ASSET_NAME }}" \
-            jres_solver \
-            jres_formatter \
-            libjres_solver.* \
-            2>/dev/null || true
-
+          # Archive the entire 'dist' folder content (bin, include, lib)
+          cd dist
+          tar -czvf "../${{ env.ASSET_NAME }}" .
+          
       # ---------------------------------------------------------
       # Generate Signature (Checksum)
       # ---------------------------------------------------------
