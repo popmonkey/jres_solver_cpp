@@ -44,7 +44,6 @@ namespace {
       options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
       options.allowNoSpotter = false;
       options.optimalityGap = 0.0;
-      options.quiet = true;
 
       char* resultJsonCStr = nullptr;
       int resultCode = solve_race_schedule(SOLVABLE_JSON, options, &resultJsonCStr);
@@ -84,7 +83,6 @@ namespace {
       options.spotterMode = JRES_SPOTTER_MODE_NONE;
       options.allowNoSpotter = false;
       options.optimalityGap = 0.0;
-      options.quiet = true;
 
       char* resultJsonCStr = nullptr;
       int resultCode = solve_race_schedule(SPOTTER_NONE_JSON, options, &resultJsonCStr);
@@ -123,7 +121,6 @@ namespace {
       options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
       options.allowNoSpotter = false; // <-- This forces the conflict
       options.optimalityGap = 0.0;
-      options.quiet = true;
 
       char* resultJsonCStr = nullptr;
       int resultCode = solve_race_schedule(CONFLICT_INTEGRATED_JSON, options, &resultJsonCStr);
@@ -162,7 +159,6 @@ namespace {
       options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
       options.allowNoSpotter = false;
       options.optimalityGap = 0.0;
-      options.quiet = true;
 
       char* resultJsonCStr = nullptr;
       int resultCode = solve_race_schedule(CONFLICT_SEQUENTIAL_JSON, options, &resultJsonCStr);
@@ -205,7 +201,6 @@ namespace {
       options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
       options.allowNoSpotter = true; // <-- Key for this test
       options.optimalityGap = 0.0;
-      options.quiet = true;
 
       char* resultJsonCStr = nullptr;
       int resultCode = solve_race_schedule(NO_SPOTTERS_JSON, options, &resultJsonCStr);
@@ -234,7 +229,6 @@ namespace {
       options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
       options.allowNoSpotter = true; // <-- Key for this test
       options.optimalityGap = 0.0;
-      options.quiet = true;
 
       char* resultJsonCStr = nullptr;
       int resultCode = solve_race_schedule(NO_SPOTTERS_JSON, options, &resultJsonCStr);
@@ -280,7 +274,6 @@ TEST(SpotterModeTest, SequentialInfeasibleSpotter) {
     options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
     options.allowNoSpotter = false; // <-- Key for this test
     options.optimalityGap = 0.0;
-    options.quiet = true;
 
     char* resultJsonCStr = nullptr;
     int resultCode = solve_race_schedule(SEQ_INFEASIBLE_JSON, options, &resultJsonCStr);

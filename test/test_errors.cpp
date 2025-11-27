@@ -22,7 +22,6 @@ namespace {
         JresSolverOptions options;
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_NONE;
-        options.quiet = true;
 
         char* resultJsonCStr = nullptr;
         int resultCode = solve_race_schedule(MALFORMED_JSON, options, &resultJsonCStr);
@@ -62,7 +61,6 @@ TEST(ErrorTest, MissingSchemaKey) {
     JresSolverOptions options;
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
-    options.quiet = true;
 
     char* resultJsonCStr = nullptr;
     int resultCode = solve_race_schedule(MISSING_KEY_JSON, options, &resultJsonCStr);
@@ -100,7 +98,6 @@ TEST(ErrorTest, NoDrivers) {
     JresSolverOptions options;
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
-    options.quiet = true;
 
     char* resultJsonCStr = nullptr;
     int resultCode = solve_race_schedule(NO_DRIVERS_JSON, options, &resultJsonCStr);
@@ -133,7 +130,6 @@ TEST(ErrorTest, NoSpottersRequired) {
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
     options.allowNoSpotter = false; // <-- This makes it an error
-    options.quiet = true;
 
     char* resultJsonCStr = nullptr;
     int resultCode = solve_race_schedule(NO_SPOTTERS_JSON, options, &resultJsonCStr);
@@ -165,7 +161,6 @@ TEST(ErrorTest, ZeroDuration) {
     JresSolverOptions options;
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
-    options.quiet = true;
 
     char* resultJsonCStr = nullptr;
     int resultCode = solve_race_schedule(ZERO_DURATION_JSON, options, &resultJsonCStr);

@@ -49,11 +49,10 @@ enum JresSpotterMode {
  * @brief Options for the race schedule solver.
  */
 struct JresSolverOptions {
-    int timeLimit;               // Maximum time in seconds to let the solver run
-    JresSpotterMode spotterMode; // Type of spotter scheduling to use
-    bool allowNoSpotter;         // Allow stints to have no spotter assigned
-    double optimalityGap;        // e.g., 0.01 for 1%
-    bool quiet;                  // Suppress console logging from the library
+    int timeLimit = 5;               // Maximum time in seconds to let the solver run (default: 5)
+    JresSpotterMode spotterMode = JRES_SPOTTER_MODE_NONE; // Type of spotter scheduling to use
+    bool allowNoSpotter = false;     // Allow stints to have no spotter assigned
+    double optimalityGap = 0.2;      // Optimality gap (default: 0.2 = 20%)
 };
 
 /**
