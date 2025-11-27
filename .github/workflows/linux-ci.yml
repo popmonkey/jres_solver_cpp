@@ -1,0 +1,33 @@
+name: Linux CI
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - '**.cpp'
+      - '**.hpp'
+      - '**/CMakeLists.txt'
+      - '.github/workflows/linux-*.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - '**.cpp'
+      - '**.hpp'
+      - '**/CMakeLists.txt'
+      - '.github/workflows/linux-*.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    uses: ./.github/workflows/linux-build.yml
+    secrets: inherit
+    with:
+      name: "Linux (x64)"
+      version: ${{ github.ref_name }}
+      platform: "linux"
+      arch: x64
+      asset_ext: tar.gz
+      upload_assets: false
+      upload_url: ""

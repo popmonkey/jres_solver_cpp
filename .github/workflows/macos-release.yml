@@ -1,0 +1,28 @@
+name: MacOS Release
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build-all:
+    strategy:
+      matrix:
+        include:
+          - { name: "macOS Intel (x64)",           platform: darwin,  os: macos-13,      arch: x64, asset_ext: tar.gz }
+          - { name: "macOS Apple Silicon (arm64)", platform: darwin,  os: macos-14,      arch: arm64, asset_ext: tar.gz }
+
+    uses: ./.github/workflows/macos-build.yml
+    secrets: inherit
+    with:
+      version:    ${{ github.ref_name }}
+      name:       ${{ matrix.name }}
+      platform:   ${{ matrix.platform }}
+      os:         ${{ matrix.os }}
+      arch:       ${{ matrix.arch }}
+      asset_ext:  ${{ matrix.asset_ext }}
+      upload_assets: true
+      upload_url:   ${{ github.event.release.upload_url }}

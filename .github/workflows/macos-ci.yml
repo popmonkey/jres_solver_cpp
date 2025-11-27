@@ -1,4 +1,4 @@
-name: Unix CI
+name: MacOS CI
 
 on:
   push:
@@ -7,34 +7,21 @@ on:
       - '**.cpp'
       - '**.hpp'
       - '**/CMakeLists.txt'
-      - '.github/workflows/unix-*.yml'
+      - '.github/workflows/macos*.yml'
   pull_request:
     branches: [ "main" ]
     paths:
       - '**.cpp'
       - '**.hpp'
       - '**/CMakeLists.txt'
-      - '.github/workflows/unix-*.yml'
+      - '.github/workflows/macos*.yml'
 
 permissions:
   contents: read
 
 jobs:
-  linux:
-    uses: ./.github/workflows/unix-build.yml
-    secrets: inherit
-    with:
-      name: "Linux (x64)"
-      version: ${{ github.ref_name }}
-      platform: "linux"
-      os: ubuntu-20.04
-      arch: x64
-      asset_ext: tar.gz
-      upload_assets: false
-      upload_url: ""
-
   macos-intel:
-    uses: ./.github/workflows/unix-build.yml
+    uses: ./.github/workflows/macos-build.yml
     secrets: inherit
     with:
       name: "macOS Intel (x64)"
@@ -47,7 +34,7 @@ jobs:
       upload_url: ""
 
   macos-arm:
-    uses: ./.github/workflows/unix-build.yml
+    uses: ./.github/workflows/macos-build.yml
     secrets: inherit
     with:
       name: "macOS Apple Silicon (arm64)"
