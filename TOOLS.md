@@ -18,19 +18,14 @@ brew tap popmonkey/jres_solver
 brew install jres_solver
 ```
 
-### Windows Specific Requirement
-
-On Windows, the `jres_solver` application is built as a thin executable that relies on a shared library. You must ensure the following DLL is present in the same directory as the executable (or in your system `%PATH%`):
-
-* **`jres_solver.dll`**
-
-The `jres_formatter` tool is statically linked and does not require this DLL.
-
 ---
 
 ## Solver (`jres_solver`)
 
 The **Solver** is the core engine. It accepts raw race data (track info, driver constraints, car specs) and calculates the optimal driver schedule.
+
+> [!TIP]
+> See the [README](./README.md#controlling-solve-time) for guidance on controlling solve time and understanding the difference between [Solver vs. Diagnostic Mode](./README.md#solver-vs-diagnostic-mode).
 
 ### Usage
 
@@ -101,11 +96,18 @@ If a schedule fails to solve, run with `-d` to get a plain English explanation o
 ./jres_solver -i race_config.json --diagnose
 ```
 
-**Advanced Optimization:**
-Run for up to 5 minutes (`300s`), use `integrated` spotter logic, and allow a 1% margin of error for faster results.
+**With Spotter Scheduling:**
+Use `integrated` spotter logic with a reasonable optimality gap for faster results.
 
 ```sh
-./jres_solver -i race_config.json -o solution.json -t 300 --spotter-mode integrated --optimality-gap 0.01
+./jres_solver -i race_config.json -o solution.json --spotter-mode integrated --optimality-gap 0.2
+```
+
+**Extended Solve Time:**
+For complex schedules, allow more time while maintaining a practical optimality gap.
+
+```sh
+./jres_solver -i race_config.json -o solution.json -t 30 --optimality-gap 0.2
 ```
 
 **Pipeline Usage:**
@@ -173,8 +175,8 @@ Here is how you would go from a raw configuration file to a final distributable 
 ### Linux / macOS
 
 ```sh
-# Step 1: Solve the schedule (allowing 60 seconds for calculation)
-./jres_solver -i race_24h_config.json -o solved_schedule.json -t 60
+# Step 1: Solve the schedule (allowing 30 seconds with 20% optimality gap)
+./jres_solver -i race_24h_config.json -o solved_schedule.json -t 30 -g 0.2
 
 # Step 2: Format the solution into a ZIP file
 ./jres_formatter -i solved_schedule.json -o team_schedule.zip
@@ -183,10 +185,8 @@ Here is how you would go from a raw configuration file to a final distributable 
 ### Windows (Command Prompt)
 
 ```cmd
-REM Ensure jres_solver.dll is in the current folder
-
 REM Step 1: Solve
-jres_solver.exe -i race_24h_config.json -o solved_schedule.json -t 60
+jres_solver.exe -i race_24h_config.json -o solved_schedule.json -t 30 -g 0.2
 
 REM Step 2: Format
 jres_formatter.exe -i solved_schedule.json -o team_schedule.zip
