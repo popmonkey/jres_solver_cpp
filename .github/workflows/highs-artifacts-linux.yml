@@ -1,0 +1,11 @@
+name: Build HiGHS Static Artifacts (Linux)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "This is a placeholder. Switch to the feature branch to run the actual artifact build."
