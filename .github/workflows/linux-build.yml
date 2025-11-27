@@ -116,7 +116,6 @@ jobs:
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="${{ env.HIGHS_DIR }}" \
-            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/dist" \
             -DBUILD_SHARED_LIBS=OFF
 
       - name: Build Project
@@ -132,7 +131,7 @@ jobs:
       # Install (Stage Files)
       # ---------------------------------------------------------
       - name: Stage Artifacts
-        run: cmake --install build --config Release
+        run: cmake --install build --config Release --prefix dist
 
       # ---------------------------------------------------------
       # Package binaries
