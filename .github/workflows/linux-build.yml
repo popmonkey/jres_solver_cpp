@@ -45,14 +45,22 @@ jobs:
           echo "Arch:      ${{ inputs.arch }}"
 
       # ---------------------------------------------------------
-      # Install Build Tools
+      # Install Build Tools (Modern CMake)
       # ---------------------------------------------------------
       - name: Install Build Tools
         run: |
           export DEBIAN_FRONTEND=noninteractive
           export TZ=Etc/UTC
           apt-get update
-          apt-get install -y cmake g++ git curl jq build-essential zip unzip
+          
+          # Install python3-pip to get modern CMake, remove old cmake from apt
+          apt-get install -y python3-pip g++ git curl jq build-essential zip unzip
+          
+          # Install latest CMake (3.20+) via pip to support FetchContent features
+          pip3 install cmake
+          
+          # Verify version (Should be 3.2x or higher)
+          cmake --version
 
       # ---------------------------------------------------------
       # Checkout repo with submodules
