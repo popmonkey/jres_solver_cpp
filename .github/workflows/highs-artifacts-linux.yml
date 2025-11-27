@@ -9,6 +9,7 @@ permissions:
 env:
   HIGHS_VERSION: v1.12.0
   RELEASE_TAG: highs-static-v1.12.0
+  ARTIFACT_NAME: ""
 
 jobs:
   build-highs:

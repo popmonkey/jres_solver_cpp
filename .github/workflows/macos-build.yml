@@ -34,6 +34,10 @@ jobs:
     env:
       HIGHS_TAG: highs-static-v1.12.0
       HIGHS_DIR: ${{ github.workspace }}/highs
+      ASSET_NAME: "" 
+      SAFE_VERSION: ""
+      SAFE_ARCH: ""
+      SAFE_PLATFORM: ""
 
     steps:
       # ---------------------------------------------------------
