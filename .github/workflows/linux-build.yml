@@ -116,7 +116,8 @@ jobs:
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="${{ env.HIGHS_DIR }}" \
-            -DBUILD_SHARED_LIBS=OFF
+            -DBUILD_SHARED_LIBS=OFF \
+            -DJRES_VERSION="${{ inputs.version }}"
 
       - name: Build Project
         run: cmake --build build --config Release
@@ -151,10 +152,27 @@ jobs:
       - name: Set Asset Name
         run: echo "ASSET_NAME=jres-solver-${{ env.SAFE_VERSION }}-${{ env.SAFE_PLATFORM }}-${{ env.SAFE_ARCH }}.${{ inputs.asset_ext }}" >> $GITHUB_ENV
 
-      - name: Package (tar.gz)
+      - name: Package (Curated Selection)
         run: |
-          # Archive the entire 'dist' folder content (bin, include, lib)
-          cd dist
+          mkdir -p package/bin
+          mkdir -p package/lib
+          mkdir -p package/include/jres_solver
+
+          echo "Packaging Binary Artifacts..."
+          
+          # Executables
+          cp dist/bin/jres_solver package/bin/
+          cp dist/bin/jres_formatter package/bin/
+          
+          # Library (Grab .a or .so depending on build, likely .a)
+          # Using find/cp with wildcard to be robust against lib vs lib64 differences
+          find dist -name "libjres_solver.*" -exec cp {} package/lib/ \;
+          
+          # Specific Header
+          cp dist/include/jres_solver/jres_solver.hpp package/include/jres_solver/
+          
+          # Archive the 'package' folder content
+          cd package
           tar -czvf "../${{ env.ASSET_NAME }}" .
           
       # ---------------------------------------------------------

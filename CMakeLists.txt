@@ -166,9 +166,11 @@ set_target_properties(jres_solver_lib PROPERTIES OUTPUT_NAME "jres_solver")
 
 if(WIN32)
     target_sources(jres_solver_lib PRIVATE ${VERSION_RC})
-    # Only export symbols if we are actually building shared
+    
     if(BUILD_SHARED_LIBS)
         target_compile_definitions(jres_solver_lib PRIVATE JRES_SOLVER_EXPORTS)
+    else()
+        target_compile_definitions(jres_solver_lib PUBLIC JRES_STATIC)
     endif()
 endif()
 

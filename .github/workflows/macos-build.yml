@@ -92,7 +92,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="${{ env.HIGHS_DIR }}" \
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/dist" \
-            -DBUILD_SHARED_LIBS=OFF
+            -DBUILD_SHARED_LIBS=OFF \
+            -DJRES_VERSION="${{ inputs.version }}"
 
       - name: Build Project
         run: cmake --build build --config Release
@@ -130,15 +131,32 @@ jobs:
       - name: Ad-hoc Sign Binary (macOS)
         if: startsWith(inputs.os, 'macos')
         run: |
-          # Sign staged binaries in the /dist folder
+          # Sign staged binaries in the /dist folder before packaging
           codesign --force --deep -s - dist/bin/jres_solver
           codesign --force --deep -s - dist/bin/jres_formatter
           # No need to sign .a static libs
 
-      - name: Package (tar.gz)
+      - name: Package (Curated Selection)
         run: |
-          # Archive the entire 'dist' folder content (bin, include, lib)
-          cd dist
+          mkdir -p package/bin
+          mkdir -p package/lib
+          mkdir -p package/include/jres_solver
+
+          echo "Packaging Binary Artifacts..."
+          
+          # Executables
+          cp dist/bin/jres_solver package/bin/
+          cp dist/bin/jres_formatter package/bin/
+          
+          # Library (Grab .dylib or .a)
+          # Using find/cp with wildcard to be robust
+          find dist -name "libjres_solver.*" -exec cp {} package/lib/ \;
+          
+          # Specific Header
+          cp dist/include/jres_solver/jres_solver.hpp package/include/jres_solver/
+          
+          # Archive the 'package' folder content
+          cd package
           tar -czvf "../${{ env.ASSET_NAME }}" .
           
       # ---------------------------------------------------------

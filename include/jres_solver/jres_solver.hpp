@@ -13,10 +13,15 @@
 #define JRES_SOLVER_HPP
 
 #if defined(_WIN32)
-    // Windows/MSVC: Use __declspec(dllexport/dllimport)
-    #ifdef JRES_SOLVER_EXPORTS
+    // Windows/MSVC: Handle DLL exports, imports, AND static builds
+    #if defined(JRES_STATIC)
+        // Static build: No special attributes needed
+        #define JRES_SOLVER_API
+    #elif defined(JRES_SOLVER_EXPORTS)
+        // Building the DLL: Export symbols
         #define JRES_SOLVER_API __declspec(dllexport)
     #else
+        // Using the DLL: Import symbols
         #define JRES_SOLVER_API __declspec(dllimport)
     #endif
 #else
