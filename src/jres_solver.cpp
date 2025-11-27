@@ -52,7 +52,15 @@ int solve_race_schedule(const char* raceDataJson,
         *outputJson = create_output_string(resultJson.dump(4));
         return 0; 
 
+    } catch (const SolverException& e) {
+        // Custom exception with metadata - preserve timing/complexity
+        json errorJson = e.metadata;
+        errorJson["success"] = false;
+        errorJson["error"] = e.what();
+        *outputJson = create_output_string(errorJson.dump(4));
+        return -1;
     } catch (const std::exception& e) {
+        // Generic exception - minimal error JSON
         json errorJson;
         errorJson["success"] = false;
         errorJson["error"] = e.what();
