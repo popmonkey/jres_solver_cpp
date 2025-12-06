@@ -6,6 +6,7 @@
 #include "jres_solver/jres_json_converter.hpp"
 #include "nlohmann/json.hpp"
 #include <iostream>
+#include <cstring>
 
 using json = nlohmann::json;
 
