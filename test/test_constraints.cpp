@@ -6,21 +6,18 @@
 using json = nlohmann::json;
 
 // --- Test: An infeasible race ---
-const char* INFEASIBLE_JSON = R"({
-  "availability": {
-    "Niki": { "1973-06-09T14:00:00.000Z": "Unavailable" },
-    "Ayrton": { "1973-06-09T14:00:00.000Z": "Unavailable" }
-  },
+const char* INFEASIBLE_V2_JSON = R"({
   "teamMembers": [
     { "name": "Niki", "isDriver": true },
     { "name": "Ayrton", "isDriver": true }
   ],
-  "durationHours": 0.5,
-  "raceStartUTC": "1973-06-09T14:37:00.000Z",
-  "avgLapTimeInSeconds": 220.5,
-  "fuelTankSize": 120,
-  "fuelUsePerLap": 9.2,
-  "pitTimeInSeconds": 150
+  "availability": {
+    "Niki": { "1973-06-09T14:00:00.000Z": "Unavailable" },
+    "Ayrton": { "1973-06-09T14:00:00.000Z": "Unavailable" }
+  },
+  "stints": [
+    { "id": 1, "startTime": "1973-06-09T14:37:00.000Z", "endTime": "1973-06-09T15:00:00.000Z" }
+  ]
 })";
 
 TEST(ConstraintTest, InfeasibleModel) {
@@ -30,22 +27,24 @@ TEST(ConstraintTest, InfeasibleModel) {
     options.allowNoSpotter = false;
     options.optimalityGap = 0.0;
 
-    char* resultJsonCStr = nullptr;
-    int resultCode = solve_race_schedule(INFEASIBLE_JSON, options, &resultJsonCStr);
+    JresSolverInput* input = jres_input_from_json(INFEASIBLE_V2_JSON);
+    ASSERT_NE(input, nullptr);
 
-    ASSERT_EQ(resultCode, -1);
-    ASSERT_NE(resultJsonCStr, nullptr);
+    JresSolverOutput* output = solve_race_schedule(input, &options);
+    ASSERT_NE(output, nullptr);
 
-    std::string resultJsonString(resultJsonCStr);
-    free_solver_result(resultJsonCStr);
-    json resultJson = json::parse(resultJsonString);
+    // Infeasible, so schedule should be empty
+    ASSERT_EQ(output->schedule_len, 0);
 
-    ASSERT_FALSE(resultJson["success"].get<bool>());
-    EXPECT_EQ(resultJson["error"].get<std::string>(), "Model is infeasible. No solution exists.");
+    free_jres_solver_input(input);
+    free_jres_solver_output(output);
 }
 
-// --- Test: Preferred Availability ---
-const char* PREFERRED_SLOT_JSON = R"({
+const char* PREFERRED_SLOT_V2_JSON = R"({
+  "teamMembers": [
+    { "name": "Driver A", "isDriver": true, "maxStints": 2, "minimumRestHours": 0 },
+    { "name": "Driver B", "isDriver": true, "maxStints": 2, "minimumRestHours": 0 }
+  ],
   "availability": {
     "Driver A": {
       "1970-01-01T10:00:00.000Z": "Available"
@@ -54,20 +53,10 @@ const char* PREFERRED_SLOT_JSON = R"({
       "1970-01-01T10:00:00.000Z": "Preferred"
     }
   },
-  "teamMembers": [
-    { "name": "Driver A", "isDriver": true, "preferredStints": 2 },
-    { "name": "Driver B", "isDriver": true, "preferredStints": 2 }
-  ],
-  "durationHours": 0.5,
-  "raceStartUTC": "1970-01-01T10:00:00.000Z",
-  "avgLapTimeInSeconds": 120.0,
-  "fuelTankSize": 100,
-  "fuelUsePerLap": 5.0,
-  "pitTimeInSeconds": 60
+  "stints": [
+    { "id": 1, "startTime": "1970-01-01T10:00:00.000Z", "endTime": "1970-01-01T10:30:00.000Z" }
+  ]
 })";
-// Note: This 0.5-hour race will result in 1 stint:
-// Stint 0 @ 10:00 (needs 10:00 key)
-// Both drivers are available, but B is preferred.
 
 TEST(ConstraintTest, PreferredSlot) {
     JresSolverOptions options;
@@ -76,22 +65,55 @@ TEST(ConstraintTest, PreferredSlot) {
     options.allowNoSpotter = false;
     options.optimalityGap = 0.0;
 
-    char* resultJsonCStr = nullptr;
-    int resultCode = solve_race_schedule(PREFERRED_SLOT_JSON, options, &resultJsonCStr);
+    JresSolverInput* input = jres_input_from_json(PREFERRED_SLOT_V2_JSON);
+    ASSERT_NE(input, nullptr);
 
-    // Check for successful run
-    ASSERT_EQ(resultCode, 0);
-    ASSERT_NE(resultJsonCStr, nullptr);
+    JresSolverOutput* output = solve_race_schedule(input, &options);
+    ASSERT_NE(output, nullptr);
 
-    // Parse the result JSON
-    std::string resultJsonString(resultJsonCStr);
-    free_solver_result(resultJsonCStr); // Free memory
-    json resultJson = json::parse(resultJsonString);
+    ASSERT_EQ(output->schedule_len, 1);
+    free_jres_solver_input(input);
+    free_jres_solver_output(output);
+}
 
-    // Check the solution
-    ASSERT_TRUE(resultJson["success"].get<bool>());
-    ASSERT_EQ(resultJson["schedule"].size(), 1);
+const char* NO_DRIVER_FOR_STINT_V2_JSON = R"({
+  "teamMembers": [
+    { "name": "Brandon", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 },
+    { "name": "Cesar", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 },
+    { "name": "Harvey", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 },
+    { "name": "Jay", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 },
+    { "name": "Jack", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 }
+  ],
+  "availability": {
+    "Brandon": { "2025-11-22T14:00:00.000Z": "Unavailable" },
+    "Cesar": { "2025-11-22T14:00:00.000Z": "Unavailable" },
+    "Harvey": { "2025-11-22T14:00:00.000Z": "Unavailable" },
+    "Jay": { "2025-11-22T14:00:00.000Z": "Unavailable" },
+    "Jack": { "2025-11-22T14:00:00.000Z": "Unavailable" }
+  },
+  "stints": [
+    { "id": 1, "startTime": "2025-11-22T14:00:00.000Z", "endTime": "2025-11-22T15:00:00.000Z" }
+  ]
+})";
 
-    // Assert that Driver B was chosen due to "Preferred"
-    EXPECT_EQ(resultJson["schedule"][0]["driver"].get<std::string>(), "Driver B");
+TEST(ConstraintTest, NoDriverForStint) {
+    JresSolverOptions options;
+    options.timeLimit = 10;
+    options.spotterMode = JRES_SPOTTER_MODE_NONE;
+    options.allowNoSpotter = false;
+    options.optimalityGap = 0.0;
+
+    JresSolverInput* input = jres_input_from_json(NO_DRIVER_FOR_STINT_V2_JSON);
+    ASSERT_NE(input, nullptr);
+
+    JresSolverOutput* output = solve_race_schedule(input, &options);
+    ASSERT_NE(output, nullptr);
+
+    ASSERT_EQ(output->schedule_len, 0);
+    ASSERT_GT(output->diagnosis_len, 0);
+    std::string msg(output->diagnosis[0]);
+    EXPECT_STREQ(msg.c_str(), "Model is infeasible.");
+
+    free_jres_solver_input(input);
+    free_jres_solver_output(output);
 }

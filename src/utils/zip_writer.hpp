@@ -1,7 +1,7 @@
 /**
  * @author popmonkey+jres@gmail.com
  * @file src/utils/zip_writer.hpp
- * @brief Utility for writing ZIP files
+ * @brief Utility for writing ZIP files.
  */
 
  #pragma once

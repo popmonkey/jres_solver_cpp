@@ -15,10 +15,11 @@ It has been structured as a C-API library (`jres_solver`) and a simple CLI clien
 |   └── jres_solver/                # The public C-API header for the library
 ├── src/                            # The C++ library implementation
 |   ├── jres_solver.cpp             # C-API Wrapper and Orchestrator
-|   ├── jres_solver_utils.cpp       # Shared utilities and Base Class
+|   ├── jres_solver_base.cpp        # Shared logic for both solvers
 |   ├── jres_standard_solver.cpp    # Optimized Strict Solver
 |   ├── jres_diagnostic_solver.cpp  # Relaxed Diagnostic Solver
-|   ├── jres_solver_types.cpp       # JSON serialization logic
+|   ├── jres_internal_types.cpp     # Internal C++ data structures
+|   ├── jres_json_converter.cpp     # JSON conversion logic
 |   ├── formatter/                  # Formatter implementation
 |   └── utils/                      # Utility functions
 ├── lib/

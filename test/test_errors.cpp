@@ -1,176 +1,76 @@
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
-#include "nlohmann/json.hpp"
-#include <string> // For std::string::find
-
-// Use the nlohmann::json namespace
-using json = nlohmann::json;
+#include <string>
 
 namespace {
-    // --- Test 1: Malformed JSON Input ---
-    //  Missing closing brace
-     const char* MALFORMED_JSON = R"({
-    "availability": {
-        "Niki": { "1973-06-09T14:00:00.000Z": "Available" }
-    },
-    "teamMembers": [
-        { "name": "Niki", "isDriver": true }
-    ]
-    )";
-
+    const char* MALFORMED_JSON = R"({ "teamMembers": [ { "name": "Niki", "isDriver": true } )";
     TEST(ErrorTest, MalformedJson) {
+        JresSolverInput* input = jres_input_from_json(MALFORMED_JSON);
+        ASSERT_EQ(input, nullptr);
+    }
+
+    const char* MISSING_KEY_JSON = R"({ "stints": [] })";
+    TEST(ErrorTest, MissingSchemaKey) {
+        JresSolverInput* input = jres_input_from_json(MISSING_KEY_JSON);
+        ASSERT_EQ(input, nullptr);
+    }
+
+    const char* NO_DRIVERS_V2_JSON = R"({
+      "teamMembers": [ { "name": "Alain", "isDriver": false, "isSpotter": true } ],
+      "availability": {},
+      "stints": [ { "id": 1, "startTime": "1973-06-09T14:37:00.000Z", "endTime": "1973-06-09T15:00:00.000Z" } ]
+    })";
+    TEST(ErrorTest, NoDrivers) {
         JresSolverOptions options;
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_NONE;
-
-        char* resultJsonCStr = nullptr;
-        int resultCode = solve_race_schedule(MALFORMED_JSON, options, &resultJsonCStr);
-
-        // Check for failure code
-        ASSERT_EQ(resultCode, -1);
-        ASSERT_NE(resultJsonCStr, nullptr);
-
-        std::string resultJsonString(resultJsonCStr);
-        free_solver_result(resultJsonCStr);
-        json resultJson = json::parse(resultJsonString);
-
-        // Check the error message
-        ASSERT_FALSE(resultJson["success"].get<bool>());
-        
-        // Check that the error is a nlohmann::json parse error
-        std::string errorMsg = resultJson["error"].get<std::string>();
-        EXPECT_TRUE(errorMsg.find("[json.exception.parse_error") != std::string::npos);
+        JresSolverInput* input = jres_input_from_json(NO_DRIVERS_V2_JSON);
+        ASSERT_NE(input, nullptr);
+        JresSolverOutput* output = solve_race_schedule(input, &options);
+        ASSERT_NE(output, nullptr);
+        ASSERT_GT(output->diagnosis_len, 0);
+        std::string msg(output->diagnosis[0]);
+        EXPECT_TRUE(msg.find("No drivers available") != std::string::npos);
+        free_jres_solver_input(input);
+        free_jres_solver_output(output);
     }
 
-    // --- Test 2: Invalid Schema (Missing Required Key) ---
-    // "teamMembers" key is missing
-    const char* MISSING_KEY_JSON = R"({
-    "availability": {
-        "Niki": { "1973-06-09T14:00:00.000Z": "Available" }
-    },
-    "durationHours": 0.5,
-    "raceStartUTC": "1973-06-09T14:37:00.000Z",
-    "avgLapTimeInSeconds": 220.5,
-    "fuelTankSize": 120,
-    "fuelUsePerLap": 9.2,
-    "pitTimeInSeconds": 150
+    const char* NO_SPOTTERS_REQUIRED_V2_JSON = R"({
+      "teamMembers": [      { "name": "Ayrton", "isDriver": true, "isSpotter": false, "maxStints": 1, "minimumRestHours": 0 } ],
+      "availability": { "Ayrton": { "1973-06-09T14:00:00.000Z": "Available" } },
+      "stints": [ { "id": 1, "startTime": "1973-06-09T14:37:00.000Z", "endTime": "1973-06-09T15:00:00.000Z" } ]
     })";
-}
+    TEST(ErrorTest, NoSpottersRequired) {
+        JresSolverOptions options;
+        options.timeLimit = 10;
+        options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
+        options.allowNoSpotter = false;
+        JresSolverInput* input = jres_input_from_json(NO_SPOTTERS_REQUIRED_V2_JSON);
+        ASSERT_NE(input, nullptr);
+        JresSolverOutput* output = solve_race_schedule(input, &options);
+        ASSERT_NE(output, nullptr);
+        ASSERT_GT(output->diagnosis_len, 0);
+        std::string msg(output->diagnosis[0]);
+        EXPECT_STREQ(msg.c_str(), "Model is infeasible.");
+        free_jres_solver_input(input);
+        free_jres_solver_output(output);
+    }
 
-TEST(ErrorTest, MissingSchemaKey) {
-    JresSolverOptions options;
-    options.timeLimit = 10;
-    options.spotterMode = JRES_SPOTTER_MODE_NONE;
-
-    char* resultJsonCStr = nullptr;
-    int resultCode = solve_race_schedule(MISSING_KEY_JSON, options, &resultJsonCStr);
-
-    // Check for failure code
-    ASSERT_EQ(resultCode, -1);
-    ASSERT_NE(resultJsonCStr, nullptr);
-
-    std::string resultJsonString(resultJsonCStr);
-    free_solver_result(resultJsonCStr);
-    json resultJson = json::parse(resultJsonString);
-
-    // Check the error message
-    ASSERT_FALSE(resultJson["success"].get<bool>());
-    
-    // Check that the error is a nlohmann::json key error
-    std::string errorMsg = resultJson["error"].get<std::string>();
-    EXPECT_TRUE(errorMsg.find("key 'teamMembers' not found") != std::string::npos);
-}
-
-// --- Test 3: Logical Error (No Drivers) ---
-const char* NO_DRIVERS_JSON = R"({
-  "availability": {
-    "Alain": { "1973-06-09T14:00:00.000Z": "Available" }
-  },
-  "teamMembers": [
-    { "name": "Alain", "isDriver": false, "isSpotter": true }
-  ],
-  "durationHours": 0.5,
-  "raceStartUTC": "1973-06-09T14:37:00.000Z",
-  "avgLapTimeInSeconds": 220.5, "fuelTankSize": 120, "fuelUsePerLap": 9.2, "pitTimeInSeconds": 150
-})";
-
-TEST(ErrorTest, NoDrivers) {
-    JresSolverOptions options;
-    options.timeLimit = 10;
-    options.spotterMode = JRES_SPOTTER_MODE_NONE;
-
-    char* resultJsonCStr = nullptr;
-    int resultCode = solve_race_schedule(NO_DRIVERS_JSON, options, &resultJsonCStr);
-
-    ASSERT_EQ(resultCode, -1);
-    ASSERT_NE(resultJsonCStr, nullptr);
-    std::string resultJsonString(resultJsonCStr);
-    free_solver_result(resultJsonCStr);
-    json resultJson = json::parse(resultJsonString);
-
-    ASSERT_FALSE(resultJson["success"].get<bool>());
-    EXPECT_EQ(resultJson["error"].get<std::string>(), "No drivers available for this race.");
-}
-
-// --- Test 4: Logical Error (No Spotters, Required) ---
-const char* NO_SPOTTERS_JSON = R"({
-  "availability": {
-    "Ayrton": { "1973-06-09T14:00:00.000Z": "Available" }
-  },
-  "teamMembers": [
-    { "name": "Ayrton", "isDriver": true, "isSpotter": false }
-  ],
-  "durationHours": 0.5,
-  "raceStartUTC": "1973-06-09T14:37:00.000Z",
-  "avgLapTimeInSeconds": 220.5, "fuelTankSize": 120, "fuelUsePerLap": 9.2, "pitTimeInSeconds": 150
-})";
-
-TEST(ErrorTest, NoSpottersRequired) {
-    JresSolverOptions options;
-    options.timeLimit = 10;
-    options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
-    options.allowNoSpotter = false; // <-- This makes it an error
-
-    char* resultJsonCStr = nullptr;
-    int resultCode = solve_race_schedule(NO_SPOTTERS_JSON, options, &resultJsonCStr);
-
-    ASSERT_EQ(resultCode, -1);
-    ASSERT_NE(resultJsonCStr, nullptr);
-    std::string resultJsonString(resultJsonCStr);
-    free_solver_result(resultJsonCStr);
-    json resultJson = json::parse(resultJsonString);
-
-    ASSERT_FALSE(resultJson["success"].get<bool>());
-    EXPECT_EQ(resultJson["error"].get<std::string>(), "Spotter mode is 'integrated' but no spotters are available and 'allow-no-spotter' is false.");
-}
-
-// --- Test 5: Logical Error (Zero Duration) ---
-const char* ZERO_DURATION_JSON = R"({
-  "availability": {
-    "Ayrton": { "1973-06-09T14:00:00.000Z": "Available" }
-  },
-  "teamMembers": [
-    { "name": "Ayrton", "isDriver": true }
-  ],
-  "durationHours": 0.0,
-  "raceStartUTC": "1973-06-09T14:37:00.000Z",
-  "avgLapTimeInSeconds": 220.5, "fuelTankSize": 120, "fuelUsePerLap": 9.2, "pitTimeInSeconds": 150
-})";
-
-TEST(ErrorTest, ZeroDuration) {
-    JresSolverOptions options;
-    options.timeLimit = 10;
-    options.spotterMode = JRES_SPOTTER_MODE_NONE;
-
-    char* resultJsonCStr = nullptr;
-    int resultCode = solve_race_schedule(ZERO_DURATION_JSON, options, &resultJsonCStr);
-
-    ASSERT_EQ(resultCode, -1);
-    ASSERT_NE(resultJsonCStr, nullptr);
-    std::string resultJsonString(resultJsonCStr);
-    free_solver_result(resultJsonCStr);
-    json resultJson = json::parse(resultJsonString);
-
-    ASSERT_FALSE(resultJson["success"].get<bool>());
-    EXPECT_EQ(resultJson["error"].get<std::string>(), "Invalid race parameters: totalStints must be > 0.");
+    const char* ZERO_STINTS_V2_JSON = R"({
+      "teamMembers": [ { "name": "Ayrton", "isDriver": true, "maxStints": 1, "minimumRestHours": 0 } ],
+      "availability": { "Ayrton": { "1973-06-09T14:00:00.000Z": "Available" } },
+      "stints": []
+    })";
+    TEST(ErrorTest, ZeroStints) {
+        JresSolverOptions options;
+        options.timeLimit = 10;
+        options.spotterMode = JRES_SPOTTER_MODE_NONE;
+        JresSolverInput* input = jres_input_from_json(ZERO_STINTS_V2_JSON);
+        ASSERT_NE(input, nullptr);
+        JresSolverOutput* output = solve_race_schedule(input, &options);
+        ASSERT_NE(output, nullptr);
+        ASSERT_EQ(output->schedule_len, 0);
+        free_jres_solver_input(input);
+        free_jres_solver_output(output);
+    }
 }

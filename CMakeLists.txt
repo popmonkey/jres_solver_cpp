@@ -157,10 +157,11 @@ target_include_directories(jres_utils PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # --- JRES Solver Core (Shared or Static) ---
 add_library(jres_solver_lib 
   src/jres_solver.cpp
-  src/jres_solver_utils.cpp
+  src/jres_json_converter.cpp
+  src/jres_internal_types.cpp
+  src/jres_solver_base.cpp
   src/jres_standard_solver.cpp
   src/jres_diagnostic_solver.cpp
-  src/jres_solver_types.cpp
 )
 set_target_properties(jres_solver_lib PROPERTIES OUTPUT_NAME "jres_solver")
 

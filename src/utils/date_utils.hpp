@@ -1,7 +1,7 @@
 /**
  * @author popmonkey+jres@gmail.com
  * @file src/utils/date_utils.hpp
- * @brief Utility functions for date and time handling
+ * @brief Utility functions for date and time handling.
  */
 
  #pragma once

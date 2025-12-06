@@ -13,96 +13,182 @@
 #define JRES_SOLVER_HPP
 
 #if defined(_WIN32)
-    // Windows/MSVC: Handle DLL exports, imports, AND static builds
     #if defined(JRES_STATIC)
-        // Static build: No special attributes needed
         #define JRES_SOLVER_API
     #elif defined(JRES_SOLVER_EXPORTS)
-        // Building the DLL: Export symbols
         #define JRES_SOLVER_API __declspec(dllexport)
     #else
-        // Using the DLL: Import symbols
         #define JRES_SOLVER_API __declspec(dllimport)
     #endif
 #else
-    // macOS/Linux (GCC/Clang): Use visibility attribute
-    // This allows the shared library (.dylib/.so) to function correctly.
     #define JRES_SOLVER_API __attribute__((visibility("default")))
 #endif
 
-
-// Use standard C-style linking for compatibility
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+// --- Public C-API Enums and Structs ---
+
 /**
- * @brief C-API enum for specifying the spotter scheduling mode.
+ * @brief Enum for member availability.
+ */
+enum JresAvailability {
+    JRES_AVAILABILITY_UNAVAILABLE,
+    JRES_AVAILABILITY_AVAILABLE,
+    JRES_AVAILABILITY_PREFERRED
+};
+
+/**
+ * @brief Enum for spotter scheduling mode.
  */
 enum JresSpotterMode {
-    JRES_SPOTTER_MODE_NONE = 0,       // No Spotter schedule is solved for
-    JRES_SPOTTER_MODE_INTEGRATED = 1, // Driver and Spotter schedule is solved together
-    JRES_SPOTTER_MODE_SEQUENTIAL = 2  // Driver schedule is prioritized
+    JRES_SPOTTER_MODE_NONE = 0,
+    JRES_SPOTTER_MODE_INTEGRATED = 1,
+    JRES_SPOTTER_MODE_SEQUENTIAL = 2
 };
 
 /**
- * @brief Options for the race schedule solver.
+ * @brief Options for the solver.
  */
 struct JresSolverOptions {
-    int timeLimit = 5;               // Maximum time in seconds to let the solver run (default: 5)
-    JresSpotterMode spotterMode = JRES_SPOTTER_MODE_NONE; // Type of spotter scheduling to use
-    bool allowNoSpotter = false;     // Allow stints to have no spotter assigned
-    double optimalityGap = 0.2;      // Optimality gap (default: 0.2 = 20%)
+    /** @brief Maximum time in seconds to let the solver run. */
+    int timeLimit;
+    /** @brief Type of spotter scheduling to use. */
+    JresSpotterMode spotterMode;
+    /** @brief Allow stints to have no spotter assigned. */
+    bool allowNoSpotter;
+    /** @brief The solver will terminate when the gap between the primal and dual objective bound is less than this value. */
+    double optimalityGap;
 };
 
 /**
- * @brief Solves a race schedule.
- *
- * This function is thread-safe. It takes a JSON string of race data and a set of
- * options, and returns a JSON string containing the schedule or an error.
- *
- * @param raceDataJson A UTF-8 JSON string containing the race data.
- * @param options A struct containing the solver options.
- * @param outputJson A pointer that will be set to a newly allocated string
- * containing the JSON result. The caller is responsible for
- * freeing this string using free_solver_result().
- *
- * @return 0 on success.
- * @return -1 on failure (e.g., parse error, infeasible model).
- * On failure, outputJson will still be set to a JSON string
- * containing an "error" key.
+ * @brief Represents a single team member.
  */
-JRES_SOLVER_API int solve_race_schedule(const char* raceDataJson,
-                        const JresSolverOptions& options,
-                        char** outputJson);
+struct JresTeamMember {
+    /** @brief Unique name of the team member. */
+    const char* name;
+    /** @brief 1 if the member can drive, 0 otherwise. */
+    int isDriver;
+    /** @brief 1 if the member can spot, 0 otherwise. */
+    int isSpotter;
+    /** @brief Maximum number of consecutive stints a member can perform. */
+    int maxStints;
+    /** @brief Minimum rest time in hours required after a shift. */
+    int minimumRestHours;
+};
 
 /**
- * @brief Runs the diagnostic solver to explain why a schedule is infeasible.
- *
- * This uses a relaxed model with penalties to find the minimum set of
- * constraints that must be violated to make the schedule work.
- *
- * @param raceDataJson A UTF-8 JSON string containing the race data.
- * @param options A struct containing the solver options.
- * @param outputJson A pointer that will be set to a newly allocated string
- * containing the JSON result. The result will contain a "diagnosis" array.
- *
- * @return 0 on success (diagnosis ran successfully).
- * @return -1 on failure (internal error running diagnosis).
+ * @brief Represents a single race stint.
  */
-JRES_SOLVER_API int diagnose_race_schedule(const char* raceDataJson,
-                        const JresSolverOptions& options,
-                        char** outputJson);
+struct JresStint {
+    /** @brief Unique identifier for the stint. */
+    int id;
+    /** @brief ISO 8601 timestamp for the start of the stint. */
+    const char* startTime;
+    /** @brief ISO 8601 timestamp for the end of the stint. */
+    const char* endTime;
+};
 
 /**
- * @brief Frees the memory of the JSON result string.
- *
- * Use this function to free the string allocated and returned by
- * solve_race_schedule() or diagnose_race_schedule().
- *
- * @param resultJson The string to free.
+ * @brief Represents a single availability entry for a team member.
  */
-JRES_SOLVER_API void free_solver_result(char* resultJson);
+struct JresAvailabilityEntry {
+    /** @brief An ISO 8601 timestamp for the hour slot. */
+    const char* time;
+    /** @brief The availability for that hour. */
+    JresAvailability availability;
+};
+
+/**
+ * @brief Represents the availability for a single team member.
+ */
+struct JresMemberAvailability {
+    /** @brief The name of the team member. */
+    const char* name;
+    /** @brief A pointer to an array of availability entries. */
+    JresAvailabilityEntry* availability;
+    /** @brief The number of availability entries for this member. */
+    int availability_len;
+};
+
+/**
+ * @brief The main input struct for the solver.
+ */
+struct JresSolverInput {
+    /** @brief A pointer to an array of team members. */
+    JresTeamMember* teamMembers;
+    /** @brief The number of team members. */
+    int teamMembers_len;
+    /** @brief A pointer to an array of availability information. */
+    JresMemberAvailability* availability;
+    /** @brief The number of members with availability information. */
+    int availability_len;
+    /** @brief A pointer to an array of stints. */
+    JresStint* stints;
+    /** @brief The number of stints. */
+    int stints_len;
+};
+
+/**
+ * @brief Represents a single entry in the solved schedule.
+ */
+struct JresScheduleEntry {
+    /** @brief The ID of the stint. */
+    int stintId;
+    /** @brief Name of the assigned driver. */
+    const char* driver;
+    /** @brief Name of the assigned spotter. */
+    const char* spotter;
+};
+
+/**
+ * @brief Solver performance and complexity metrics.
+ */
+struct JresSolverStats {
+    /** @brief The number of columns in the solver model. */
+    int modelColumns;
+    /** @brief The number of rows in the solver model. */
+    int modelRows;
+    /** @brief The number of nodes explored by the solver. */
+    int searchNodes;
+    /** @brief The final optimality gap of the solution. */
+    double finalGap;
+    /** @brief The time taken to set up the model in milliseconds. */
+    double setupDurationMs;
+    /** @brief The time taken to solve for the drivers in milliseconds. */
+    double driverSolveDurationMs;
+    /** @brief The time taken to solve for the spotters in milliseconds (sequential mode only). */
+    double spotterSolveDurationMs;
+};
+
+/**
+ * @brief The main output struct from the solver.
+ */
+struct JresSolverOutput {
+    /** @brief A pointer to an array of schedule entries. */
+    JresScheduleEntry* schedule;
+    /** @brief The number of schedule entries. */
+    int schedule_len;
+    /** @brief An array of strings with diagnostic information. Empty on success. */
+    const char** diagnosis;
+    /** @brief The number of diagnosis strings. */
+    int diagnosis_len;
+    /** @brief Solver performance and complexity metrics. */
+    JresSolverStats* stats;
+};
+
+// --- Public C-API Functions ---
+
+JRES_SOLVER_API JresSolverOutput* solve_race_schedule(const JresSolverInput* input, const JresSolverOptions* options);
+JRES_SOLVER_API JresSolverOutput* diagnose_race_schedule(const JresSolverInput* input, const JresSolverOptions* options);
+
+JRES_SOLVER_API JresSolverInput* jres_input_from_json(const char* jsonData);
+JRES_SOLVER_API char* jres_output_to_json(const JresSolverOutput* output);
+
+JRES_SOLVER_API void free_jres_solver_input(JresSolverInput* input);
+JRES_SOLVER_API void free_jres_solver_output(JresSolverOutput* output);
+JRES_SOLVER_API void free_json_string(char* json_string);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -1,7 +1,7 @@
 /**
  * @author popmonkey+jres@gmail.com
  * @file src/utils/zip_writer.cpp
- * @brief Utility for writing ZIP files
+ * @brief Utility for writing ZIP files.
  */
 #include "utils/zip_writer.hpp"
 #include <array>

@@ -1,7 +1,7 @@
 /**
  * @author popmonkey+jres@gmail.com
  * @file src/utils/date_utils.cpp
- * @brief Utility functions for date and time handling
+ * @brief Utility functions for date and time handling.
  */
 #include "utils/date_utils.hpp"
 
