@@ -8,15 +8,78 @@ This library can be used to solve for optimal driver and spotter schedules for e
 ## Additional Documentation
 
 * **[Tools](./TOOLS.md)** - releases include some command line tools that use the library
-* **[Development](./DEVELOPMENT.md)** - instructions for development of the library
+* **[Development](./CONTRIBUTING.md)** - instructions for development of the library
 
 ## The Library
 
 **JresSolver** is a C++ library designed to optimize endurance racing schedules. It uses the **HiGHS** Mixed Integer Programming (MIP) solver to assign drivers (and optional spotters) to race stints while satisfying constraints such as fuel usage, maximum drive times, minimum rest periods, and driver availability.
 
-### Integration (C-API)
+### Data Structures
 
-The library exposes a C-compatible API and can be bound to languages like C, C++, Go, Python, or Rust.
+The C-API uses the following structs to pass data to and from the solver.
+
+#### Input Structures
+
+`JresSolverInput` is the main input struct. It contains arrays of the other input structs.
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `teamMembers` | `JresTeamMember*` | A pointer to an array of team members. |
+| `teamMembers_len` | `int` | The number of team members. |
+| `availability` | `JresMemberAvailability*` | A pointer to an array of availability information. |
+| `availability_len`| `int` | The number of members with availability information. |
+| `stints` | `JresStint*` | A pointer to an array of stints. |
+| `stints_len`| `int` | The number of stints. |
+
+`JresTeamMember`
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `name` | `const char*` | Unique identifier for the member. |
+| `isDriver` | `int` | `1` if the member can drive, `0` otherwise. |
+| `isSpotter` | `int` | `1` if the member can spot, `0` otherwise. |
+| `preferredStints`| `int` | Soft constraint: solver attempts to limit consecutive stints to this number. |
+| `minimumRestHours` | `int` | Hard constraint: Minimum rest time required after a driving shift before driving again. |
+
+`JresStint`
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | `int` | Unique identifier for the stint. |
+| `startTime` | `const char*` | ISO 8601 timestamp for the start of the stint. |
+| `endTime` | `const char*` | ISO 8601 timestamp for the end of the stint. |
+
+`JresAvailabilityEntry` & `JresMemberAvailability`
+
+These structs are used to represent the availability of team members.
+
+| Struct | Field | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `JresAvailabilityEntry` | `time` | `const char*` | An ISO 8601 timestamp for the hour slot. |
+| | `availability` | `JresAvailability` | The availability for that hour (`JRES_AVAILABILITY_UNAVAILABLE`, `JRES_AVAILABILITY_AVAILABLE`, `JRES_AVAILABILITY_PREFERRED`). |
+| `JresMemberAvailability`| `name` | `const char*` | The name of the team member. |
+| | `availability` | `JresAvailabilityEntry*` | A pointer to an array of availability entries. |
+| | `availability_len` | `int` | The number of availability entries for this member. |
+
+
+#### Output Structures
+
+`JresSolverOutput` is the main output struct.
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `schedule` | `JresScheduleEntry*` | A pointer to an array of schedule entries. |
+| `schedule_len` | `int` | The number of schedule entries. |
+| `diagnosis` | `const char**` | An array of strings with diagnostic information. Empty on success. |
+| `diagnosis_len` | `int` | The number of diagnosis strings. |
+
+`JresScheduleEntry`
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `stintId` | `int` | The ID of the stint. |
+| `driver` | `const char*` | Name of the assigned driver. |
+| `spotter` | `const char*` | Name of the assigned spotter. |
 
 #### Basic Usage Example
 
@@ -29,14 +92,16 @@ options.timeLimit = 5;
 options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
 options.allowNoSpotter = false;
 options.optimalityGap = 0.2;
-options.quiet = false;
 
-// Solve with race data JSON string
-char* resultJson = nullptr;
-int status = solve_race_schedule(raceDataJson, options, &resultJson);
+// Create input struct from JSON
+JresSolverInput* input = jres_input_from_json(raceDataJson);
 
-// Always free the result
-free_solver_result(resultJson);
+// Solve the schedule
+JresSolverOutput* output = solve_race_schedule(input, &options);
+
+// Free the memory
+free_jres_solver_input(input);
+free_jres_solver_output(output);
 ```
 
 For a complete working example, see [`cmd/solver/cli.cpp`](./cmd/solver/cli.cpp).
@@ -70,32 +135,44 @@ The solver prioritizes hard constraints (rest times, fuel, availability) first. 
 
 -----
 
+### JSON Helper Functions
+
+The library provides helper functions to convert between the C-API structs and JSON strings.
+
+#### `jres_input_from_json(const char* jsonData)`
+Parses a JSON string and returns a `JresSolverInput*`. The caller is responsible for freeing the memory using `free_jres_solver_input`.
+
+#### `jres_output_to_json(const JresSolverOutput* output)`
+Converts a `JresSolverOutput` struct to a JSON string. The caller is responsible for freeing the memory using `free_json_string`.
+
 ### Input JSON Specification
 
-The `raceDataJson` string passed to `solve_race_schedule` must strictly follow this schema.
+The `raceDataJson` string passed to `jres_input_from_json` must strictly follow this schema.
 
-#### Root Object (`RaceData`)
+#### Root Object
 
 | Field | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `raceStartUTC` | String | Yes | ISO 8601 timestamp for the start of the race (e.g., `"2023-06-10T14:00:00"`). |
-| `durationHours` | Number | Yes | Total length of the race in hours. |
-| `avgLapTimeInSeconds`| Number | Yes | Average lap time used to calculate stint duration. |
-| `pitTimeInSeconds` | Number | Yes | Time lost during a pit stop. |
-| `fuelTankSize` | Number | Yes | Total fuel capacity (units must match `fuelUsePerLap`). |
-| `fuelUsePerLap` | Number | Yes | Fuel consumed per lap. |
 | `teamMembers` | Array | Yes | List of drivers and spotters (see below). |
 | `availability` | Object | Yes | Map of availability constraints (see below). |
-| `firstStintDriver` | String | No | Name of the driver forced to take the first stint. |
+| `stints` | Array | Yes | List of pre-defined race stints (see below). |
+
+#### Stint Object
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | Integer | Yes | Unique identifier for the stint. |
+| `startTime` | String | Yes | ISO 8601 timestamp for the start of the stint. |
+| `endTime` | String | Yes | ISO 8601 timestamp for the end of the stint. |
 
 #### Team Member Object
 
 | Field | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `name` | String | **Required** | Unique identifier for the member. |
-| `isDriver` | Boolean | `false` | Can this member drive? |
+| `isDriver` | Boolean | `true` | Can this member drive? |
 | `isSpotter` | Boolean | `false` | Can this member spot? |
-| `preferredStints` | Integer| `3` | Soft constraint: solver attempts to limit consecutive stints to this number. |
+| `maxStints` | Integer| `1` | Hard constraint: Maximum number of consecutive stints a member can perform. |
 | `minimumRestHours` | Integer| `0` | Hard constraint: Minimum rest time required after a driving shift before driving again. |
 
 #### Availability Map & Time Formatting
@@ -106,32 +183,24 @@ The `availability` object maps a **Team Member's Name** to a dictionary of **Tim
 
   * You must provide availability for every hour the race covers.
   * The keys must be formatted exactly as: `YYYY-MM-DDTHH:00:00.000Z`.
-  * If a driver/time pair is missing, the solver assumes the driver is **Available** (Standard) unless specific logic interprets missing keys as unavailable.
-      * *Note on current implementation:* The solver checks for `"Unavailable"` explicitly. If the key exists and value is `"Unavailable"`, they cannot drive. If the key is `"Preferred"`, the cost is reduced.
+  * If a driver/time pair is missing, the solver assumes the driver is **Available**.
 
 ##### Values:
 
   * `"Preferred"`: The solver is incentivized to schedule the driver here.
   * `"Unavailable"`: The driver is strictly forbidden from being scheduled.
-  * (Missing/Other): The driver is available but not preferred.
+  * `"Available"`: The driver is available but not preferred.
 
 ##### JSON Example
 
 ```json
 {
-  "raceStartUTC": "2024-06-15T15:00:00",
-  "durationHours": 24,
-  "avgLapTimeInSeconds": 210.5,
-  "pitTimeInSeconds": 45.0,
-  "fuelTankSize": 100.0,
-  "fuelUsePerLap": 3.2,
-  "firstStintDriver": "Niki",
   "teamMembers": [
     {
       "name": "Niki",
       "isDriver": true,
       "isSpotter": true,
-      "preferredStints": 2,
+      "maxStints": 2,
       "minimumRestHours": 4
     },
     {
@@ -145,56 +214,62 @@ The `availability` object maps a **Team Member's Name** to a dictionary of **Tim
       "2024-06-15T18:00:00.000Z": "Unavailable",
       "2024-06-15T19:00:00.000Z": "Preferred"
     }
-  }
+  },
+  "stints": [
+    { "id": 1, "startTime": "2024-06-15T15:00:00Z", "endTime": "2024-06-15T16:00:00Z" },
+    { "id": 2, "startTime": "2024-06-15T16:00:00Z", "endTime": "2024-06-15T17:00:00Z" }
+  ]
 }
 ```
 
------
-
 ### Output JSON Specification
 
-The function returns a JSON string containing the solution or error details.
+The `jres_output_to_json` function returns a JSON string containing the solution or error details.
 
 #### Success Response
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `success` | Boolean | Always `true`. |
-| `solveDurationSeconds` | Number | Time taken by the C++ solver to reach the solution. |
 | `schedule` | Array | List of optimized stint assignments. |
-| `raceData` | Object | Echoes the input configuration for verification. |
+| `diagnosis`| Array | List of strings with diagnostic information. Empty on success. |
+| `stats` | Object | Solver performance and complexity metrics. |
+
+##### Stats Object
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `modelColumns`| Integer | The number of columns in the solver model. |
+| `modelRows` | Integer | The number of rows in the solver model. |
+| `searchNodes` | Integer | The number of nodes explored by the solver. |
+| `finalGap` | Number | The final optimality gap of the solution. |
+| `setupDurationMs`| Number | The time taken to set up the model in milliseconds. |
+| `driverSolveDurationMs` | Number | The time taken to solve for the drivers in milliseconds. |
+| `spotterSolveDurationMs` | Number | The time taken to solve for the spotters in milliseconds (sequential mode only). |
 
 ##### Schedule Entry Object
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `stint` | Integer | 1-based stint index. |
+| `stintId` | Integer | The ID of the stint. |
 | `driver` | String | Name of the assigned driver. |
 | `spotter` | String | Name of the assigned spotter (if Spotter Mode is active). |
 
 #### Error Response
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `success` | Boolean | Always `false`. |
-| `error` | String | Description of the failure (e.g., "Infeasible model", "Parse error"). |
-| `diagnosis` | Array | (Diagnostic Mode Only) List of strings explaining why the schedule is infeasible. |
+When the solver fails, the `schedule` array will be empty, and the `diagnosis` array will contain one or more strings explaining the failure.
 
 ##### Example Output
 
 ```json
 {
-  "success": true,
-  "solveDurationSeconds": 0.45,
   "schedule": [
-    { "stint": 1, "driver": "Niki", "spotter": "Alain" },
-    { "stint": 2, "driver": "Niki", "spotter": "Alain" },
-    { "stint": 3, "driver": "Alain", "spotter": "Niki" }
+    { "stintId": 1, "driver": "Niki", "spotter": "Alain" },
+    { "stintId": 2, "driver": "Niki", "spotter": "Alain" },
+    { "stintId": 3, "driver": "Alain", "spotter": "Niki" }
   ],
-  "raceData": { ... }
+  "diagnosis": []
 }
 ```
-
 
 ---
 
