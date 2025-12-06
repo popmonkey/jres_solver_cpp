@@ -30,80 +30,151 @@ extern "C" {
 
 // --- Public C-API Enums and Structs ---
 
+/**
+ * @brief Enum for member availability.
+ */
 enum JresAvailability {
     JRES_AVAILABILITY_UNAVAILABLE,
     JRES_AVAILABILITY_AVAILABLE,
     JRES_AVAILABILITY_PREFERRED
 };
 
+/**
+ * @brief Enum for spotter scheduling mode.
+ */
 enum JresSpotterMode {
     JRES_SPOTTER_MODE_NONE = 0,
     JRES_SPOTTER_MODE_INTEGRATED = 1,
     JRES_SPOTTER_MODE_SEQUENTIAL = 2
 };
 
+/**
+ * @brief Options for the solver.
+ */
 struct JresSolverOptions {
+    /** @brief Maximum time in seconds to let the solver run. */
     int timeLimit;
+    /** @brief Type of spotter scheduling to use. */
     JresSpotterMode spotterMode;
+    /** @brief Allow stints to have no spotter assigned. */
     bool allowNoSpotter;
+    /** @brief The solver will terminate when the gap between the primal and dual objective bound is less than this value. */
     double optimalityGap;
 };
 
+/**
+ * @brief Represents a single team member.
+ */
 struct JresTeamMember {
+    /** @brief Unique name of the team member. */
     const char* name;
+    /** @brief 1 if the member can drive, 0 otherwise. */
     int isDriver;
+    /** @brief 1 if the member can spot, 0 otherwise. */
     int isSpotter;
+    /** @brief Maximum number of consecutive stints a member can perform. */
     int maxStints;
+    /** @brief Minimum rest time in hours required after a shift. */
     int minimumRestHours;
 };
 
+/**
+ * @brief Represents a single race stint.
+ */
 struct JresStint {
+    /** @brief Unique identifier for the stint. */
     int id;
+    /** @brief ISO 8601 timestamp for the start of the stint. */
     const char* startTime;
+    /** @brief ISO 8601 timestamp for the end of the stint. */
     const char* endTime;
 };
 
+/**
+ * @brief Represents a single availability entry for a team member.
+ */
 struct JresAvailabilityEntry {
+    /** @brief An ISO 8601 timestamp for the hour slot. */
     const char* time;
+    /** @brief The availability for that hour. */
     JresAvailability availability;
 };
 
+/**
+ * @brief Represents the availability for a single team member.
+ */
 struct JresMemberAvailability {
+    /** @brief The name of the team member. */
     const char* name;
+    /** @brief A pointer to an array of availability entries. */
     JresAvailabilityEntry* availability;
+    /** @brief The number of availability entries for this member. */
     int availability_len;
 };
 
+/**
+ * @brief The main input struct for the solver.
+ */
 struct JresSolverInput {
+    /** @brief A pointer to an array of team members. */
     JresTeamMember* teamMembers;
+    /** @brief The number of team members. */
     int teamMembers_len;
+    /** @brief A pointer to an array of availability information. */
     JresMemberAvailability* availability;
+    /** @brief The number of members with availability information. */
     int availability_len;
+    /** @brief A pointer to an array of stints. */
     JresStint* stints;
+    /** @brief The number of stints. */
     int stints_len;
 };
 
+/**
+ * @brief Represents a single entry in the solved schedule.
+ */
 struct JresScheduleEntry {
+    /** @brief The ID of the stint. */
     int stintId;
+    /** @brief Name of the assigned driver. */
     const char* driver;
+    /** @brief Name of the assigned spotter. */
     const char* spotter;
 };
 
+/**
+ * @brief Solver performance and complexity metrics.
+ */
 struct JresSolverStats {
+    /** @brief The number of columns in the solver model. */
     int modelColumns;
+    /** @brief The number of rows in the solver model. */
     int modelRows;
+    /** @brief The number of nodes explored by the solver. */
     int searchNodes;
+    /** @brief The final optimality gap of the solution. */
     double finalGap;
+    /** @brief The time taken to set up the model in milliseconds. */
     double setupDurationMs;
+    /** @brief The time taken to solve for the drivers in milliseconds. */
     double driverSolveDurationMs;
+    /** @brief The time taken to solve for the spotters in milliseconds (sequential mode only). */
     double spotterSolveDurationMs;
 };
 
+/**
+ * @brief The main output struct from the solver.
+ */
 struct JresSolverOutput {
+    /** @brief A pointer to an array of schedule entries. */
     JresScheduleEntry* schedule;
+    /** @brief The number of schedule entries. */
     int schedule_len;
+    /** @brief An array of strings with diagnostic information. Empty on success. */
     const char** diagnosis;
+    /** @brief The number of diagnosis strings. */
     int diagnosis_len;
+    /** @brief Solver performance and complexity metrics. */
     JresSolverStats* stats;
 };
 

@@ -1,9 +1,7 @@
 /**
  * @author popmonkey+jres@gmail.com
  * @file cmd/solver/cli.cpp
- * @brief An example CLI client for the JRES Solver Library.
- *
- * This application is an example `JresSolver` library client.
+ * @brief Command-line interface for the JRES Solver library.
  */
 
 #include <iostream>

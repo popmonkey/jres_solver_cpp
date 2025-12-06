@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_internal_types.cpp
+ * @brief Internal data structures and conversion functions for the JRES Solver library.
+ */
 #include "jres_internal_types.hpp"
 #include <iomanip>
 #include <sstream>

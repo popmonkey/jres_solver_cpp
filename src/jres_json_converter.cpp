@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_json_converter.cpp
+ * @brief JSON conversion functions for the JRES Solver library.
+ */
 #include "jres_solver/jres_json_converter.hpp"
 #include "nlohmann/json.hpp"
 #include <iostream>

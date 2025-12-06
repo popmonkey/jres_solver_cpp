@@ -1,7 +1,7 @@
 /**
  * @author popmonkey+jres@gmail.com
  * @file src/formatter/formatter_core.hpp
- * @brief Core header for JRES Schedule Formatter
+ * @brief Core header for the JRES Schedule Formatter.
  */
 
  #pragma once

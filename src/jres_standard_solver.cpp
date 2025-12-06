@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_standard_solver.cpp
+ * @brief Standard solver for the JRES Solver library.
+ */
 #include "jres_standard_solver.hpp"
 #include <algorithm>
 #include <cmath>

@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_solver_base.hpp
+ * @brief Base class for the JRES Solver.
+ */
 #pragma once
 
 #include "jres_internal_types.hpp"

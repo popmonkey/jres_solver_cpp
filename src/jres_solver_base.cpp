@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_solver_base.cpp
+ * @brief Base class for the JRES Solver.
+ */
 #include "jres_solver_base.hpp"
 
 JresSolverBase::JresSolverBase(const jres::internal::SolverInput& input, const JresSolverOptions& options)

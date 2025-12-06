@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_diagnostic_solver.hpp
+ * @brief Diagnostic solver for the JRES Solver library.
+ */
 #pragma once
 
 #include "jres_solver_base.hpp"

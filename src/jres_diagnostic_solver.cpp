@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_diagnostic_solver.cpp
+ * @brief Diagnostic solver for the JRES Solver library.
+ */
 #include "jres_diagnostic_solver.hpp"
 #include "Highs.h"
 #include "jres_internal_types.hpp"

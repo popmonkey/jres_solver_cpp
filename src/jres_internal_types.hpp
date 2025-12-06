@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_internal_types.hpp
+ * @brief Internal data structures for the JRES Solver library.
+ */
 #pragma once
 
 #include "jres_solver/jres_solver.hpp"

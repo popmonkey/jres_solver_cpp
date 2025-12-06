@@ -1,7 +1,7 @@
 /**
  * @author popmonkey+jres@gmail.com
  * @file src/formatter/formatter_core.cpp
- * @brief Core logic for formatting
+ * @brief Core logic for the JRES Schedule Formatter.
  */
 
 #include "formatter/formatter_core.hpp" 

@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/jres_solver.cpp
+ * @brief C-API implementation for the JRES Solver library.
+ */
 #include "jres_solver/jres_solver.hpp"
 #include "jres_internal_types.hpp"
 #include "jres_standard_solver.hpp"
