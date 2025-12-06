@@ -1,5 +1,49 @@
 {
   "success": true,
+  "teamMembers": [
+    {
+      "name": "Niki",
+      "isDriver": true,
+      "isSpotter": true,
+      "maxStints": 1,
+      "minimumRestHours": 8
+    },
+    {
+      "name": "Ayrton",
+      "isDriver": true,
+      "isSpotter": false,
+      "maxStints": 2,
+      "minimumRestHours": 8
+    },
+    {
+      "name": "Jack",
+      "isDriver": true,
+      "isSpotter": true,
+      "maxStints": 3,
+      "minimumRestHours": 8
+    },
+    {
+      "name": "James",
+      "isDriver": true,
+      "isSpotter": true,
+      "maxStints": 2,
+      "minimumRestHours": 8
+    },
+    {
+      "name": "Mario",
+      "isDriver": true,
+      "isSpotter": true,
+      "maxStints": 1,
+      "minimumRestHours": 8
+    },
+    {
+      "name": "Ricky",
+      "isDriver": false,
+      "isSpotter": true,
+      "maxStints": 2,
+      "minimumRestHours": 8
+    }
+  ],
   "availability": {
     "Niki": {
       "1973-06-09T14:00:00.000Z": "Available",
@@ -170,61 +214,152 @@
       "1973-06-10T15:00:00.000Z": "Available"
     }
   },
-  "teamMembers": [
+  "stints": [
     {
-      "name": "Niki",
-      "timezone": "1",
-      "isDriver": true,
-      "isSpotter": true,
-      "preferredStints": 1,
-      "minimumRestHours": 6
+      "id": 1,
+      "startTime": "1973-06-09T14:37:00.000Z",
+      "endTime": "1973-06-09T15:27:16.500Z"
     },
     {
-      "name": "Ayrton",
-      "timezone": "-3",
-      "isDriver": true,
-      "isSpotter": false,
-      "preferredStints": 2,
-      "minimumRestHours": 6
+      "id": 2,
+      "startTime": "1973-06-09T15:27:16.500Z",
+      "endTime": "1973-06-09T16:17:33.000Z"
     },
     {
-      "name": "Jack",
-      "timezone": "11",
-      "isDriver": true,
-      "isSpotter": true,
-      "preferredStints": 3,
-      "minimumRestHours": 6
+      "id": 3,
+      "startTime": "1973-06-09T16:17:33.000Z",
+      "endTime": "1973-06-09T17:07:49.500Z"
     },
     {
-      "name": "James",
-      "timezone": "0",
-      "isDriver": true,
-      "isSpotter": true,
-      "preferredStints": 2,
-      "minimumRestHours": 6
+      "id": 4,
+      "startTime": "1973-06-09T17:07:49.500Z",
+      "endTime": "1973-06-09T17:58:06.000Z"
     },
     {
-      "name": "Mario",
-      "timezone": "-5",
-      "isDriver": true,
-      "isSpotter": true,
-      "preferredStints": 1,
-      "minimumRestHours": 6
+      "id": 5,
+      "startTime": "1973-06-09T17:58:06.000Z",
+      "endTime": "1973-06-09T18:48:22.500Z"
     },
     {
-      "name": "Ricky",
-      "timezone": "-6",
-      "isDriver": false,
-      "isSpotter": true,
-      "preferredStints": 2,
-      "minimumRestHours": 6
+      "id": 6,
+      "startTime": "1973-06-09T18:48:22.500Z",
+      "endTime": "1973-06-09T19:38:39.000Z"
+    },
+    {
+      "id": 7,
+      "startTime": "1973-06-09T19:38:39.000Z",
+      "endTime": "1973-06-09T20:28:55.500Z"
+    },
+    {
+      "id": 8,
+      "startTime": "1973-06-09T20:28:55.500Z",
+      "endTime": "1973-06-09T21:19:12.000Z"
+    },
+    {
+      "id": 9,
+      "startTime": "1973-06-09T21:19:12.000Z",
+      "endTime": "1973-06-09T22:09:28.500Z"
+    },
+    {
+      "id": 10,
+      "startTime": "1973-06-09T22:09:28.500Z",
+      "endTime": "1973-06-09T22:59:45.000Z"
+    },
+    {
+      "id": 11,
+      "startTime": "1973-06-09T22:59:45.000Z",
+      "endTime": "1973-06-09T23:50:01.500Z"
+    },
+    {
+      "id": 12,
+      "startTime": "1973-06-09T23:50:01.500Z",
+      "endTime": "1973-06-10T00:40:18.000Z"
+    },
+    {
+      "id": 13,
+      "startTime": "1973-06-10T00:40:18.000Z",
+      "endTime": "1973-06-10T01:30:34.500Z"
+    },
+    {
+      "id": 14,
+      "startTime": "1973-06-10T01:30:34.500Z",
+      "endTime": "1973-06-10T02:20:51.000Z"
+    },
+    {
+      "id": 15,
+      "startTime": "1973-06-10T02:20:51.000Z",
+      "endTime": "1973-06-10T03:11:07.500Z"
+    },
+    {
+      "id": 16,
+      "startTime": "1973-06-10T03:11:07.500Z",
+      "endTime": "1973-06-10T04:01:24.000Z"
+    },
+    {
+      "id": 17,
+      "startTime": "1973-06-10T04:01:24.000Z",
+      "endTime": "1973-06-10T04:51:40.500Z"
+    },
+    {
+      "id": 18,
+      "startTime": "1973-06-10T04:51:40.500Z",
+      "endTime": "1973-06-10T05:41:57.000Z"
+    },
+    {
+      "id": 19,
+      "startTime": "1973-06-10T05:41:57.000Z",
+      "endTime": "1973-06-10T06:32:13.500Z"
+    },
+    {
+      "id": 20,
+      "startTime": "1973-06-10T06:32:13.500Z",
+      "endTime": "1973-06-10T07:22:30.000Z"
+    },
+    {
+      "id": 21,
+      "startTime": "1973-06-10T07:22:30.000Z",
+      "endTime": "1973-06-10T08:12:46.500Z"
+    },
+    {
+      "id": 22,
+      "startTime": "1973-06-10T08:12:46.500Z",
+      "endTime": "1973-06-10T09:03:03.000Z"
+    },
+    {
+      "id": 23,
+      "startTime": "1973-06-10T09:03:03.000Z",
+      "endTime": "1973-06-10T09:53:19.500Z"
+    },
+    {
+      "id": 24,
+      "startTime": "1973-06-10T09:53:19.500Z",
+      "endTime": "1973-06-10T10:43:36.000Z"
+    },
+    {
+      "id": 25,
+      "startTime": "1973-06-10T10:43:36.000Z",
+      "endTime": "1973-06-10T11:33:52.500Z"
+    },
+    {
+      "id": 26,
+      "startTime": "1973-06-10T11:33:52.500Z",
+      "endTime": "1973-06-10T12:24:09.000Z"
+    },
+    {
+      "id": 27,
+      "startTime": "1973-06-10T12:24:09.000Z",
+      "endTime": "1973-06-10T13:14:25.500Z"
+    },
+    {
+      "id": 28,
+      "startTime": "1973-06-10T13:14:25.500Z",
+      "endTime": "1973-06-10T14:04:42.000Z"
+    },
+    {
+      "id": 29,
+      "startTime": "1973-06-10T14:04:42.000Z",
+      "endTime": "1973-06-10T14:37:00.000Z"
     }
   ],
-  "durationHours": 24,
-  "raceStartUTC": "1973-06-09T14:37:00.000Z",
-  "avgLapTimeInSeconds": 220.5,
-  "fuelTankSize": 120,
-  "fuelUsePerLap": 9.2,
-  "pitTimeInSeconds": 150,
   "firstStintDriver": "James"
 }
