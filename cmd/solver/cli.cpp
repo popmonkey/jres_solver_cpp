@@ -117,143 +117,96 @@ int main(int argc, char **argv)
     solverOptions.optimalityGap = result["optimality-gap"].as<double>();
 
     // Call the Solver Library
-    char* resultJsonCStr = nullptr;
-    int resultCode = 0;
-
-    if (runDiagnostics) {
-        if (!quiet) std::cout << "[App] Running in DIAGNOSTIC mode..." << std::endl;
-        resultCode = diagnose_race_schedule(raceDataJsonString.c_str(), solverOptions, &resultJsonCStr);
-    } else {
-        resultCode = solve_race_schedule(raceDataJsonString.c_str(), solverOptions, &resultJsonCStr);
-    }
-
-    // Process Results
-    if (resultJsonCStr == nullptr) {
-        std::cerr << "[App] Critical Error: Solver returned no data." << std::endl;
+    JresSolverInput* solverInput = jres_input_from_json(raceDataJsonString.c_str());
+    if (solverInput == nullptr) {
+        std::cerr << "[App] Critical Error: Could not parse input JSON." << std::endl;
         return 1;
     }
 
-    std::string resultJsonString(resultJsonCStr);
-    std::string outputPath = result.count("output") ? result["output"].as<std::string>() : "";
-    
-    try {
-        json resultJson = json::parse(resultJsonString);
-
-        if (runDiagnostics) {
-            // --- Diagnostic Output Handling ---
-            if (resultCode == 0) {
-                // Diagnosis ran successfully (even if constraints were violated)
-                if (!quiet) {
-                    std::cout << "\n--- ⚠️  Infeasibility Diagnosis ---" << std::endl;
-                    if (resultJson.contains("diagnosis")) {
-                        auto issues = resultJson["diagnosis"];
-                        if (issues.empty()) {
-                            std::cout << "The diagnostic solver found a solution, but no specific constraints were identified as the cause. This implies the schedule might actually be feasible in a relaxed context." << std::endl;
-                        } else {
-                            std::cout << "The solver identified the following blockers:" << std::endl;
-                            for (const auto& issue : issues) {
-                                std::cout << " - " << issue.get<std::string>() << std::endl;
-                            }
-                        }
-                    } else {
-                        std::cout << "Diagnosis completed but no 'diagnosis' key found in result." << std::endl;
-                    }
-                }
-            } else {
-                 // Engine failure
-                 std::cerr << "[Solver] Diagnostic Engine Error: " << resultJson.value("error", "Unknown error") << std::endl;
-            }
-        } 
-        else {
-            // --- Standard Schedule Output Handling ---
-            if (!quiet) {
-                // Print Metadata / Settings
-                if (resultJson.contains("metadata")) {
-                    std::cout << "\n--- 🔧 Solver Settings ---" << std::endl;
-                    json meta = resultJson["metadata"];
-                    std::cout << "Time Limit: " << meta.value("timeLimit", 0) << "s | "
-                              << "Gap: " << meta.value("optimalityGap", 0.0) << " | "
-                              << "Spotter: " << meta.value("spotterMode", "unknown") << std::endl;
-                }
-
-                // Print Complexity (regardless of success/failure)
-                if (resultJson.contains("complexity")) {
-                    std::cout << "\n--- 🧠 Complexity ---" << std::endl;
-                    json c = resultJson["complexity"];
-                    std::cout << "Rows: " << c.value("modelRows", 0) << " | "
-                              << "Cols: " << c.value("modelColumns", 0) << " | "
-                              << "Nodes: " << c.value("searchNodes", 0) << std::endl;
-                    std::cout << "Big-M Rest Constraints: " << c.value("numRestConstraints", 0) << std::endl;
-                    if (!c["finalGap"].is_null()) {
-                        std::cout << "Final Gap: " << c.value("finalGap", 0.0) << std::endl;
-                    }
-                }
-
-                // Print Timing (regardless of success/failure)
-                if (resultJson.contains("timing")) {
-                    std::cout << "\n--- ⏱️  Timing Performance ---" << std::endl;
-                    json t = resultJson["timing"];
-                    std::cout << std::fixed << std::setprecision(2);
-                    std::cout << "Setup/Model Build : " << std::setw(8) << t.value("setupMs", 0.0) << " ms" << std::endl;
-                    std::cout << "Driver Solve      : " << std::setw(8) << t.value("driverSolveMs", 0.0) << " ms" << std::endl;
-                    if (t.contains("spotterSolveMs")) {
-                    std::cout << "Spotter Solve     : " << std::setw(8) << t.value("spotterSolveMs", 0.0) << " ms" << std::endl;
-                    }
-                    std::cout << "Total Wall Time   : " << std::setw(8) << t.value("totalSeconds", 0.0) << " s" << std::endl;
-                }
-            }
-
-            // Check if the solve was successful
-            if (resultCode == 0) {
-                // Success
-                if (!quiet) {
-                    // Print the schedule
-                    std::cout << "\n--- 🏁 Race Schedule ---" << std::endl;
-                    bool hasSpotters = (solverOptions.spotterMode != JRES_SPOTTER_MODE_NONE);
-                    if (resultJson.contains("schedule")) {
-                        for (const auto& entry : resultJson["schedule"]) {
-                            std::stringstream ss;
-                            ss << "Stint " << std::setw(3) << entry["stint"].get<int>()
-                               << ": Driver: " << std::setw(15) << std::left << entry["driver"].get<std::string>();
-                            
-                            if (hasSpotters && entry.contains("spotter")) {
-                                ss << " | Spotter: " << std::setw(15) << std::left << entry["spotter"].get<std::string>();
-                            }
-                            std::cout << ss.str() << std::endl;
-                        }
-                    }
-                }
-            } else {
-                // Failure
-                std::cerr << "[Solver] Error: " << resultJson.value("error", "Unknown error") << std::endl;
-                if (!quiet) {
-                    std::cout << "\nTip: Try running with --diagnose to find out why." << std::endl;
-                }
-            }
-        }
-
-        // Save to file (Common for both modes)
-        if (!outputPath.empty()) {
-            std::ofstream o(outputPath);
-            o << resultJsonString << std::endl;
-            if (!quiet) {
-                std::cout << "\n[App] Result saved to " << outputPath << std::endl;
-            }
-        }
-
-    } catch (const std::exception& e) {
-        std::cerr << "[App] Error processing solver result: " << e.what() << std::endl;
-        std::cerr << "Raw output: " << resultJsonString << std::endl;
+    JresSolverOutput* solverOutput = nullptr;
+    if (runDiagnostics) {
+        if (!quiet) std::cout << "[App] Running in DIAGNOSTIC mode..." << std::endl;
+        solverOutput = diagnose_race_schedule(solverInput, &solverOptions);
+    } else {
+        solverOutput = solve_race_schedule(solverInput, &solverOptions);
     }
 
+    if (solverOutput == nullptr) {
+        std::cerr << "[App] Critical Error: Solver returned no data." << std::endl;
+        free_jres_solver_input(solverInput);
+        return 1;
+    }
 
+    if (solverOutput->diagnosis_len > 0) {
+        if (runDiagnostics) {
+             if (!quiet) {
+                std::cout << "\n--- Infeasibility Diagnosis ---" << std::endl;
+                for (int i = 0; i < solverOutput->diagnosis_len; ++i) {
+                    std::cout << " - " << solverOutput->diagnosis[i] << std::endl;
+                }
+            }
+        } else {
+            std::cerr << "[Solver] Error: Model is infeasible." << std::endl;
+            if (!quiet) {
+                std::cerr << "\nTip: Try running with --diagnose to find out why." << std::endl;
+            }
+        }
+    } else if (!quiet) {
+        if (solverOutput->stats) {
+            std::cout << "\n--- Complexity ---" << std::endl;
+            std::cout << "Rows: " << solverOutput->stats->modelRows << " | "
+                        << "Cols: " << solverOutput->stats->modelColumns << " | "
+                        << "Nodes: " << solverOutput->stats->searchNodes << std::endl;
+            if (solverOutput->stats->finalGap > 0) {
+                std::cout << "Final Gap: " << solverOutput->stats->finalGap << std::endl;
+            }
+
+            std::cout << "\n--- Timing Performance ---" << std::endl;
+            std::cout << std::fixed << std::setprecision(2);
+            std::cout << "Setup/Model Build : " << std::setw(8) << solverOutput->stats->setupDurationMs << " ms" << std::endl;
+            std::cout << "Driver Solve      : " << std::setw(8) << solverOutput->stats->driverSolveDurationMs << " ms" << std::endl;
+            if (solverOutput->stats->spotterSolveDurationMs > 0) {
+                std::cout << "Spotter Solve     : " << std::setw(8) << solverOutput->stats->spotterSolveDurationMs << " ms" << std::endl;
+            }
+        }
+        // Print the schedule
+        std::cout << "\n--- Race Schedule ---" << std::endl;
+        bool hasSpotters = (solverOptions.spotterMode != JRES_SPOTTER_MODE_NONE);
+        if (solverOutput->schedule_len > 0) {
+            for (int i = 0; i < solverOutput->schedule_len; ++i) {
+                std::stringstream ss;
+                ss << "Stint " << std::setw(3) << solverOutput->schedule[i].stintId
+                    << ": Driver: " << std::setw(15) << std::left << solverOutput->schedule[i].driver;
+                
+                if (hasSpotters) {
+                    ss << " | Spotter: " << std::setw(15) << std::left << solverOutput->schedule[i].spotter;
+                }
+                std::cout << ss.str() << std::endl;
+            }
+        }
+    }
+
+    char* resultJsonCStr = jres_output_to_json(solverOutput);
+    std::string outputPath = result.count("output") ? result["output"].as<std::string>() : "";
+
+    if (!outputPath.empty()) {
+        std::ofstream o(outputPath);
+        o << resultJsonCStr << std::endl;
+        if (!quiet) {
+            std::cout << "\n[App] Result saved to " << outputPath << std::endl;
+        }
+    }
+    
     // Clean up
-    free_solver_result(resultJsonCStr);
+    int returnCode = solverOutput->diagnosis_len > 0 ? 1 : 0;
+    free_jres_solver_input(solverInput);
+    free_jres_solver_output(solverOutput);
+    free_json_string(resultJsonCStr);
 
     if (!quiet)
     {
         std::cout << "[App] Solver finished." << std::endl;
     }
 
-    return (resultCode == 0) ? 0 : 1;
+    return returnCode;
 }

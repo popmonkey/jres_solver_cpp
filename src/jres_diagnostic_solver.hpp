@@ -1,18 +1,12 @@
-/**
- * @author popmonkey+jres@gmail.com
- * @file src/jres_diagnostic_solver.hpp
- * @brief Diagnostic solver header for JRES endurance race scheduling.
- */
-
 #pragma once
 
-#include "jres_solver_utils.hpp"
+#include "jres_solver_base.hpp"
 
 class JresDiagnosticSolver : public JresSolverBase
 {
 public:
-    JresDiagnosticSolver(const SolverContext& ctx);
+    JresDiagnosticSolver(const jres::internal::SolverInput& input, const JresSolverOptions& options);
     ~JresDiagnosticSolver();
 
-    json diagnose();
+    jres::internal::SolverOutput diagnose();
 };

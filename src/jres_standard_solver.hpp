@@ -1,12 +1,6 @@
-/**
- * @author popmonkey+jres@gmail.com
- * @file src/jres_standard_solver.hpp
- * @brief Standard solver implementation for JRES endurance race scheduling.
- */
-
 #pragma once
 
-#include "jres_solver_utils.hpp"
+#include "jres_solver_base.hpp"
 #include <memory>
 
 // Forward declaration
@@ -15,19 +9,21 @@ class Highs;
 class JresStandardSolver : public JresSolverBase
 {
 public:
-    JresStandardSolver(const SolverContext& ctx);
+    JresStandardSolver(const jres::internal::SolverInput& input, const JresSolverOptions& options);
     ~JresStandardSolver();
 
-    json solve();
+    jres::internal::SolverOutput solve();
 
 private:
     // Helper to build the complex variable model for drivers/spotters
-    ParticipantModel add_participant_model(
+    void add_participant_model(
         Highs &highs,
-        const std::vector<TeamMember> &participants,
-        const std::string &prefix,
-        double stintWithPitSeconds,
-        int stintLaps);
+        const std::vector<jres::internal::TeamMember> &participants,
+        std::map<std::pair<std::string, int>, int>& workVars
+    );
 
     std::unique_ptr<Highs> m_highs;
+    std::map<std::pair<std::string, int>, int> m_driverWorkVars;
+    std::map<std::pair<std::string, int>, int> m_spotterWorkVars;
+    std::map<std::pair<std::string, int>, int> m_switchVars;
 };

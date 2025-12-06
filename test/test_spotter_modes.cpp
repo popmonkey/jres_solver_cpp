@@ -6,8 +6,12 @@
 using json = nlohmann::json;
 
 namespace {
-  // --- Test 1: Basic Integrated Solve (Moved from test_solver.cpp) ---
-  const char* SOLVABLE_JSON = R"({
+  const char* SOLVABLE_V2_JSON = R"({
+    "teamMembers": [
+      { "name": "Niki", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 },
+      { "name": "Ayrton", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 },
+      { "name": "Alain", "isDriver": false, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 }
+    ],
     "availability": {
       "Niki": {
         "1973-06-09T14:00:00.000Z": "Unavailable",
@@ -25,17 +29,10 @@ namespace {
         "1973-06-09T16:00:00.000Z": "Available"
       }
     },
-    "teamMembers": [
-      { "name": "Niki", "isDriver": true, "isSpotter": true, "preferredStints": 2 },
-      { "name": "Ayrton", "isDriver": true, "isSpotter": true, "preferredStints": 2 },
-      { "name": "Alain", "isDriver": false, "isSpotter": true, "preferredStints": 2 }
-    ],
-    "durationHours": 1.0,
-    "raceStartUTC": "1973-06-09T14:37:00.000Z",
-    "avgLapTimeInSeconds": 220.5,
-    "fuelTankSize": 120,
-    "fuelUsePerLap": 9.2,
-    "pitTimeInSeconds": 150
+    "stints": [
+        { "id": 1, "startTime": "1973-06-09T14:37:00.000Z", "endTime": "1973-06-09T15:27:16.500Z" },
+        { "id": 2, "startTime": "1973-06-09T15:27:16.500Z", "endTime": "1973-06-09T16:17:33.000Z" }
+    ]
   })";
 
   TEST(SpotterModeTest, BasicIntegratedSolve) {
@@ -45,36 +42,34 @@ namespace {
       options.allowNoSpotter = false;
       options.optimalityGap = 0.0;
 
-      char* resultJsonCStr = nullptr;
-      int resultCode = solve_race_schedule(SOLVABLE_JSON, options, &resultJsonCStr);
+      JresSolverInput* input = jres_input_from_json(SOLVABLE_V2_JSON);
+      ASSERT_NE(input, nullptr);
 
-      ASSERT_EQ(resultCode, 0);
-      ASSERT_NE(resultJsonCStr, nullptr);
-      std::string resultJsonString(resultJsonCStr);
-      free_solver_result(resultJsonCStr);
-      json resultJson = json::parse(resultJsonString);
+      JresSolverOutput* output = solve_race_schedule(input, &options);
+      ASSERT_NE(output, nullptr);
 
-      ASSERT_TRUE(resultJson["success"].get<bool>());
-      ASSERT_EQ(resultJson["schedule"].size(), 2);
+      ASSERT_EQ(output->schedule_len, 2);
       
-      // Stint 1 (idx 0):
-      // Niki is unavailable ("14:00"). Ayrton must drive.
+      // Stint 1 (id 1):
+      // Niki is unavailable. Ayrton must drive.
       // Alain must spot (Ayrton is driving).
-      EXPECT_EQ(resultJson["schedule"][0]["driver"].get<std::string>(), "Ayrton");
-      EXPECT_EQ(resultJson["schedule"][0]["spotter"].get<std::string>(), "Alain");
+      EXPECT_STREQ(output->schedule[0].driver, "Ayrton");
+      EXPECT_STREQ(output->schedule[0].spotter, "Alain");
+
+      free_jres_solver_input(input);
+      free_jres_solver_output(output);
   }
 
-  // --- Test 2: Mode None ---
-  const char* SPOTTER_NONE_JSON = R"({
+  const char* SPOTTER_NONE_V2_JSON = R"({
+    "teamMembers": [
+      { "name": "Ayrton", "isDriver": true, "isSpotter": true, "maxStints": 1, "minimumRestHours": 0 }
+    ],
     "availability": {
       "Ayrton": { "1970-01-01T10:00:00.000Z": "Available" }
     },
-    "teamMembers": [
-      { "name": "Ayrton", "isDriver": true, "isSpotter": true }
-    ],
-    "durationHours": 0.5,
-    "raceStartUTC": "1970-01-01T10:00:00.000Z",
-    "avgLapTimeInSeconds": 120, "fuelTankSize": 100, "fuelUsePerLap": 5, "pitTimeInSeconds": 60
+    "stints": [
+        { "id": 1, "startTime": "1970-01-01T10:00:00.000Z", "endTime": "1970-01-01T10:30:00.000Z" }
+    ]
   })";
 
   TEST(SpotterModeTest, ModeNone) {
@@ -84,74 +79,67 @@ namespace {
       options.allowNoSpotter = false;
       options.optimalityGap = 0.0;
 
-      char* resultJsonCStr = nullptr;
-      int resultCode = solve_race_schedule(SPOTTER_NONE_JSON, options, &resultJsonCStr);
+      JresSolverInput* input = jres_input_from_json(SPOTTER_NONE_V2_JSON);
+      ASSERT_NE(input, nullptr);
 
-      ASSERT_EQ(resultCode, 0);
-      ASSERT_NE(resultJsonCStr, nullptr);
-      std::string resultJsonString(resultJsonCStr);
-      free_solver_result(resultJsonCStr);
-      json resultJson = json::parse(resultJsonString);
+      JresSolverOutput* output = solve_race_schedule(input, &options);
+      ASSERT_NE(output, nullptr);
 
-      ASSERT_TRUE(resultJson["success"].get<bool>());
-      ASSERT_EQ(resultJson["schedule"].size(), 1);
+      ASSERT_EQ(output->schedule_len, 1);
       
-      // Assert that the "spotter" field does NOT exist
-      EXPECT_FALSE(resultJson["schedule"][0].contains("spotter"));
+      EXPECT_STREQ(output->schedule[0].spotter, "N/A");
+
+      free_jres_solver_input(input);
+      free_jres_solver_output(output);
   }
 
-  // --- Test 3: Integrated Driver/Spotter Conflict (Infeasible) ---
-  const char* CONFLICT_INTEGRATED_JSON = R"({
+  const char* CONFLICT_INTEGRATED_V2_JSON = R"({
+    "teamMembers": [
+      { "name": "Ayrton", "isDriver": true, "isSpotter": true, "maxStints": 1, "minimumRestHours": 0 }
+    ],
     "availability": {
       "Ayrton": { "1970-01-01T10:00:00.000Z": "Available" }
     },
-    "teamMembers": [
-      { "name": "Ayrton", "isDriver": true, "isSpotter": true }
-    ],
-    "durationHours": 0.5,
-    "raceStartUTC": "1970-01-01T10:00:00.000Z",
-    "avgLapTimeInSeconds": 120, "fuelTankSize": 100, "fuelUsePerLap": 5, "pitTimeInSeconds": 60
+    "stints": [
+        { "id": 1, "startTime": "1970-01-01T10:00:00.000Z", "endTime": "1970-01-01T10:30:00.000Z" }
+    ]
   })";
-  // Note: 1 stint. Ayrton is the ONLY driver and ONLY spotter.
-  // In Integrated mode, he cannot be both.
 
   TEST(SpotterModeTest, IntegratedConflictInfeasible) {
       JresSolverOptions options;
       options.timeLimit = 10;
       options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
-      options.allowNoSpotter = false; // <-- This forces the conflict
+      options.allowNoSpotter = false;
       options.optimalityGap = 0.0;
 
-      char* resultJsonCStr = nullptr;
-      int resultCode = solve_race_schedule(CONFLICT_INTEGRATED_JSON, options, &resultJsonCStr);
+      JresSolverInput* input = jres_input_from_json(CONFLICT_INTEGRATED_V2_JSON);
+      ASSERT_NE(input, nullptr);
 
-      // This must fail, as the model is infeasible
-      ASSERT_EQ(resultCode, -1);
-      ASSERT_NE(resultJsonCStr, nullptr);
-      std::string resultJsonString(resultJsonCStr);
-      free_solver_result(resultJsonCStr);
-      json resultJson = json::parse(resultJsonString);
+      JresSolverOutput* output = solve_race_schedule(input, &options);
+      ASSERT_NE(output, nullptr);
 
-      ASSERT_FALSE(resultJson["success"].get<bool>());
-      EXPECT_EQ(resultJson["error"].get<std::string>(), "Model is infeasible. No solution exists.");
+      ASSERT_EQ(output->schedule_len, 0);
+      ASSERT_GT(output->diagnosis_len, 0);
+      std::string msg(output->diagnosis[0]);
+      EXPECT_TRUE(msg.find("Model is infeasible") != std::string::npos);
+
+      free_jres_solver_input(input);
+      free_jres_solver_output(output);
   }
 
-  // --- Test 4: Sequential Driver/Spotter Conflict (Solvable) ---
-  const char* CONFLICT_SEQUENTIAL_JSON = R"({
+  const char* CONFLICT_SEQUENTIAL_V2_JSON = R"({
+    "teamMembers": [
+      { "name": "Ayrton", "isDriver": true, "isSpotter": true, "maxStints": 1, "minimumRestHours": 0 },
+      { "name": "Alain", "isDriver": false, "isSpotter": true, "maxStints": 1, "minimumRestHours": 0 }
+    ],
     "availability": {
       "Ayrton": { "1970-01-01T10:00:00.000Z": "Available" },
       "Alain": { "1970-01-01T10:00:00.000Z": "Available" }
     },
-    "teamMembers": [
-      { "name": "Ayrton", "isDriver": true, "isSpotter": true },
-      { "name": "Alain", "isDriver": false, "isSpotter": true }
-    ],
-    "durationHours": 0.5,
-    "raceStartUTC": "1970-01-01T10:00:00.000Z",
-    "avgLapTimeInSeconds": 120, "fuelTankSize": 100, "fuelUsePerLap": 5, "pitTimeInSeconds": 60
+    "stints": [
+        { "id": 1, "startTime": "1970-01-01T10:00:00.000Z", "endTime": "1970-01-01T10:30:00.000Z" }
+    ]
   })";
-  // Note: 1 stint. Ayrton is only driver. Ayrton and Alain are spotters.
-  // Sequential mode must assign Alain to spot, as Ayrton is driving.
 
   TEST(SpotterModeTest, SequentialConflictSolvable) {
       JresSolverOptions options;
@@ -160,136 +148,112 @@ namespace {
       options.allowNoSpotter = false;
       options.optimalityGap = 0.0;
 
-      char* resultJsonCStr = nullptr;
-      int resultCode = solve_race_schedule(CONFLICT_SEQUENTIAL_JSON, options, &resultJsonCStr);
+      JresSolverInput* input = jres_input_from_json(CONFLICT_SEQUENTIAL_V2_JSON);
+      ASSERT_NE(input, nullptr);
 
-      ASSERT_EQ(resultCode, 0);
-      ASSERT_NE(resultJsonCStr, nullptr);
-      std::string resultJsonString(resultJsonCStr);
-      free_solver_result(resultJsonCStr);
-      json resultJson = json::parse(resultJsonString);
+      JresSolverOutput* output = solve_race_schedule(input, &options);
+      ASSERT_NE(output, nullptr);
 
-      ASSERT_TRUE(resultJson["success"].get<bool>());
-      ASSERT_EQ(resultJson["schedule"].size(), 1);
+      ASSERT_EQ(output->schedule_len, 1);
       
-      // Ayrton MUST drive
-      EXPECT_EQ(resultJson["schedule"][0]["driver"].get<std::string>(), "Ayrton");
-      // Alain MUST spot, because Ayrton is blocked by driving
-      EXPECT_EQ(resultJson["schedule"][0]["spotter"].get<std::string>(), "Alain");
+      EXPECT_STREQ(output->schedule[0].driver, "Ayrton");
+      EXPECT_STREQ(output->schedule[0].spotter, "Alain");
+
+      free_jres_solver_input(input);
+      free_jres_solver_output(output);
   }
 
-  // --- Test 5: Allow No Spotter (Integrated) ---
-  const char* NO_SPOTTERS_JSON = R"({
+  const char* NO_SPOTTERS_V2_JSON = R"({
+    "teamMembers": [
+      { "name": "Ayrton", "isDriver": true, "isSpotter": false, "maxStints": 1, "minimumRestHours": 0 },
+      { "name": "Niki", "isDriver": false, "isSpotter": true, "maxStints": 1, "minimumRestHours": 0 }
+    ],
     "availability": {
       "Ayrton": { "1970-01-01T10:00:00.000Z": "Available" },
       "Niki": { "1970-01-01T10:00:00.000Z": "Unavailable" }
     },
-    "teamMembers": [
-      { "name": "Ayrton", "isDriver": true, "isSpotter": false },
-      { "name": "Niki", "isDriver": false, "isSpotter": true }
-    ],
-    "durationHours": 0.5,
-    "raceStartUTC": "1970-01-01T10:00:00.000Z",
-    "avgLapTimeInSeconds": 120, "fuelTankSize": 100, "fuelUsePerLap": 5, "pitTimeInSeconds": 60
+    "stints": [
+        { "id": 1, "startTime": "1970-01-01T10:00:00.000Z", "endTime": "1970-01-01T10:30:00.000Z" }
+    ]
   })";
-  // Note: 1 stint. Ayrton (driver) is available.
-  // Niki (spotter) is unavailable.
 
   TEST(SpotterModeTest, AllowNoSpotterIntegrated) {
       JresSolverOptions options;
       options.timeLimit = 10;
       options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
-      options.allowNoSpotter = true; // <-- Key for this test
+      options.allowNoSpotter = true;
       options.optimalityGap = 0.0;
 
-      char* resultJsonCStr = nullptr;
-      int resultCode = solve_race_schedule(NO_SPOTTERS_JSON, options, &resultJsonCStr);
+      JresSolverInput* input = jres_input_from_json(NO_SPOTTERS_V2_JSON);
+      ASSERT_NE(input, nullptr);
 
-      ASSERT_EQ(resultCode, 0);
-      ASSERT_NE(resultJsonCStr, nullptr);
-      std::string resultJsonString(resultJsonCStr);
-      free_solver_result(resultJsonCStr);
-      json resultJson = json::parse(resultJsonString);
+      JresSolverOutput* output = solve_race_schedule(input, &options);
+      ASSERT_NE(output, nullptr);
 
-      ASSERT_TRUE(resultJson["success"].get<bool>());
-      ASSERT_EQ(resultJson["schedule"].size(), 1);
+      ASSERT_EQ(output->schedule_len, 1);
       
-      // Ayrton drives
-      EXPECT_EQ(resultJson["schedule"][0]["driver"].get<std::string>(), "Ayrton");
-      // No spotter is available, but this is allowed
-      EXPECT_EQ(resultJson["schedule"][0]["spotter"].get<std::string>(), "N/A");
-  }
+      EXPECT_STREQ(output->schedule[0].driver, "Ayrton");
+      EXPECT_STREQ(output->schedule[0].spotter, "N/A");
 
-  // --- Test 6: Allow No Spotter (Sequential) ---
-  // We can reuse the same JSON as Test 5.
+      free_jres_solver_input(input);
+      free_jres_solver_output(output);
+  }
 
   TEST(SpotterModeTest, AllowNoSpotterSequential) {
       JresSolverOptions options;
       options.timeLimit = 10;
       options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
-      options.allowNoSpotter = true; // <-- Key for this test
+      options.allowNoSpotter = true;
       options.optimalityGap = 0.0;
 
-      char* resultJsonCStr = nullptr;
-      int resultCode = solve_race_schedule(NO_SPOTTERS_JSON, options, &resultJsonCStr);
+      JresSolverInput* input = jres_input_from_json(NO_SPOTTERS_V2_JSON);
+      ASSERT_NE(input, nullptr);
 
-      ASSERT_EQ(resultCode, 0);
-      ASSERT_NE(resultJsonCStr, nullptr);
-      std::string resultJsonString(resultJsonCStr);
-      free_solver_result(resultJsonCStr);
-      json resultJson = json::parse(resultJsonString);
+      JresSolverOutput* output = solve_race_schedule(input, &options);
+      ASSERT_NE(output, nullptr);
 
-      ASSERT_TRUE(resultJson["success"].get<bool>());
-      ASSERT_EQ(resultJson["schedule"].size(), 1);
+      ASSERT_EQ(output->schedule_len, 1);
       
-      // Ayrton drives
-      EXPECT_EQ(resultJson["schedule"][0]["driver"].get<std::string>(), "Ayrton");
-      // No spotter is available, but this is allowed
-      EXPECT_EQ(resultJson["schedule"][0]["spotter"].get<std::string>(), "N/A");
+      EXPECT_STREQ(output->schedule[0].driver, "Ayrton");
+      EXPECT_STREQ(output->schedule[0].spotter, "N/A");
+
+      free_jres_solver_input(input);
+      free_jres_solver_output(output);
   }
 
-  // --- Test 7: Sequential Infeasible Spotter ---
-  // This test ensures that a failed *spotter* solve in sequential mode
-  // does not fail the *entire* solve.
-  const char* SEQ_INFEASIBLE_JSON = R"({
+  const char* SEQ_INFEASIBLE_V2_JSON = R"({
+    "teamMembers": [
+      { "name": "Ayrton", "isDriver": true, "isSpotter": false, "maxStints": 1, "minimumRestHours": 0 },
+      { "name": "Niki", "isDriver": false, "isSpotter": true, "maxStints": 1, "minimumRestHours": 0 }
+    ],
     "availability": {
       "Ayrton": { "1970-01-01T10:00:00.000Z": "Available" },
       "Niki": { "1970-01-01T10:00:00.000Z": "Unavailable" }
     },
-    "teamMembers": [
-      { "name": "Ayrton", "isDriver": true, "isSpotter": false },
-      { "name": "Niki", "isDriver": false, "isSpotter": true }
-    ],
-    "durationHours": 0.5,
-    "raceStartUTC": "1970-01-01T10:00:00.000Z",
-    "avgLapTimeInSeconds": 120, "fuelTankSize": 100, "fuelUsePerLap": 5, "pitTimeInSeconds": 60
+    "stints": [
+        { "id": 1, "startTime": "1970-01-01T10:00:00.000Z", "endTime": "1970-01-01T10:30:00.000Z" }
+    ]
   })";
-  // Note: 1 stint. Ayrton (driver) is available.
-  // Niki (spotter) is unavailable. `allowNoSpotter` is FALSE.
-}
 
-TEST(SpotterModeTest, SequentialInfeasibleSpotter) {
-    JresSolverOptions options;
-    options.timeLimit = 10;
-    options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
-    options.allowNoSpotter = false; // <-- Key for this test
-    options.optimalityGap = 0.0;
+  TEST(SpotterModeTest, SequentialInfeasibleSpotter) {
+      JresSolverOptions options;
+      options.timeLimit = 10;
+      options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
+      options.allowNoSpotter = false;
+      options.optimalityGap = 0.0;
 
-    char* resultJsonCStr = nullptr;
-    int resultCode = solve_race_schedule(SEQ_INFEASIBLE_JSON, options, &resultJsonCStr);
+      JresSolverInput* input = jres_input_from_json(SEQ_INFEASIBLE_V2_JSON);
+      ASSERT_NE(input, nullptr);
 
-    // The OVERALL solve should SUCCEED
-    ASSERT_EQ(resultCode, 0);
-    ASSERT_NE(resultJsonCStr, nullptr);
-    std::string resultJsonString(resultJsonCStr);
-    free_solver_result(resultJsonCStr);
-    json resultJson = json::parse(resultJsonString);
+      JresSolverOutput* output = solve_race_schedule(input, &options);
+      ASSERT_NE(output, nullptr);
 
-    ASSERT_TRUE(resultJson["success"].get<bool>());
-    ASSERT_EQ(resultJson["schedule"].size(), 1);
-    
-    // Ayrton drives
-    EXPECT_EQ(resultJson["schedule"][0]["driver"].get<std::string>(), "Ayrton");
-    // The sequential spotter solve failed, so this is N/A
-    EXPECT_EQ(resultJson["schedule"][0]["spotter"].get<std::string>(), "N/A");
+      ASSERT_EQ(output->schedule_len, 1);
+      
+      EXPECT_STREQ(output->schedule[0].driver, "Ayrton");
+      EXPECT_STREQ(output->schedule[0].spotter, "N/A");
+
+      free_jres_solver_input(input);
+      free_jres_solver_output(output);
+  }
 }
