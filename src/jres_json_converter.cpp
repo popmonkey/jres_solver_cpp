@@ -7,6 +7,9 @@
 #include "nlohmann/json.hpp"
 #include <iostream>
 #include <cstring>
+#include <stdexcept> // Needed for std::runtime_error
+
+thread_local std::string last_error_message;
 
 using json = nlohmann::json;
 
@@ -55,6 +58,7 @@ char* allocate_and_copy(const std::string& s) {
 }
 
 JresSolverInput* jres_input_from_json(const char* jsonData) {
+    last_error_message.clear(); // Clear previous error
     try {
         json j = json::parse(jsonData);
         JresSolverInput* input = new JresSolverInput();
@@ -112,17 +116,19 @@ JresSolverInput* jres_input_from_json(const char* jsonData) {
         return input;
 
     } catch (const json::parse_error& e) {
-        std::cerr << "JSON parse error: " << e.what() << std::endl;
+        last_error_message = "JSON parse error: " + std::string(e.what());
         return nullptr;
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        last_error_message = "Error: " + std::string(e.what());
         return nullptr;
     }
 }
 
 
 char* jres_output_to_json(const JresSolverOutput* output) {
+    last_error_message.clear(); // Clear previous error
     if (!output) {
+        last_error_message = "Output is nullptr.";
         return nullptr;
     }
 
@@ -183,9 +189,13 @@ char* jres_output_to_json(const JresSolverOutput* output) {
         return allocate_and_copy(json_str);
 
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        last_error_message = "Error converting output to JSON: " + std::string(e.what());
         return nullptr;
     }
+}
+
+const char* jres_get_last_error() {
+    return last_error_message.c_str();
 }
 
 void free_jres_solver_output(JresSolverOutput* output) {
