@@ -11,6 +11,7 @@
 #include <cmath>
 #include <algorithm>
 #include <vector>
+#include <stdexcept>
 
 // Cross-platform gmtime
 std::tm* safe_gmtime(const std::time_t* timer, std::tm* buf) {
@@ -48,10 +49,20 @@ namespace jres {
             ss.clear();
             ss.str(iso_str);
             ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+            if (ss.fail()) {
+                throw std::runtime_error("Invalid date-time format: " + iso_str);
+            }
         }
         
-        // If milliseconds exist (e.g. .000Z), get_time usually stops before them.
-        // We can ignore fractional seconds for this scheduler's granularity.
+        // Check for remaining characters which are not a 'Z' or '.000Z'
+        std::string remaining;
+        ss >> remaining;
+        if (!remaining.empty() && remaining != "Z" && remaining != ".000Z") {
+            // A non-empty remaining string is only ok if it's just whitespace
+            if (remaining.find_first_not_of(" \t\n\v\f\r") != std::string::npos) {
+                 throw std::runtime_error("Invalid trailing characters in date-time: " + iso_str);
+            }
+        }
         
         return DateTime(safe_timegm(&tm));
     }
