@@ -9,22 +9,20 @@ TEST(FormatterCSVTest, ScheduleGeneration) {
     // 1. Create Mock Data
     std::vector<json> schedule;
     schedule.push_back({
-        {"stint", 1},
-        {"startTimeUTC", "2023-01-01 12:00:00"},
-        {"endTimeUTC", "2023-01-01 13:00:00"},
+        {"id", 1},
+        {"startTime", "2023-01-01T12:00:00Z"},
+        {"endTime", "2023-01-01T13:00:00Z"},
         {"driver", "DriverA"},
-        {"spotter", "SpotterB"},
-        {"laps", 20}
+        {"spotter", "SpotterB"}
     });
 
     // 2. Run Function
     std::string result = jres::generate_schedule_csv_string(schedule, true);
 
     // 3. Assertions
-    EXPECT_NE(result.find("Stint,Start Time (UTC)"), std::string::npos) << "Header missing";
+    EXPECT_NE(result.find("Stint,Start Time (UTC),End Time (UTC)"), std::string::npos) << "Header is incorrect";
     EXPECT_NE(result.find("Assigned Spotter"), std::string::npos) << "Spotter column missing";
+    EXPECT_EQ(result.find("Laps"), std::string::npos) << "Laps column should not exist";
     
-    EXPECT_NE(result.find("DriverA"), std::string::npos) << "Driver data missing";
-    EXPECT_NE(result.find("SpotterB"), std::string::npos) << "Spotter data missing";
-    EXPECT_NE(result.find("20"), std::string::npos) << "Laps data missing";
+    EXPECT_NE(result.find("1,2023-01-01T12:00:00Z,2023-01-01T13:00:00Z,DriverA,SpotterB"), std::string::npos) << "CSV data row is incorrect";
 }

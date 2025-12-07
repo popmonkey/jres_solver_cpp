@@ -193,7 +193,9 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         const std::vector<double>& colValues = solution.col_value;
         for (size_t s = 0; s < m_input.stints.size(); ++s) {
             jres::internal::ScheduleEntry entry;
-            entry.stintId = m_input.stints[s].id;
+            entry.id = m_input.stints[s].id;
+            entry.startTime = m_input.stints[s].startTime;
+            entry.endTime = m_input.stints[s].endTime;
             entry.driver = "N/A";
             entry.spotter = "N/A";
             for (const auto& p : m_driverPool) {
@@ -268,5 +270,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     } else if (status == HighsModelStatus::kInfeasible) {
         throw std::runtime_error("Model is infeasible.");
     }
+    output.teamMembers = m_input.teamMembers;
     return output;
 }

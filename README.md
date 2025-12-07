@@ -38,8 +38,9 @@ The C-API uses the following structs to pass data to and from the solver.
 | `name` | `const char*` | Unique identifier for the member. |
 | `isDriver` | `int` | `1` if the member can drive, `0` otherwise. |
 | `isSpotter` | `int` | `1` if the member can spot, `0` otherwise. |
-| `preferredStints`| `int` | Soft constraint: solver attempts to limit consecutive stints to this number. |
+| `maxStints`| `int` | Hard constraint: Maximum number of consecutive stints a member can perform. |
 | `minimumRestHours` | `int` | Hard constraint: Minimum rest time required after a driving shift before driving again. |
+| `tzOffset` | `double` | Timezone offset in hours from UTC. |
 
 `JresStint`
 
@@ -72,6 +73,8 @@ These structs are used to represent the availability of team members.
 | `schedule_len` | `int` | The number of schedule entries. |
 | `diagnosis` | `const char**` | An array of strings with diagnostic information. Empty on success. |
 | `diagnosis_len` | `int` | The number of diagnosis strings. |
+| `teamMembers` | `JresTeamMember*` | A pointer to an array of team members, including their tzOffset. |
+| `teamMembers_len` | `int` | The number of team members. |
 
 `JresScheduleEntry`
 
@@ -174,6 +177,7 @@ The `raceDataJson` string passed to `jres_input_from_json` must strictly follow 
 | `isSpotter` | Boolean | `false` | Can this member spot? |
 | `maxStints` | Integer| `1` | Hard constraint: Maximum number of consecutive stints a member can perform. |
 | `minimumRestHours` | Integer| `0` | Hard constraint: Minimum rest time required after a driving shift before driving again. |
+| `tzOffset` | Number | `0.0` | Timezone offset in hours from UTC. |
 
 #### Availability Map & Time Formatting
 
@@ -233,6 +237,7 @@ The `jres_output_to_json` function returns a JSON string containing the solution
 | `schedule` | Array | List of optimized stint assignments. |
 | `diagnosis`| Array | List of strings with diagnostic information. Empty on success. |
 | `stats` | Object | Solver performance and complexity metrics. |
+| `teamMembers` | Array | List of team members and their properties. |
 
 ##### Stats Object
 

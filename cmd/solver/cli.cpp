@@ -173,7 +173,7 @@ int main(int argc, char **argv)
         if (solverOutput->schedule_len > 0) {
             for (int i = 0; i < solverOutput->schedule_len; ++i) {
                 std::stringstream ss;
-                ss << "Stint " << std::setw(3) << solverOutput->schedule[i].stintId
+                ss << "Stint " << std::setw(3) << solverOutput->schedule[i].id
                     << ": Driver: " << std::setw(15) << std::left << solverOutput->schedule[i].driver;
                 
                 if (hasSpotters) {

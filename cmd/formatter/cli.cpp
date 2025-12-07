@@ -106,8 +106,8 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        if (!solved_data.contains("schedule") || !solved_data.contains("raceData")) {
-            std::cerr << "Error: Invalid JSON. Expected keys 'schedule' and 'raceData'." << std::endl;
+        if (!solved_data.contains("schedule") || !solved_data.contains("teamMembers")) {
+            std::cerr << "Error: Invalid JSON. Expected keys 'schedule' and 'teamMembers'." << std::endl;
             return 1;
         }
 

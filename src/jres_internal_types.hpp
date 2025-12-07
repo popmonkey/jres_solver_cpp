@@ -52,7 +52,9 @@ struct SolverInput
 };
 
 struct ScheduleEntry {
-    int stintId;
+    int id;
+    std::string startTime;
+    std::string endTime;
     std::string driver;
     std::string spotter;
 };
@@ -72,6 +74,7 @@ struct SolverOutput
     std::vector<ScheduleEntry> schedule;
     std::vector<std::string> diagnosis;
     SolverStats stats;
+    std::vector<TeamMember> teamMembers;
     // Add any other output fields here, like diagnosis or metrics
 };
 

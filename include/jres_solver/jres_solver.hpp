@@ -76,6 +76,8 @@ struct JresTeamMember {
     int maxStints;
     /** @brief Minimum rest time in hours required after a shift. */
     int minimumRestHours;
+    /** @brief Timezone offset, in hours from UTC. */
+    double tzOffset;
 };
 
 /**
@@ -135,7 +137,11 @@ struct JresSolverInput {
  */
 struct JresScheduleEntry {
     /** @brief The ID of the stint. */
-    int stintId;
+    int id;
+    /** @brief ISO 8601 timestamp for the start of the stint. */
+    const char* startTime;
+    /** @brief ISO 8601 timestamp for the end of the stint. */
+    const char* endTime;
     /** @brief Name of the assigned driver. */
     const char* driver;
     /** @brief Name of the assigned spotter. */
@@ -176,6 +182,12 @@ struct JresSolverOutput {
     int diagnosis_len;
     /** @brief Solver performance and complexity metrics. */
     JresSolverStats* stats;
+    /** @brief The options used to generate this solution. */
+    JresSolverOptions* options;
+    /** @brief A pointer to an array of team members, including their tzOffset. */
+    JresTeamMember* teamMembers;
+    /** @brief The number of team members. */
+    int teamMembers_len;
 };
 
 // --- Public C-API Functions ---
