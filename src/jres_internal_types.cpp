@@ -72,6 +72,7 @@ SolverInput from_c_input(const JresSolverInput* c_input) {
         member.isSpotter = c_input->teamMembers[i].isSpotter;
         member.maxStints = c_input->teamMembers[i].maxStints;
         member.minimumRestHours = c_input->teamMembers[i].minimumRestHours;
+        member.tzOffset = c_input->teamMembers[i].tzOffset;
         input.teamMembers.push_back(member);
     }
 
@@ -138,6 +139,7 @@ JresSolverOutput* to_c_output(const SolverOutput& output, const JresSolverOption
         c_output->teamMembers[i].isSpotter = output.teamMembers[i].isSpotter;
         c_output->teamMembers[i].maxStints = output.teamMembers[i].maxStints;
         c_output->teamMembers[i].minimumRestHours = output.teamMembers[i].minimumRestHours;
+        c_output->teamMembers[i].tzOffset = output.teamMembers[i].tzOffset;
     }
 
     c_output->options = new JresSolverOptions(options);

@@ -36,6 +36,7 @@ struct TeamMember
     bool isSpotter = false;
     int maxStints = 1;
     int minimumRestHours = 0;
+    double tzOffset = 0.0;
 };
 
 struct Stint {
