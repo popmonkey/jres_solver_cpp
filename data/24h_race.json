@@ -5,6 +5,7 @@
       "name": "Niki",
       "isDriver": true,
       "isSpotter": true,
+      "tzOffset": 1,
       "maxStints": 1,
       "minimumRestHours": 8
     },
@@ -12,6 +13,7 @@
       "name": "Ayrton",
       "isDriver": true,
       "isSpotter": false,
+      "tzOffset": -3,
       "maxStints": 2,
       "minimumRestHours": 8
     },
@@ -19,6 +21,7 @@
       "name": "Jack",
       "isDriver": true,
       "isSpotter": true,
+      "tzOffset": 11,
       "maxStints": 3,
       "minimumRestHours": 8
     },
@@ -26,6 +29,7 @@
       "name": "James",
       "isDriver": true,
       "isSpotter": true,
+      "tzOffset": 0,
       "maxStints": 2,
       "minimumRestHours": 8
     },
@@ -33,6 +37,7 @@
       "name": "Mario",
       "isDriver": true,
       "isSpotter": true,
+      "tzOffset": -5,
       "maxStints": 1,
       "minimumRestHours": 8
     },
@@ -40,6 +45,7 @@
       "name": "Ricky",
       "isDriver": false,
       "isSpotter": true,
+      "tzOffset": -6,
       "maxStints": 2,
       "minimumRestHours": 8
     }

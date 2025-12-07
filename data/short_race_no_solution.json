@@ -29,13 +29,13 @@
   "availability": {
     "Niki": {
       "1973-06-09T14:00:00.000Z": "Unavailable",
-      "1973-06-09T15:00:00.000Z": "Available",
+      "1973-06-09T15:00:00.000Z": "Unavailable",
       "1973-06-09T16:00:00.000Z": "Available",
       "1973-06-09T17:00:00.000Z": "Available"
     },
     "Ayrton": {
       "1973-06-09T14:00:00.000Z": "Available",
-      "1973-06-09T15:00:00.000Z": "Available",
+      "1973-06-09T15:00:00.000Z": "Unavailable",
       "1973-06-09T16:00:00.000Z": "Available",
       "1973-06-09T17:00:00.000Z": "Available"
     },
