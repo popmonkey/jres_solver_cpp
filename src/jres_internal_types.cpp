@@ -102,7 +102,7 @@ char* allocate_and_copy(const std::string& s) {
     return cstr;
 }
 
-JresSolverOutput* to_c_output(const SolverOutput& output) {
+JresSolverOutput* to_c_output(const SolverOutput& output, const JresSolverOptions& options) {
     JresSolverOutput* c_output = new JresSolverOutput();
     c_output->schedule_len = output.schedule.size();
     c_output->schedule = new JresScheduleEntry[c_output->schedule_len];
@@ -139,6 +139,8 @@ JresSolverOutput* to_c_output(const SolverOutput& output) {
         c_output->teamMembers[i].maxStints = output.teamMembers[i].maxStints;
         c_output->teamMembers[i].minimumRestHours = output.teamMembers[i].minimumRestHours;
     }
+
+    c_output->options = new JresSolverOptions(options);
 
     return c_output;
 }

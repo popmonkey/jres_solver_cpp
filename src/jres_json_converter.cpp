@@ -10,6 +10,30 @@
 
 using json = nlohmann::json;
 
+// Helper function to convert string to JresSpotterMode
+JresSpotterMode to_jres_spotter_mode(const std::string& s) {
+    if (s == "integrated") {
+        return JRES_SPOTTER_MODE_INTEGRATED;
+    } else if (s == "sequential") {
+        return JRES_SPOTTER_MODE_SEQUENTIAL;
+    }
+    return JRES_SPOTTER_MODE_NONE;
+}
+
+// Helper function to convert JresSpotterMode to string
+std::string to_string(JresSpotterMode mode) {
+    switch (mode) {
+        case JRES_SPOTTER_MODE_INTEGRATED:
+            return "integrated";
+        case JRES_SPOTTER_MODE_SEQUENTIAL:
+            return "sequential";
+        case JRES_SPOTTER_MODE_NONE:
+            return "none";
+        default:
+            return "none"; // Should not happen
+    }
+}
+
 // Helper function to convert string to JresAvailability
 JresAvailability to_jres_availability(const std::string& s) {
     if (s == "Available") {
@@ -149,7 +173,7 @@ char* jres_output_to_json(const JresSolverOutput* output) {
         if (output->options) {
             json options_json;
             options_json["timeLimit"] = output->options->timeLimit;
-            options_json["spotterMode"] = output->options->spotterMode;
+            options_json["spotterMode"] = to_string(output->options->spotterMode);
             options_json["allowNoSpotter"] = output->options->allowNoSpotter;
             options_json["optimalityGap"] = output->options->optimalityGap;
             j["options"] = options_json;

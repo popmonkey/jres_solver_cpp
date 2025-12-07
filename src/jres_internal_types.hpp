@@ -82,7 +82,7 @@ struct SolverOutput
 
 Availability to_internal_availability(JresAvailability availability);
 SolverInput from_c_input(const JresSolverInput* c_input);
-JresSolverOutput* to_c_output(const SolverOutput& output);
+JresSolverOutput* to_c_output(const SolverOutput& output, const JresSolverOptions& options);
 char* allocate_and_copy(const std::string& s);
 
 } // namespace jres::internal
