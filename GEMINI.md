@@ -12,6 +12,13 @@ The project is structured as a C-API library (`libjres_solver.a`) with two comma
 
 The library provides helper functions to convert between its C-API data structures and JSON, making it easier to integrate with other systems.
 
+### Public headers
+
+The library exposes its API via headers in `include/jres_solver/`. Designed for seamless Foreign Function Interface (FFI) integration with languages like Python, Ruby, and Go, these headers are strictly:
+* **C-Compatible:** All exported symbols utilize extern "C" linkage.
+* **Self-Contained:** The interface uses standard C types and opaque handles only, ensuring no dependency on the C++ Standard Library (STL) at the boundary.
+* **Standalone:** Each header is fully self-sufficient and requires no prior includes.
+
 ## Building and Running
 
 This project uses CMake for building.
@@ -59,19 +66,19 @@ ctest
 
 ### Running the CLI Tools
 
-The compiled executables are located in the `build/bin` directory.
+The compiled executables are located in the `build/` directory.
 
 **Solver (`jres_solver`):**
 
 ```bash
 # Run with an input file
-./bin/jres_solver -i ../data/short_race.json -s integrated
+./jres_solver -i ../data/short_race.json -s integrated
 
-# Pipe data from stdin
-cat ../data/24h_race.json | ./bin/jres_solver -s sequential
+# Pipe data from stdin and output to a file
+cat ../data/24h_race.json | ./jres_solver -s sequential -o /tmp/24_race_solution.json
 
 # Run diagnostics on an infeasible schedule
-./bin/jres_solver -i ../data/no_solution.json --diagnose
+./jres_solver -i ../data/short_race_no_solution.json --diagnose
 ```
 
 **Formatter (`jres_formatter`):**
@@ -79,8 +86,8 @@ cat ../data/24h_race.json | ./bin/jres_solver -s sequential
 The formatter takes the JSON output from the solver and can generate different report formats.
 
 ```bash
-# Get help for the formatter
-./bin/jres_formatter --help
+# Load a solution and generate a txt summary
+./jres_formatter -i /tmp/24_race_solution.json -o /tmp/summary.txt
 ```
 
 ## Development Conventions
