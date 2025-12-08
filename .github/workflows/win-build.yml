@@ -131,8 +131,8 @@ jobs:
             Copy-Item "dist\lib\jres_solver.lib" -Destination "$pkg\lib\"
         }
         
-        # Specific Header
-        Copy-Item "dist\include\jres_solver\jres_solver.hpp" -Destination "$pkg\include\jres_solver\"
+        # Public Headers
+        Copy-Item "dist\include\jres_solver\*.hpp" -Destination "$pkg\include\jres_solver\"
 
         # Zip the package folder
         $assetPath = "$env:ASSET_NAME"
