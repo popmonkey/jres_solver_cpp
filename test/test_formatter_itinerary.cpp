@@ -6,61 +6,102 @@
 using json = nlohmann::json;
 
 TEST(FormatterItineraryTest, ConsolidationAndTimezones) {
-    // Mock Data: Race starts at 12:00 UTC
-    // DriverA does Stint 1 (12:00-13:00) and Stint 2 (13:05-14:05) (5 min pit).
-    // DriverA is in Timezone +2.
-    json race_data = {
-        {"raceStartUTC", "2023-01-01 12:00:00"},
-        {"durationHours", 6},
-        {"pitTimeInSeconds", 300}, // 5 mins
-        {"teamMembers", {
-            { {"name", "DriverA"}, {"isDriver", true}, {"timezone", 2} }
-        }}
+    // Mock Data: DriverA does Stint 1 (12:00-13:00 UTC) and Stint 2 (13:05-14:05 UTC).
+    // DriverA is in Timezone +2 (tzOffset is in hours).
+    json solved_data = {
+        {"teamMembers", {{
+            {"name", "DriverA"}, {"isDriver", true}, {"tzOffset", 2} 
+        }}},
+        {"schedule", json::array({
+            {
+                {"id", 1},
+                {"startTime", "2023-01-01T12:00:00Z"},
+                {"endTime", "2023-01-01T13:00:00Z"},
+                {"driver", "DriverA"},
+                {"spotter", "N/A"}
+            },
+            {
+                {"id", 2},
+                {"startTime", "2023-01-01T13:05:00Z"},
+                {"endTime", "2023-01-01T14:05:00Z"},
+                {"driver", "DriverA"},
+                {"spotter", "N/A"}
+            }
+        })}
     };
 
-    std::vector<json> schedule;
-    // Stint 1
-    schedule.push_back({
-        {"stint", 1},
-        {"startTimeUTC", "2023-01-01 12:00:00"},
-        {"endTimeUTC", "2023-01-01 13:00:00"},
-        {"driver", "DriverA"},
-        {"spotter", "N/A"}
-    });
-    // Stint 2 (Starts 5 mins later due to pit)
-    schedule.push_back({
-        {"stint", 2},
-        {"startTimeUTC", "2023-01-01 13:05:00"},
-        {"endTimeUTC", "2023-01-01 14:05:00"},
-        {"driver", "DriverA"},
-        {"spotter", "N/A"}
-    });
+    std::vector<json> schedule_vec;
+    for(const auto& s : solved_data["schedule"]) {
+        schedule_vec.push_back(s);
+    }
 
-    auto itineraries = jres::generate_member_itineraries(schedule, race_data, 300, false);
+    auto itineraries = jres::generate_member_itineraries(schedule_vec, solved_data, false);
 
     // Assertions for DriverA
     ASSERT_TRUE(itineraries.count("DriverA"));
-    const auto& items = itineraries["DriverA"];
+    const auto& itinerary = itineraries.at("DriverA");
     
-    // Expecting: 1. Consolidated Driving, 2. Resting
-    ASSERT_GE(items.size(), 1);
-    
-    // Check Item 1: Driving
-    const auto& drive_block = items[0];
-    
-    // Check logic that consolidates adjacent stints
-    // Note: "Driving Stints #1" might be followed by "-2" depending on exact formatting implementation
-    EXPECT_NE(drive_block.activity.find("Driving Stints"), std::string::npos);
-    
-    // Check Timezone math: 12:00 UTC + 2h = 14:00 Local
-    EXPECT_EQ(drive_block.start_local.time_string(), "14:00");
-    // End: 14:05 UTC + 2h = 16:05 Local
-    EXPECT_EQ(drive_block.end_local.time_string(), "16:05");
+    // Check timezone offset
+    EXPECT_EQ(itinerary.tz_offset, 2);
 
-    // Check Item 2: Resting (if present in logic)
-    if (items.size() > 1) {
-        const auto& rest_block = items[1];
-        EXPECT_EQ(rest_block.activity, "Resting");
-        EXPECT_EQ(rest_block.start_local.time_string(), "16:05");
+    // Expecting: 1. Driving, 2. Resting, 3. Driving
+    ASSERT_EQ(itinerary.items.size(), 3);
+    
+    // Check Item 1: Driving Stint #1
+    const auto& drive_block1 = itinerary.items[0];
+    EXPECT_EQ(drive_block1.activity, "Driving Stint #1");
+    EXPECT_EQ(drive_block1.start_local.to_string(), "2023-01-01 14:00:00"); // 12:00 UTC + 2h
+    EXPECT_EQ(drive_block1.end_local.to_string(), "2023-01-01 15:00:00");   // 13:00 UTC + 2h
+
+    // Check Item 2: Resting block between stints
+    const auto& rest_block = itinerary.items[1];
+    EXPECT_EQ(rest_block.activity, "Resting");
+    EXPECT_EQ(rest_block.start_local.to_string(), "2023-01-01 15:00:00");
+    EXPECT_EQ(rest_block.end_local.to_string(), "2023-01-01 15:05:00"); // 13:05 UTC + 2h
+
+    // Check Item 3: Driving Stint #2
+    const auto& drive_block2 = itinerary.items[2];
+    EXPECT_EQ(drive_block2.activity, "Driving Stint #2");
+    EXPECT_EQ(drive_block2.start_local.to_string(), "2023-01-01 15:05:00");
+    EXPECT_EQ(drive_block2.end_local.to_string(), "2023-01-01 16:05:00");   // 14:05 UTC + 2h
+}
+
+TEST(FormatterItineraryTest, NegativeTimezone) {
+    // Mock Data: Driver with timezone -5
+    json solved_data = {
+        {"teamMembers", {{
+            {"name", "DriverB"}, {"isDriver", true}, {"tzOffset", -5}
+        }}},
+        {"schedule", json::array({
+            {
+                {"id", 1},
+                {"startTime", "2023-01-01T02:00:00Z"},
+                {"endTime", "2023-01-01T03:00:00Z"},
+                {"driver", "DriverB"},
+                {"spotter", "N/A"}
+            }
+        })}
+    };
+
+    std::vector<json> schedule_vec;
+    for(const auto& s : solved_data["schedule"]) {
+        schedule_vec.push_back(s);
     }
+
+    auto itineraries = jres::generate_member_itineraries(schedule_vec, solved_data, false);
+
+    // Assertions for DriverB
+    ASSERT_TRUE(itineraries.count("DriverB"));
+    const auto& itinerary = itineraries.at("DriverB");
+
+    // Check timezone offset
+    EXPECT_EQ(itinerary.tz_offset, -5);
+
+    ASSERT_EQ(itinerary.items.size(), 1);
+
+    // Check Item 1: Driving Stint #1
+    const auto& drive_block1 = itinerary.items[0];
+    EXPECT_EQ(drive_block1.activity, "Driving Stint #1");
+    EXPECT_EQ(drive_block1.start_local.to_string(), "2022-12-31 21:00:00"); // 02:00 UTC - 5h
+    EXPECT_EQ(drive_block1.end_local.to_string(), "2022-12-31 22:00:00");   // 03:00 UTC - 5h
 }

@@ -43,6 +43,16 @@ void free_jres_solver_input(JresSolverInput* input);
  */
 void free_jres_solver_output(JresSolverOutput* output);
 
+/**
+ * @brief Retrieves the last error message that occurred in a C-API function.
+ *
+ * The caller does NOT own the returned string and must NOT free it.
+ * The message is thread-local and valid until the next C-API call on the same thread.
+ *
+ * @return A C-string containing the last error message, or an empty string if no error.
+ */
+const char* jres_get_last_error();
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

@@ -72,6 +72,7 @@ SolverInput from_c_input(const JresSolverInput* c_input) {
         member.isSpotter = c_input->teamMembers[i].isSpotter;
         member.maxStints = c_input->teamMembers[i].maxStints;
         member.minimumRestHours = c_input->teamMembers[i].minimumRestHours;
+        member.tzOffset = c_input->teamMembers[i].tzOffset;
         input.teamMembers.push_back(member);
     }
 
@@ -102,13 +103,15 @@ char* allocate_and_copy(const std::string& s) {
     return cstr;
 }
 
-JresSolverOutput* to_c_output(const SolverOutput& output) {
+JresSolverOutput* to_c_output(const SolverOutput& output, const JresSolverOptions& options) {
     JresSolverOutput* c_output = new JresSolverOutput();
     c_output->schedule_len = output.schedule.size();
     c_output->schedule = new JresScheduleEntry[c_output->schedule_len];
 
     for (size_t i = 0; i < output.schedule.size(); ++i) {
-        c_output->schedule[i].stintId = output.schedule[i].stintId;
+        c_output->schedule[i].id = output.schedule[i].id;
+        c_output->schedule[i].startTime = allocate_and_copy(output.schedule[i].startTime);
+        c_output->schedule[i].endTime = allocate_and_copy(output.schedule[i].endTime);
         c_output->schedule[i].driver = allocate_and_copy(output.schedule[i].driver);
         c_output->schedule[i].spotter = allocate_and_copy(output.schedule[i].spotter);
     }
@@ -127,6 +130,19 @@ JresSolverOutput* to_c_output(const SolverOutput& output) {
     c_output->stats->setupDurationMs = output.stats.setupDurationMs;
     c_output->stats->driverSolveDurationMs = output.stats.driverSolveDurationMs;
     c_output->stats->spotterSolveDurationMs = output.stats.spotterSolveDurationMs;
+
+    c_output->teamMembers_len = output.teamMembers.size();
+    c_output->teamMembers = new JresTeamMember[c_output->teamMembers_len];
+    for (size_t i = 0; i < output.teamMembers.size(); ++i) {
+        c_output->teamMembers[i].name = allocate_and_copy(output.teamMembers[i].name);
+        c_output->teamMembers[i].isDriver = output.teamMembers[i].isDriver;
+        c_output->teamMembers[i].isSpotter = output.teamMembers[i].isSpotter;
+        c_output->teamMembers[i].maxStints = output.teamMembers[i].maxStints;
+        c_output->teamMembers[i].minimumRestHours = output.teamMembers[i].minimumRestHours;
+        c_output->teamMembers[i].tzOffset = output.teamMembers[i].tzOffset;
+    }
+
+    c_output->options = new JresSolverOptions(options);
 
     return c_output;
 }

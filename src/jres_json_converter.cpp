@@ -7,8 +7,35 @@
 #include "nlohmann/json.hpp"
 #include <iostream>
 #include <cstring>
+#include <stdexcept> // Needed for std::runtime_error
+
+thread_local std::string last_error_message;
 
 using json = nlohmann::json;
+
+// Helper function to convert string to JresSpotterMode
+JresSpotterMode to_jres_spotter_mode(const std::string& s) {
+    if (s == "integrated") {
+        return JRES_SPOTTER_MODE_INTEGRATED;
+    } else if (s == "sequential") {
+        return JRES_SPOTTER_MODE_SEQUENTIAL;
+    }
+    return JRES_SPOTTER_MODE_NONE;
+}
+
+// Helper function to convert JresSpotterMode to string
+std::string to_string(JresSpotterMode mode) {
+    switch (mode) {
+        case JRES_SPOTTER_MODE_INTEGRATED:
+            return "integrated";
+        case JRES_SPOTTER_MODE_SEQUENTIAL:
+            return "sequential";
+        case JRES_SPOTTER_MODE_NONE:
+            return "none";
+        default:
+            return "none"; // Should not happen
+    }
+}
 
 // Helper function to convert string to JresAvailability
 JresAvailability to_jres_availability(const std::string& s) {
@@ -31,6 +58,7 @@ char* allocate_and_copy(const std::string& s) {
 }
 
 JresSolverInput* jres_input_from_json(const char* jsonData) {
+    last_error_message.clear(); // Clear previous error
     try {
         json j = json::parse(jsonData);
         JresSolverInput* input = new JresSolverInput();
@@ -55,6 +83,7 @@ JresSolverInput* jres_input_from_json(const char* jsonData) {
             input->teamMembers[i].isSpotter = member_json.value("isSpotter", false);
             input->teamMembers[i].maxStints = member_json.value("maxStints", 1);
             input->teamMembers[i].minimumRestHours = member_json.value("minimumRestHours", 0);
+            input->teamMembers[i].tzOffset = member_json.value("tzOffset", 0.0);
         }
 
         // Stints
@@ -87,17 +116,19 @@ JresSolverInput* jres_input_from_json(const char* jsonData) {
         return input;
 
     } catch (const json::parse_error& e) {
-        std::cerr << "JSON parse error: " << e.what() << std::endl;
+        last_error_message = "JSON parse error: " + std::string(e.what());
         return nullptr;
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        last_error_message = "Error: " + std::string(e.what());
         return nullptr;
     }
 }
 
 
 char* jres_output_to_json(const JresSolverOutput* output) {
+    last_error_message.clear(); // Clear previous error
     if (!output) {
+        last_error_message = "Output is nullptr.";
         return nullptr;
     }
 
@@ -106,7 +137,9 @@ char* jres_output_to_json(const JresSolverOutput* output) {
         j["schedule"] = json::array();
         for (int i = 0; i < output->schedule_len; ++i) {
             json entry;
-            entry["stintId"] = output->schedule[i].stintId;
+            entry["id"] = output->schedule[i].id;
+            entry["startTime"] = output->schedule[i].startTime;
+            entry["endTime"] = output->schedule[i].endTime;
             entry["driver"] = output->schedule[i].driver;
             entry["spotter"] = output->schedule[i].spotter;
             j["schedule"].push_back(entry);
@@ -115,6 +148,20 @@ char* jres_output_to_json(const JresSolverOutput* output) {
         j["diagnosis"] = json::array();
         for (int i = 0; i < output->diagnosis_len; ++i) {
             j["diagnosis"].push_back(output->diagnosis[i]);
+        }
+        
+        if (output->teamMembers) {
+            j["teamMembers"] = json::array();
+            for (int i = 0; i < output->teamMembers_len; ++i) {
+                json member_entry;
+                member_entry["name"] = output->teamMembers[i].name;
+                member_entry["isDriver"] = output->teamMembers[i].isDriver;
+                member_entry["isSpotter"] = output->teamMembers[i].isSpotter;
+                member_entry["maxStints"] = output->teamMembers[i].maxStints;
+                member_entry["minimumRestHours"] = output->teamMembers[i].minimumRestHours;
+                member_entry["tzOffset"] = output->teamMembers[i].tzOffset;
+                j["teamMembers"].push_back(member_entry);
+            }
         }
         
         if (output->stats) {
@@ -129,13 +176,26 @@ char* jres_output_to_json(const JresSolverOutput* output) {
             j["stats"] = stats_json;
         }
 
+        if (output->options) {
+            json options_json;
+            options_json["timeLimit"] = output->options->timeLimit;
+            options_json["spotterMode"] = to_string(output->options->spotterMode);
+            options_json["allowNoSpotter"] = output->options->allowNoSpotter;
+            options_json["optimalityGap"] = output->options->optimalityGap;
+            j["options"] = options_json;
+        }
+
         std::string json_str = j.dump();
         return allocate_and_copy(json_str);
 
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        last_error_message = "Error converting output to JSON: " + std::string(e.what());
         return nullptr;
     }
+}
+
+const char* jres_get_last_error() {
+    return last_error_message.c_str();
 }
 
 void free_jres_solver_output(JresSolverOutput* output) {
@@ -144,6 +204,8 @@ void free_jres_solver_output(JresSolverOutput* output) {
     }
 
     for (int i = 0; i < output->schedule_len; ++i) {
+        delete[] output->schedule[i].startTime;
+        delete[] output->schedule[i].endTime;
         delete[] output->schedule[i].driver;
         delete[] output->schedule[i].spotter;
     }
@@ -154,7 +216,19 @@ void free_jres_solver_output(JresSolverOutput* output) {
     }
     delete[] output->diagnosis;
 
-    delete output->stats;
+    if (output->teamMembers) {
+        for (int i = 0; i < output->teamMembers_len; ++i) {
+            delete[] output->teamMembers[i].name;
+        }
+        delete[] output->teamMembers;
+    }
+
+    if (output->stats) {
+        delete output->stats;
+    }
+    if (output->options) {
+        delete output->options;
+    }
     delete output;
 }
 

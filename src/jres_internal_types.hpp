@@ -36,6 +36,7 @@ struct TeamMember
     bool isSpotter = false;
     int maxStints = 1;
     int minimumRestHours = 0;
+    double tzOffset = 0.0;
 };
 
 struct Stint {
@@ -52,7 +53,9 @@ struct SolverInput
 };
 
 struct ScheduleEntry {
-    int stintId;
+    int id;
+    std::string startTime;
+    std::string endTime;
     std::string driver;
     std::string spotter;
 };
@@ -72,6 +75,7 @@ struct SolverOutput
     std::vector<ScheduleEntry> schedule;
     std::vector<std::string> diagnosis;
     SolverStats stats;
+    std::vector<TeamMember> teamMembers;
     // Add any other output fields here, like diagnosis or metrics
 };
 
@@ -79,7 +83,7 @@ struct SolverOutput
 
 Availability to_internal_availability(JresAvailability availability);
 SolverInput from_c_input(const JresSolverInput* c_input);
-JresSolverOutput* to_c_output(const SolverOutput& output);
+JresSolverOutput* to_c_output(const SolverOutput& output, const JresSolverOptions& options);
 char* allocate_and_copy(const std::string& s);
 
 } // namespace jres::internal

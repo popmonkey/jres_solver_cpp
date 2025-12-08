@@ -271,6 +271,6 @@ jres::internal::SolverOutput JresDiagnosticSolver::diagnose()
     if (output.diagnosis.empty()) {
         output.diagnosis.push_back("Diagnosis complete.");
     }
-    
+    output.teamMembers = m_input.teamMembers;
     return output;
 }

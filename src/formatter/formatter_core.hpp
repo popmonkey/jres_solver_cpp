@@ -21,6 +21,11 @@ namespace jres {
         std::string activity;
     };
 
+    struct MemberItinerary {
+        std::vector<ItineraryItem> items;
+        int tz_offset;
+    };
+
     // --- Core File Generation Function ---
     void write_output(const nlohmann::json& solved_data, 
                       const std::string& output_file, 
@@ -40,15 +45,14 @@ namespace jres {
     );
 
     std::string generate_summary_csv_string(
-        const std::map<std::string, std::pair<int, int>>& driver_stats,
+        const std::map<std::string, int>& driver_stats,
         const std::map<std::string, int>& spotter_stats,
         bool has_spotters
     );
     
-    std::map<std::string, std::vector<ItineraryItem>> generate_member_itineraries(
+    std::map<std::string, MemberItinerary> generate_member_itineraries(
         const std::vector<nlohmann::json>& schedule, 
         const nlohmann::json& data, 
-        int pit_time_seconds, 
         bool has_spotters
     );
 

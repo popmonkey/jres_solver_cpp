@@ -77,9 +77,9 @@ void JresStandardSolver::add_participant_model(
 
         // --- Hard Constraint: Max Consecutive Stints ---
         int maxConsecutive = p.maxStints;
-        if (maxConsecutive == 0 || m_input.stints.size() < maxConsecutive) continue; // No limit if maxStints is 0 (or less)
+        if (maxConsecutive == 0 || m_input.stints.size() < static_cast<size_t>(maxConsecutive + 1)) continue; // No limit if maxStints is 0 (or less)
 
-        for (size_t s = 0; s <= m_input.stints.size() - maxConsecutive; ++s) {
+        for (size_t s = 0; s <= m_input.stints.size() - (maxConsecutive + 1); ++s) {
             std::vector<int> consIdx;
             std::vector<double> consVal;
             for (size_t i = 0; i < maxConsecutive + 1; ++i) { // Window of maxConsecutive + 1
@@ -107,6 +107,26 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     // --- Build Driver Model ---
     add_participant_model(*m_highs, m_driverPool, m_driverWorkVars);
 
+    // --- Hard Constraint: Fair Share ---
+    const double num_stints = m_input.stints.size();
+    const double num_drivers = m_driverPool.size();
+    if (num_drivers > 0) {
+        const double min_stints_per_driver = std::floor((num_stints / num_drivers) / 4.0);
+        for (const auto &p : m_driverPool) {
+            std::vector<int> driver_stint_indices;
+            std::vector<double> driver_stint_values;
+            for (size_t s = 0; s < m_input.stints.size(); ++s) {
+                if (m_driverWorkVars.count({p.name, s})) {
+                    driver_stint_indices.push_back(m_driverWorkVars.at({p.name, s}));
+                    driver_stint_values.push_back(1.0);
+                }
+            }
+            if (!driver_stint_indices.empty()) {
+                m_highs->addRow(min_stints_per_driver, kHighsInf, (int)driver_stint_indices.size(), driver_stint_indices.data(), driver_stint_values.data());
+            }
+        }
+    }
+
     // --- Add Coverage Constraints (One driver per stint) ---
     for (size_t s = 0; s < m_input.stints.size(); ++s)
     {
@@ -124,6 +144,47 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         }
         m_highs->addRow(1.0, 1.0, (int)indices.size(), indices.data(), values.data());
     }
+
+    // --- Add balancing variables and objective ---
+    const double avg_stints_per_driver = num_stints / num_drivers;
+    for (const auto &p : m_driverPool) {
+        std::vector<int> driver_stint_indices;
+        std::vector<double> driver_stint_values;
+        for (size_t s = 0; s < m_input.stints.size(); ++s) {
+            if (m_driverWorkVars.count({p.name, s})) {
+                driver_stint_indices.push_back(m_driverWorkVars.at({p.name, s}));
+                driver_stint_values.push_back(1.0);
+            }
+        }
+
+        if (driver_stint_indices.empty()) continue;
+
+        // Variable for total stints for this driver
+        int total_stints_var = m_highs->getNumCol();
+        m_highs->addVar(0.0, kHighsInf);
+        driver_stint_indices.push_back(total_stints_var);
+        driver_stint_values.push_back(-1.0);
+        m_highs->addRow(0.0, 0.0, (int)driver_stint_indices.size(), driver_stint_indices.data(), driver_stint_values.data());
+
+        // Deviation variables
+        int over_avg_var = m_highs->getNumCol();
+        m_highs->addVar(0.0, kHighsInf);
+        int under_avg_var = m_highs->getNumCol();
+        m_highs->addVar(0.0, kHighsInf);
+        
+        // over_avg >= total_stints - avg
+        m_highs->addRow(0.0, kHighsInf, 2, std::vector<int>{over_avg_var, total_stints_var}.data(), std::vector<double>{1.0, -1.0}.data());
+        m_highs->changeRowBounds(m_highs->getNumRow() - 1, -avg_stints_per_driver, kHighsInf);
+        
+        // under_avg >= avg - total_stints
+        m_highs->addRow(0.0, kHighsInf, 2, std::vector<int>{under_avg_var, total_stints_var}.data(), std::vector<double>{1.0, 1.0}.data());
+        m_highs->changeRowBounds(m_highs->getNumRow() - 1, avg_stints_per_driver, kHighsInf);
+
+        // Add to objective
+        m_highs->changeColCost(over_avg_var, 1.0);
+        m_highs->changeColCost(under_avg_var, 1.0);
+    }
+
 
     // --- Add Spotter Model (Integrated Mode) ---
     if (m_options.spotterMode == JRES_SPOTTER_MODE_INTEGRATED)
@@ -193,7 +254,9 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         const std::vector<double>& colValues = solution.col_value;
         for (size_t s = 0; s < m_input.stints.size(); ++s) {
             jres::internal::ScheduleEntry entry;
-            entry.stintId = m_input.stints[s].id;
+            entry.id = m_input.stints[s].id;
+            entry.startTime = m_input.stints[s].startTime;
+            entry.endTime = m_input.stints[s].endTime;
             entry.driver = "N/A";
             entry.spotter = "N/A";
             for (const auto& p : m_driverPool) {
@@ -268,5 +331,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     } else if (status == HighsModelStatus::kInfeasible) {
         throw std::runtime_error("Model is infeasible.");
     }
+    output.teamMembers = m_input.teamMembers;
     return output;
 }

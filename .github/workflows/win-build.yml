@@ -86,6 +86,11 @@ jobs:
         cmake --build build --config Release --target formatter_tests
         ctest --test-dir build --output-on-failure -C Release
 
+    - name: Run Integration Tests
+      if: inputs.run_integration_tests == true
+      shell: pwsh
+      run: ./test/integration/run_test.bat
+
     # ---------------------------------------------------------
     # Install (Stage Files)
     # ---------------------------------------------------------

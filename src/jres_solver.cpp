@@ -14,7 +14,7 @@ JresSolverOutput* solve_race_schedule(const JresSolverInput* input, const JresSo
         jres::internal::SolverInput internal_input = jres::internal::from_c_input(input);
         JresStandardSolver solver(internal_input, *options);
         jres::internal::SolverOutput internal_output = solver.solve();
-        return jres::internal::to_c_output(internal_output);
+        return jres::internal::to_c_output(internal_output, *options);
     } catch (const std::exception& e) {
         JresSolverOutput* error_output = new JresSolverOutput();
         error_output->schedule_len = 0;
@@ -31,7 +31,7 @@ JresSolverOutput* diagnose_race_schedule(const JresSolverInput* input, const Jre
         jres::internal::SolverInput internal_input = jres::internal::from_c_input(input);
         JresDiagnosticSolver solver(internal_input, *options);
         jres::internal::SolverOutput internal_output = solver.diagnose();
-        return jres::internal::to_c_output(internal_output);
+        return jres::internal::to_c_output(internal_output, *options);
     } catch (const std::exception& e) {
         JresSolverOutput* error_output = new JresSolverOutput();
         error_output->schedule_len = 0;
