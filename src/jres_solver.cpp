@@ -7,9 +7,8 @@
 #include "jres_internal_types.hpp"
 #include "jres_standard_solver.hpp"
 #include "jres_diagnostic_solver.hpp"
-#include "jres_solver/jres_json_converter.hpp"
 
-JresSolverOutput* solve_race_schedule(const JresSolverInput* input, const JresSolverOptions* options) {
+JRES_SOLVER_API JresSolverOutput* solve_race_schedule(const JresSolverInput* input, const JresSolverOptions* options) {
     try {
         jres::internal::SolverInput internal_input = jres::internal::from_c_input(input);
         JresStandardSolver solver(internal_input, *options);
@@ -26,7 +25,7 @@ JresSolverOutput* solve_race_schedule(const JresSolverInput* input, const JresSo
     }
 }
 
-JresSolverOutput* diagnose_race_schedule(const JresSolverInput* input, const JresSolverOptions* options) {
+JRES_SOLVER_API JresSolverOutput* diagnose_race_schedule(const JresSolverInput* input, const JresSolverOptions* options) {
     try {
         jres::internal::SolverInput internal_input = jres::internal::from_c_input(input);
         JresDiagnosticSolver solver(internal_input, *options);
@@ -43,6 +42,6 @@ JresSolverOutput* diagnose_race_schedule(const JresSolverInput* input, const Jre
     }
 }
 
-void free_json_string(char* json_string) {
+JRES_SOLVER_API void free_json_string(char* json_string) {
     delete[] json_string;
 }
