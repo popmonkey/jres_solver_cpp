@@ -27,7 +27,7 @@ jobs:
       name: "macOS Intel (x64)"
       version: ${{ github.ref_name }}
       platform: "darwin"
-      os: macos-13
+      os: macos-15
       arch: x64
       asset_ext: tar.gz
       upload_assets: false
@@ -40,7 +40,7 @@ jobs:
       name: "macOS Apple Silicon (arm64)"
       version: ${{ github.ref_name }}
       platform: "darwin"
-      os: macos-14
+      os: macos-15
       arch: arm64
       asset_ext: tar.gz
       upload_assets: false

@@ -15,4 +15,3 @@ jobs:
       version: ${{ github.ref_name }}
       arch: 'x64'
       upload_assets: true
-      upload_url: ${{ github.event.release.upload_url }}

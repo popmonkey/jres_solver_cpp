@@ -177,8 +177,8 @@ jobs:
           # Using find/cp with wildcard to be robust against lib vs lib64 differences
           find dist -name "libjres_solver.*" -exec cp {} package/lib/ \;
           
-          # Specific Header
-          cp dist/include/jres_solver/jres_solver.hpp package/include/jres_solver/
+          # Public Headers
+          cp dist/include/jres_solver/*.hpp package/include/jres_solver/
           
           # Archive the 'package' folder content
           cd package
