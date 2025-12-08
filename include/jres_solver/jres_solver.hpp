@@ -200,6 +200,7 @@ JRES_SOLVER_API char* jres_output_to_json(const JresSolverOutput* output);
 
 JRES_SOLVER_API void free_jres_solver_input(JresSolverInput* input);
 JRES_SOLVER_API void free_jres_solver_output(JresSolverOutput* output);
+JRES_SOLVER_API const char* jres_get_last_error();
 JRES_SOLVER_API void free_json_string(char* json_string);
 
 #ifdef __cplusplus

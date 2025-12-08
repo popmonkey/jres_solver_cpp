@@ -3,7 +3,7 @@
  * @file src/jres_json_converter.cpp
  * @brief JSON conversion functions for the JRES Solver library.
  */
-#include "jres_solver/jres_json_converter.hpp"
+#include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"
 #include <iostream>
 #include <cstring>
@@ -57,7 +57,7 @@ char* allocate_and_copy(const std::string& s) {
     return cstr;
 }
 
-JresSolverInput* jres_input_from_json(const char* jsonData) {
+JRES_SOLVER_API JresSolverInput* jres_input_from_json(const char* jsonData) {
     last_error_message.clear(); // Clear previous error
     try {
         json j = json::parse(jsonData);
@@ -125,7 +125,7 @@ JresSolverInput* jres_input_from_json(const char* jsonData) {
 }
 
 
-char* jres_output_to_json(const JresSolverOutput* output) {
+JRES_SOLVER_API char* jres_output_to_json(const JresSolverOutput* output) {
     last_error_message.clear(); // Clear previous error
     if (!output) {
         last_error_message = "Output is nullptr.";
@@ -194,11 +194,11 @@ char* jres_output_to_json(const JresSolverOutput* output) {
     }
 }
 
-const char* jres_get_last_error() {
+JRES_SOLVER_API const char* jres_get_last_error() {
     return last_error_message.c_str();
 }
 
-void free_jres_solver_output(JresSolverOutput* output) {
+JRES_SOLVER_API void free_jres_solver_output(JresSolverOutput* output) {
     if (!output) {
         return;
     }
@@ -232,7 +232,7 @@ void free_jres_solver_output(JresSolverOutput* output) {
     delete output;
 }
 
-void free_jres_solver_input(JresSolverInput* input) {
+JRES_SOLVER_API void free_jres_solver_input(JresSolverInput* input) {
     if (!input) {
         return;
     }
