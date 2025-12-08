@@ -26,4 +26,3 @@ jobs:
     with:
       version:    ${{ github.ref_name }}
       upload_assets: false
-      upload_url: ""

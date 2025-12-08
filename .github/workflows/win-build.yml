@@ -13,9 +13,6 @@ on:
       upload_assets:
         type: boolean
         required: true
-      upload_url:
-        type: string
-        required: false
 
 jobs:
   build-windows:
@@ -157,24 +154,13 @@ jobs:
     # ---------------------------------------------------------
     # Upload Release Assets
     # ---------------------------------------------------------
-    - name: Upload Release Asset (Zip)
+    - name: Upload Release Assets
       if: inputs.upload_assets == true
-      uses: actions/upload-release-asset@
+      shell: pwsh
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ inputs.upload_url }}
-        asset_path: ./${{ env.ASSET_NAME }}
-        asset_name: ${{ env.ASSET_NAME }}
-        asset_content_type: application/zip
-
-    - name: Upload Release Asset (Checksum)
-      if: inputs.upload_assets == true
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ inputs.upload_url }}
-        asset_path: ./${{ env.ASSET_NAME }}.sha256
-        asset_name: ${{ env.ASSET_NAME }}.sha256
-        asset_content_type: text/plain
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release upload "${{ inputs.version }}" `
+          "${{ env.ASSET_NAME }}" `
+          "${{ env.ASSET_NAME }}.sha256" `
+          --clobber
