@@ -12,8 +12,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: "macOS Intel (x64)",           platform: darwin,  os: macos-13,      arch: x64, asset_ext: tar.gz }
-          - { name: "macOS Apple Silicon (arm64)", platform: darwin,  os: macos-14,      arch: arm64, asset_ext: tar.gz }
+          - { name: "macOS Intel (x64)",           platform: darwin,  os: macos-15,      arch: x64, asset_ext: tar.gz }
+          - { name: "macOS Apple Silicon (arm64)", platform: darwin,  os: macos-15,      arch: arm64, asset_ext: tar.gz }
 
     uses: ./.github/workflows/macos-build.yml
     secrets: inherit
