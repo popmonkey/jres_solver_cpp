@@ -108,6 +108,11 @@ jobs:
       - name: Run Tests
         run: ctest --test-dir build --output-on-failure -C Release
 
+      - name: Run Integration Tests
+        run: |
+          chmod +x test/integration/run_test.sh
+          ./test/integration/run_test.sh
+
       # ---------------------------------------------------------
       # Install (Stage Files)
       # ---------------------------------------------------------
