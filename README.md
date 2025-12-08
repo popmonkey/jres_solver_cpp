@@ -73,6 +73,8 @@ These structs are used to represent the availability of team members.
 | `schedule_len` | `int` | The number of schedule entries. |
 | `diagnosis` | `const char**` | An array of strings with diagnostic information. Empty on success. |
 | `diagnosis_len` | `int` | The number of diagnosis strings. |
+| `stats` | `JresSolverStats*` | Solver performance and complexity metrics. |
+| `options` | `JresSolverOptions*` | The options used to generate this solution. |
 | `teamMembers` | `JresTeamMember*` | A pointer to an array of team members, including their tzOffset. |
 | `teamMembers_len` | `int` | The number of team members. |
 
@@ -80,7 +82,9 @@ These structs are used to represent the availability of team members.
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `stintId` | `int` | The ID of the stint. |
+| `id` | `int` | The ID of the stint. |
+| `startTime` | `const char*` | ISO 8601 timestamp for the start of the stint. |
+| `endTime` | `const char*` | ISO 8601 timestamp for the end of the stint. |
 | `driver` | `const char*` | Name of the assigned driver. |
 | `spotter` | `const char*` | Name of the assigned spotter. |
 
@@ -255,7 +259,9 @@ The `jres_output_to_json` function returns a JSON string containing the solution
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `stintId` | Integer | The ID of the stint. |
+| `id` | Integer | The ID of the stint. |
+| `startTime` | String | ISO 8601 timestamp for the start of the stint. |
+| `endTime` | String | ISO 8601 timestamp for the end of the stint. |
 | `driver` | String | Name of the assigned driver. |
 | `spotter` | String | Name of the assigned spotter (if Spotter Mode is active). |
 
@@ -268,9 +274,27 @@ When the solver fails, the `schedule` array will be empty, and the `diagnosis` a
 ```json
 {
   "schedule": [
-    { "stintId": 1, "driver": "Niki", "spotter": "Alain" },
-    { "stintId": 2, "driver": "Niki", "spotter": "Alain" },
-    { "stintId": 3, "driver": "Alain", "spotter": "Niki" }
+    {
+      "id": 1,
+      "startTime": "2024-06-15T15:00:00Z",
+      "endTime": "2024-06-15T16:00:00Z",
+      "driver": "Niki",
+      "spotter": "Alain"
+    },
+    {
+      "id": 2,
+      "startTime": "2024-06-15T16:00:00Z",
+      "endTime": "2024-06-15T17:00:00Z",
+      "driver": "Niki",
+      "spotter": "Alain"
+    },
+    {
+      "id": 3,
+      "startTime": "2024-06-15T17:00:00Z",
+      "endTime": "2024-06-15T18:00:00Z",
+      "driver": "Alain",
+      "spotter": "Niki"
+    }
   ],
   "diagnosis": []
 }

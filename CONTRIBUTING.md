@@ -50,6 +50,9 @@ git submodule update --init --recursive
 
 The HiGHS library must be installed on your system.
 
+>[!NOTE]
+>If CMake cannot find a system-installed version of HiGHS, it will automatically download and build it as part of the project configuration process. While this simplifies setup, a pre-installed version is recommended for faster build times.
+
 #### macOS (Homebrew)
 
 This is the easiest method for macOS:
@@ -117,7 +120,7 @@ We use a standard out-of-source CMake build.
 
 This will create the main products in the `build/` directory:
 
-  * `libjres_solver.a` (or `.lib` on Windows): The static library.
+  * `libjres_solver.so` or `libjres_solver.a` (or `.dll`/`.lib`): The shared or static library. The type depends on the `BUILD_SHARED_LIBS` CMake option (defaults to ON).
   * `jres_solver` (or `jres_solver.exe`): The solver CLI executable.
   * `jres_formatter` (or `jres_formatter.exe`): The formatter CLI executable.
 

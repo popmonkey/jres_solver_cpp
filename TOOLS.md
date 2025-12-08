@@ -48,11 +48,11 @@ jres_solver.exe [options]
 | :--- | :------------------- | :-------------------------------------------------------------------------------------------- | :------ |
 | `-i` | `--input`            | Path to the race data `.json` file. Reads from `stdin` if omitted.                            | `stdin` |
 | `-o` | `--output`           | Path to save the calculated schedule (JSON). **Required for the Formatter.** | `stdout`|
-| `-t` | `--time-limit`       | Maximum time (in seconds) to let the optimizer run.                                           | `30`    |
+| `-t` | `--time-limit`       | Maximum time (in seconds) to let the optimizer run.                                           | `5`     |
 | `-q` | `--quiet`            | Suppress INFO logs and the printed schedule summary.                                          | `false` |
 | `-s` | `--spotter-mode`     | Strategy for assigning spotters. Options: `none`, `integrated`, `sequential`.                 | `none`  |
 |      | `--allow-no-spotter` | Allow specific stints to have no spotter assigned (if spotter mode is active).                | `false` |
-| `-g` | `--optimality-gap`   | Stop solver when the solution is within this gap of perfection (e.g., `0.01` for 1%).         | `0.0`   |
+| `-g` | `--optimality-gap`   | Stop solver when the solution is within this gap of perfection (e.g., `0.2` for 20%).         | `0.2`   |
 | `-d` | `--diagnose`         | Run in **Diagnostic Mode** to explain why a schedule is infeasible.                           | `false` |
 | `-h` | `--help`             | Print usage instructions.                                                                     |         |
 
