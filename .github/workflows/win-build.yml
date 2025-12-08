@@ -87,7 +87,6 @@ jobs:
         ctest --test-dir build --output-on-failure -C Release
 
     - name: Run Integration Tests
-      if: inputs.run_integration_tests == true
       shell: pwsh
       run: ./test/integration/run_test.bat
 
@@ -160,7 +159,7 @@ jobs:
     # ---------------------------------------------------------
     - name: Upload Release Asset (Zip)
       if: inputs.upload_assets == true
-      uses: actions/upload-release-asset@v1
+      uses: actions/upload-release-asset@
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
