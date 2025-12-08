@@ -53,12 +53,23 @@ namespace jres {
                 throw std::runtime_error("Invalid date-time format: " + iso_str);
             }
         }
+
+        // Handle optional fractional seconds (e.g., .123) and Z
+        if (ss.peek() == '.') {
+            ss.ignore(); // Consume the '.'
+            int milliseconds;
+            ss >> milliseconds; // Read and discard
+        }
         
-        // Check for remaining characters which are not a 'Z' or '.000Z'
+        // Handle trailing Z
+        if (ss.peek() == 'Z') {
+            ss.ignore();
+        }
+
+        // Check for any other non-whitespace trailing characters
         std::string remaining;
         ss >> remaining;
-        if (!remaining.empty() && remaining != "Z" && remaining != ".000Z") {
-            // A non-empty remaining string is only ok if it's just whitespace
+        if (!remaining.empty()) {
             if (remaining.find_first_not_of(" \t\n\v\f\r") != std::string::npos) {
                  throw std::runtime_error("Invalid trailing characters in date-time: " + iso_str);
             }
