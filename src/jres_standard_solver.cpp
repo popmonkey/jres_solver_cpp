@@ -226,6 +226,51 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                 }
             }
         }
+
+        // --- Soft Constraint: Adjacency of spotter/driver duties ---
+        for (const auto& p : m_input.teamMembers) {
+            if (p.isDriver && p.isSpotter) {
+                for (size_t s = 0; s < m_input.stints.size(); ++s) {
+                    if (m_spotterWorkVars.count({p.name, s}) == 0) continue;
+
+                    auto spotterVar = m_spotterWorkVars.at({p.name, s});
+
+                    // Adjacency with drive stint BEFORE
+                    if (s > 0 && m_driverWorkVars.count({p.name, s - 1})) {
+                        auto driverBeforeVar = m_driverWorkVars.at({p.name, s - 1});
+                        
+                        int adjBeforeVar = m_highs->getNumCol();
+                        m_highs->addVar(0.0, 1.0);
+                        m_highs->changeColIntegrality(adjBeforeVar, HighsVarType::kInteger);
+                        m_highs->changeColCost(adjBeforeVar, -0.5); // Reward for adjacency
+
+                        // z <= x (spotter)
+                        m_highs->addRow(-kHighsInf, 0.0, 2, std::vector<int>{adjBeforeVar, spotterVar}.data(), std::vector<double>{1.0, -1.0}.data());
+                        // z <= y (driver before)
+                        m_highs->addRow(-kHighsInf, 0.0, 2, std::vector<int>{adjBeforeVar, driverBeforeVar}.data(), std::vector<double>{1.0, -1.0}.data());
+                        // z >= x + y - 1  => z - x - y >= -1
+                        m_highs->addRow(-1.0, kHighsInf, 3, std::vector<int>{adjBeforeVar, spotterVar, driverBeforeVar}.data(), std::vector<double>{1.0, -1.0, -1.0}.data());
+                    }
+
+                    // Adjacency with drive stint AFTER
+                    if (s < m_input.stints.size() - 1 && m_driverWorkVars.count({p.name, s + 1})) {
+                        auto driverAfterVar = m_driverWorkVars.at({p.name, s + 1});
+                        
+                        int adjAfterVar = m_highs->getNumCol();
+                        m_highs->addVar(0.0, 1.0);
+                        m_highs->changeColIntegrality(adjAfterVar, HighsVarType::kInteger);
+                        m_highs->changeColCost(adjAfterVar, -0.5); // Reward for adjacency
+
+                        // z <= x (spotter)
+                        m_highs->addRow(-kHighsInf, 0.0, 2, std::vector<int>{adjAfterVar, spotterVar}.data(), std::vector<double>{1.0, -1.0}.data());
+                        // z <= y (driver after)
+                        m_highs->addRow(-kHighsInf, 0.0, 2, std::vector<int>{adjAfterVar, driverAfterVar}.data(), std::vector<double>{1.0, -1.0}.data());
+                        // z >= x + y - 1 => z - x - y >= -1
+                        m_highs->addRow(-1.0, kHighsInf, 3, std::vector<int>{adjAfterVar, spotterVar, driverAfterVar}.data(), std::vector<double>{1.0, -1.0, -1.0}.data());
+                    }
+                }
+            }
+        }
     }
     
     auto endSetup = high_resolution_clock::now();
@@ -275,6 +320,44 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             }
             spotterSolver.setOptionValue("mip_rel_gap", m_options.optimalityGap);
             add_participant_model(spotterSolver, m_spotterPool, m_spotterWorkVars);
+
+            // --- Soft Constraint: Adjacency of spotter/driver duties ---
+            for (const auto& p : m_spotterPool) {
+                const auto member_it = std::find_if(m_input.teamMembers.begin(), m_input.teamMembers.end(), 
+                    [&](const jres::internal::TeamMember& tm){ return tm.name == p.name; });
+                if (member_it == m_input.teamMembers.end() || !member_it->isDriver) continue;
+
+                for (size_t s = 0; s < m_input.stints.size(); ++s) {
+                    if (m_spotterWorkVars.count({p.name, s})) {
+                        double cost = 0.0;
+                        
+                        auto stintStartTime = jres::internal::TimeHelpers::stringToTimePoint(m_input.stints[s].startTime);
+                        std::string availabilityKey = jres::internal::TimeHelpers::timePointToKey(stintStartTime);
+                        auto member_availability_it = m_input.availability.find(p.name);
+                        if (member_availability_it != m_input.availability.end()) {
+                            auto time_availability_it = member_availability_it->second.find(availabilityKey);
+                            if (time_availability_it != member_availability_it->second.end()) {
+                                if (time_availability_it->second == jres::internal::Availability::Preferred) {
+                                    cost = -1.0;
+                                }
+                            }
+                        }
+
+                        // Adjacency reward
+                        if (s > 0 && output.schedule[s - 1].driver == p.name) {
+                            cost -= 0.5;
+                        }
+                        if (s < m_input.stints.size() - 1 && output.schedule[s + 1].driver == p.name) {
+                            cost -= 0.5;
+                        }
+                        
+                        if (cost != 0.0) {
+                            spotterSolver.changeColCost(m_spotterWorkVars.at({p.name, s}), cost);
+                        }
+                    }
+                }
+            }
+            
             for (size_t s = 0; s < m_input.stints.size(); ++s) {
                 std::vector<int> indices;
                 std::vector<double> values;
