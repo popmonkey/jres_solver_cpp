@@ -3,7 +3,7 @@
 This suite consists of two command-line tools designed to generate and format driver schedules for endurance racing events.
 
 > [!NOTE]
-Currently the easiest way to generate input for the tools (and library) is to use [the JRES Availability Planner spreadsheet](https://docs.google.com/spreadsheets/d/1jI2mtS0R8dtT7gnAtxIkMfLRcRnqWuXaFc0xvM96Smw/edit?usp=sharing)
+Currently the easiest way to generate input for the tools (and library) is to use [the JRES Availability Planner spreadsheet](https://docs.google.com/spreadsheets/d/1k2WaNDhXjyHXLirju2IQKxrYExQpDCT5z6jCBM71KVc/edit?usp=sharing)
 
 ## Platform Support
 
