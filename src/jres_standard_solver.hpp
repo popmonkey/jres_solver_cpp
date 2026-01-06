@@ -24,7 +24,8 @@ private:
     void add_participant_model(
         Highs &highs,
         const std::vector<jres::internal::TeamMember> &participants,
-        std::map<std::pair<std::string, int>, int>& workVars
+        std::map<std::pair<std::string, int>, int>& workVars,
+        bool enforceMinimumRest = false
     );
 
     std::unique_ptr<Highs> m_highs;

@@ -62,16 +62,28 @@ JresStandardSolver::~JresStandardSolver() = default;
 void JresStandardSolver::add_participant_model(
     Highs &highs,
     const std::vector<jres::internal::TeamMember> &participants,
-    std::map<std::pair<std::string, int>, int>& workVars)
+    std::map<std::pair<std::string, int>, int>& workVars,
+    bool enforceMinimumRest)
 {
     if (participants.empty()) return;
+
+    // Pre-parse stint times to avoid repeated parsing in loops
+    std::vector<std::chrono::system_clock::time_point> startTimes;
+    std::vector<std::chrono::system_clock::time_point> endTimes;
+    startTimes.reserve(m_input.stints.size());
+    endTimes.reserve(m_input.stints.size());
+
+    for (const auto& stint : m_input.stints) {
+        startTimes.push_back(jres::internal::TimeHelpers::stringToTimePoint(stint.startTime));
+        endTimes.push_back(jres::internal::TimeHelpers::stringToTimePoint(stint.endTime));
+    }
 
     for (const auto &p : participants)
     {
         for (size_t s = 0; s < m_input.stints.size(); ++s)
         {
-            auto stintStartTime = jres::internal::TimeHelpers::stringToTimePoint(m_input.stints[s].startTime);
-            std::string availabilityKey = jres::internal::TimeHelpers::timePointToKey(stintStartTime);
+            // Use pre-parsed start time
+            std::string availabilityKey = jres::internal::TimeHelpers::timePointToKey(startTimes[s]);
 
             bool isUnavailable = false;
             auto member_availability_it = m_input.availability.find(p.name);
@@ -108,24 +120,46 @@ void JresStandardSolver::add_participant_model(
 
         // --- Hard Constraint: Max Consecutive Stints ---
         int maxConsecutive = p.maxStints;
-        if (maxConsecutive == 0 || m_input.stints.size() < static_cast<size_t>(maxConsecutive + 1)) continue; // No limit if maxStints is 0 (or less)
+        if (maxConsecutive > 0 && m_input.stints.size() >= static_cast<size_t>(maxConsecutive + 1)) {
+             for (size_t s = 0; s <= m_input.stints.size() - (maxConsecutive + 1); ++s) {
+                std::vector<int> consIdx;
+                std::vector<double> consVal;
+                for (size_t i = 0; i < maxConsecutive + 1; ++i) { // Window of maxConsecutive + 1
+                    if (workVars.count({p.name, s + i})) {
+                        consIdx.push_back(workVars.at({p.name, s + i}));
+                        consVal.push_back(1.0);
+                    }
+                }
+                if (consIdx.empty()) continue; 
 
-        for (size_t s = 0; s <= m_input.stints.size() - (maxConsecutive + 1); ++s) {
-            std::vector<int> consIdx;
-            std::vector<double> consVal;
-            for (size_t i = 0; i < maxConsecutive + 1; ++i) { // Window of maxConsecutive + 1
-                if (workVars.count({p.name, s + i})) {
-                    consIdx.push_back(workVars.at({p.name, s + i}));
-                    consVal.push_back(1.0);
+                highs.addRow(-kHighsInf, maxConsecutive, (int)consIdx.size(), consIdx.data(), consVal.data());
+            }
+        }
+
+        // --- Hard Constraint: Minimum Rest Time ---
+        if (enforceMinimumRest && p.minimumRestHours > 0) {
+            auto minRestDuration = std::chrono::hours(p.minimumRestHours);
+            
+            for (size_t s1 = 0; s1 < m_input.stints.size(); ++s1) {
+                if (!workVars.count({p.name, s1})) continue;
+                int var1 = workVars.at({p.name, s1});
+
+                // Check subsequent stints that are NOT immediate successors (s1+1)
+                // s2 must start strictly after s1 ends.
+                for (size_t s2 = s1 + 2; s2 < m_input.stints.size(); ++s2) {
+                    if (!workVars.count({p.name, s2})) continue;
+                    
+                    // If start(s2) < end(s1) + minRest, then forbidden.
+                    if (startTimes[s2] < endTimes[s1] + minRestDuration) {
+                         int var2 = workVars.at({p.name, s2});
+                         // x1 + x2 <= 1
+                         highs.addRow(-kHighsInf, 1.0, 2, std::vector<int>{var1, var2}.data(), std::vector<double>{1.0, 1.0}.data());
+                    } else {
+                        // Optimization: Stints are sorted by time.
+                        break; 
+                    }
                 }
             }
-            if (consIdx.empty()) continue; // No variables in this window for this driver
-
-            // Sum of window must be <= maxConsecutive
-            // This formulation is actually for "at most X stints in a window of X+1"
-            // So if maxConsecutive = 1, then at most 1 stint in a window of 2 (stints s and s+1)
-            // This means one stint can be driven, then there must be a break.
-            highs.addRow(-kHighsInf, maxConsecutive, (int)consIdx.size(), consIdx.data(), consVal.data());
         }
     }
 }
@@ -136,7 +170,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     auto startTotal = high_resolution_clock::now();
 
     // --- Build Driver Model ---
-    add_participant_model(*m_highs, m_driverPool, m_driverWorkVars);
+    add_participant_model(*m_highs, m_driverPool, m_driverWorkVars, true);
 
     // --- Hard Constraint: Fair Share ---
     const double num_stints = m_input.stints.size();

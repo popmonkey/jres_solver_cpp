@@ -30,6 +30,7 @@ add_executable(solver_tests
   test_diagnosis.cpp
   test_balancing.cpp
   test_optimization.cpp
+  test_minimum_rest.cpp
 )
 
 add_dependencies(solver_tests jres_solver_lib)
@@ -48,6 +49,7 @@ target_link_libraries(solver_tests PRIVATE
 
 target_include_directories(solver_tests PRIVATE
   ${JRES_SOLVER_INCLUDE_DIR}
+  ${CMAKE_SOURCE_DIR}/src
 )
 
 target_compile_definitions(solver_tests PRIVATE TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/data")

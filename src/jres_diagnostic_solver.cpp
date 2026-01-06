@@ -48,6 +48,16 @@ jres::internal::SolverOutput JresDiagnosticSolver::diagnose()
 {
     Highs solver;
     solver.setOptionValue("output_flag", false);
+
+    // Pre-parse stint times
+    std::vector<std::chrono::system_clock::time_point> startTimes;
+    std::vector<std::chrono::system_clock::time_point> endTimes;
+    startTimes.reserve(m_input.stints.size());
+    endTimes.reserve(m_input.stints.size());
+    for (const auto& stint : m_input.stints) {
+        startTimes.push_back(jres::internal::TimeHelpers::stringToTimePoint(stint.startTime));
+        endTimes.push_back(jres::internal::TimeHelpers::stringToTimePoint(stint.endTime));
+    }
     
     std::map<std::pair<std::string, int>, int> assignVars;
     
@@ -165,6 +175,38 @@ jres::internal::SolverOutput JresDiagnosticSolver::diagnose()
             solver.addRow(-kHighsInf, maxConsecutive, (int)idx.size(), idx.data(), val.data());
         }
     }
+
+    // --- Minimum Rest Soft Constraints ---
+    for (const auto& p : m_driverPool) {
+        if (p.minimumRestHours <= 0) continue;
+        auto minRestDuration = std::chrono::hours(p.minimumRestHours);
+        
+        for (size_t s1 = 0; s1 < m_input.stints.size(); ++s1) {
+            if (!assignVars.count({p.name, s1})) continue;
+            
+            for (size_t s2 = s1 + 2; s2 < m_input.stints.size(); ++s2) {
+                 if (!assignVars.count({p.name, s2})) continue;
+                 
+                 if (startTimes[s2] < endTimes[s1] + minRestDuration) {
+                     // Violation if both selected
+                     int var1 = assignVars.at({p.name, s1});
+                     int var2 = assignVars.at({p.name, s2});
+                     
+                     int slack = solver.getNumCol();
+                     solver.addVar(0.0, 1.0);
+                     solver.changeColIntegrality(slack, HighsVarType::kInteger);
+                     solver.changeColCost(slack, 20000.0);
+                     
+                     // x1 + x2 - slack <= 1
+                     std::vector<int> idx = {var1, var2, slack};
+                     std::vector<double> val = {1.0, 1.0, -1.0};
+                     solver.addRow(-kHighsInf, 1.0, 3, idx.data(), val.data());
+                 } else {
+                     break; 
+                 }
+            }
+        }
+    }
     
     if (m_options.spotterMode == JRES_SPOTTER_MODE_INTEGRATED && !m_spotterPool.empty()) {
         for (const auto& p : m_spotterPool) {
@@ -261,10 +303,50 @@ jres::internal::SolverOutput JresDiagnosticSolver::diagnose()
     }
 
     for (const auto& [name, ranges] : driverConsecutiveDetails) {
+        auto it = std::find_if(m_driverPool.begin(), m_driverPool.end(), [&](const auto& d){ return d.name == name; });
+        int limit = (it != m_driverPool.end()) ? it->maxStints : 0;
+
         for (const auto& range : ranges) {
             output.diagnosis.push_back("Driver " + name + " exceeded max consecutive stint limit (Driven Stints: " + 
                               std::to_string(range.first) + "-" + std::to_string(range.second) + 
-                              ", Limit: " + std::to_string(m_driverPool[0].maxStints) + ").");
+                              ", Limit: " + std::to_string(limit) + ").");
+        }
+    }
+
+    // Check for Minimum Rest Violations
+    for (const auto& p : m_driverPool) {
+        if (p.minimumRestHours <= 0) continue;
+        
+        std::vector<int> driverStints;
+        for (size_t s = 0; s < m_input.stints.size(); ++s) {
+            if (assignVars.count({p.name, s}) && colValues[assignVars.at({p.name, s})] > 0.5) {
+                driverStints.push_back(s);
+            }
+        }
+        
+        if (driverStints.empty()) continue;
+        
+        int lastShiftEndStintIdx = driverStints[0];
+        
+        for (size_t i = 1; i < driverStints.size(); ++i) {
+            int currentStintIdx = driverStints[i];
+            int prevStintIdx = driverStints[i-1];
+            
+            if (currentStintIdx == prevStintIdx + 1) {
+                // Continuation of shift
+                lastShiftEndStintIdx = currentStintIdx;
+            } else {
+                // New shift
+                // Check gap from lastShiftEndStintIdx to currentStintIdx
+                auto gap = startTimes[currentStintIdx] - endTimes[lastShiftEndStintIdx];
+                if (gap < std::chrono::hours(p.minimumRestHours)) {
+                     auto duration = std::chrono::duration_cast<std::chrono::minutes>(gap).count();
+                      output.diagnosis.push_back("Driver " + p.name + " has insufficient rest between stints " + 
+                          std::to_string(m_input.stints[lastShiftEndStintIdx].id) + " and " + std::to_string(m_input.stints[currentStintIdx].id) + 
+                          " (Gap: " + std::to_string(duration) + "m, Required: " + std::to_string(p.minimumRestHours * 60) + "m).");
+                }
+                lastShiftEndStintIdx = currentStintIdx;
+            }
         }
     }
 
