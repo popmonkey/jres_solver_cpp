@@ -29,6 +29,7 @@ add_executable(solver_tests
   test_errors.cpp
   test_diagnosis.cpp
   test_balancing.cpp
+  test_optimization.cpp
 )
 
 add_dependencies(solver_tests jres_solver_lib)

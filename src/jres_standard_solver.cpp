@@ -185,6 +185,30 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         m_highs->changeColCost(under_avg_var, 1.0);
     }
 
+    // --- Incentivize Consecutive Stints ---
+    for (const auto &p : m_driverPool) {
+        if (p.maxStints <= 1) continue; // No incentive if they can't do consecutive stints
+
+        for (size_t s = 0; s < m_input.stints.size() - 1; ++s) {
+            if (m_driverWorkVars.count({p.name, s}) && m_driverWorkVars.count({p.name, s + 1})) {
+                int var_s = m_driverWorkVars.at({p.name, s});
+                int var_next = m_driverWorkVars.at({p.name, s + 1});
+
+                int consecutive_var = m_highs->getNumCol();
+                m_highs->addVar(0.0, 1.0);
+                m_highs->changeColIntegrality(consecutive_var, HighsVarType::kInteger);
+                m_highs->changeColCost(consecutive_var, -1.5); // Reward for consecutive stints
+
+                // z <= x_s
+                m_highs->addRow(-kHighsInf, 0.0, 2, std::vector<int>{consecutive_var, var_s}.data(), std::vector<double>{1.0, -1.0}.data());
+                // z <= x_{s+1}
+                m_highs->addRow(-kHighsInf, 0.0, 2, std::vector<int>{consecutive_var, var_next}.data(), std::vector<double>{1.0, -1.0}.data());
+                // z >= x_s + x_{s+1} - 1  => z - x_s - x_{s+1} >= -1
+                m_highs->addRow(-1.0, kHighsInf, 3, std::vector<int>{consecutive_var, var_s, var_next}.data(), std::vector<double>{1.0, -1.0, -1.0}.data());
+            }
+        }
+    }
+
 
     // --- Add Spotter Model (Integrated Mode) ---
     if (m_options.spotterMode == JRES_SPOTTER_MODE_INTEGRATED)
