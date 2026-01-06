@@ -7,30 +7,28 @@
 using json = nlohmann::json;
 
 TEST(OptimizationTest, IncentivizeConsecutiveStints) {
-    // Scenario: 4 Drivers, 8 Stints.
-    // Each driver can do max 2 stints.
-    // Optimal with incentive (Max Consecutive): Driver A (1,2), Driver B (3,4), Driver C (5,6), Driver D (7,8)
-    // This results in 4 consecutive pairs: (1-2), (3-4), (5-6), (7-8).
-    // Suboptimal (Alternating): A, B, A, B... results in 0 consecutive pairs.
+    // Scenario: 2 Team Members (can drive and spot), 4 Stints.
+    // Each member can do max 2 stints.
+    // We want to see AABB or BBAA patterns for BOTH drivers and spotters.
     
     json j;
     j["success"] = true;
     
-    json drivers = json::array();
-    std::vector<std::string> names = {"Driver A", "Driver B", "Driver C", "Driver D"};
+    json members = json::array();
+    std::vector<std::string> names = {"Member A", "Member B"};
     for (const auto& name : names) {
-        drivers.push_back({
+        members.push_back({
             {"name", name},
             {"isDriver", true},
-            {"isSpotter", false},
+            {"isSpotter", true},
             {"maxStints", 2},
             {"minimumRestHours", 0}
         });
     }
-    j["teamMembers"] = drivers;
+    j["teamMembers"] = members;
 
     json stints = json::array();
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 0; i < 4; ++i) {
         stints.push_back({
             {"id", i + 1},
             {"startTime", "2026-01-17T0" + std::to_string(i) + ":00:00.000Z"},
@@ -42,38 +40,71 @@ TEST(OptimizationTest, IncentivizeConsecutiveStints) {
     j["firstStintDriver"] = nullptr;
 
     std::string json_str = j.dump();
-
-    JresSolverOptions options;
-    options.timeLimit = 10;
-    options.spotterMode = JRES_SPOTTER_MODE_NONE; // Focus on driver optimization
-    options.allowNoSpotter = true;
-    options.optimalityGap = 0.0;
-
     JresSolverInput* input = jres_input_from_json(json_str.c_str());
     ASSERT_NE(input, nullptr);
 
-    JresSolverOutput* output = solve_race_schedule(input, &options);
-    ASSERT_NE(output, nullptr);
-    ASSERT_EQ(output->schedule_len, 8);
+    // --- Sub-test 1: Integrated Mode ---
+    {
+        JresSolverOptions options;
+        options.timeLimit = 10;
+        options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
+        options.allowNoSpotter = false;
+        options.optimalityGap = 0.0;
 
-    int consecutive_count = 0;
-    for (int i = 0; i < output->schedule_len - 1; ++i) {
-        std::string current = output->schedule[i].driver;
-        std::string next = output->schedule[i+1].driver;
-        if (current == next) {
-            consecutive_count++;
+        JresSolverOutput* output = solve_race_schedule(input, &options);
+        ASSERT_NE(output, nullptr);
+        ASSERT_EQ(output->schedule_len, 4);
+
+        int driver_consecutive = 0;
+        int spotter_consecutive = 0;
+        for (int i = 0; i < output->schedule_len - 1; ++i) {
+            if (std::string(output->schedule[i].driver) == std::string(output->schedule[i+1].driver)) {
+                driver_consecutive++;
+            }
+            if (std::string(output->schedule[i].spotter) == std::string(output->schedule[i+1].spotter)) {
+                spotter_consecutive++;
+            }
         }
+
+        // With 4 stints and maxStints=2, perfect consolidation is 2 switches (one middle break for each role, or AABB/BBAA)
+        // Consecutive pairs in AABB is 2: (A,A) and (B,B).
+        // Minimal acceptable is AABB or BBAA => 2 consecutive pairs.
+        EXPECT_GE(driver_consecutive, 2) << "Integrated: Drivers should be consolidated (e.g. AABB).";
+        EXPECT_GE(spotter_consecutive, 2) << "Integrated: Spotters should be consolidated (e.g. BBAA).";
+
+        free_jres_solver_output(output);
     }
 
-    // We expect the solver to maximize consecutive stints.
-    // In a perfect 2-stint blocks schedule: A A B B C C D D
-    // Pairs: (A,A), (A,B), (B,B), (B,C), (C,C), (C,D), (D,D)
-    // Consecutive: 4.
-    // We accept at least 3 to allow for some minor variation, but definitely > 0.
-    EXPECT_GE(consecutive_count, 3) << "Solver should prioritize consecutive stints. Found " << consecutive_count << " consecutive pairs.";
+    // --- Sub-test 2: Sequential Mode ---
+    {
+        JresSolverOptions options;
+        options.timeLimit = 10;
+        options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
+        options.allowNoSpotter = false;
+        options.optimalityGap = 0.0;
+
+        JresSolverOutput* output = solve_race_schedule(input, &options);
+        ASSERT_NE(output, nullptr);
+        ASSERT_EQ(output->schedule_len, 4);
+
+        int driver_consecutive = 0;
+        int spotter_consecutive = 0;
+        for (int i = 0; i < output->schedule_len - 1; ++i) {
+            if (std::string(output->schedule[i].driver) == std::string(output->schedule[i+1].driver)) {
+                driver_consecutive++;
+            }
+            if (std::string(output->schedule[i].spotter) == std::string(output->schedule[i+1].spotter)) {
+                spotter_consecutive++;
+            }
+        }
+
+        EXPECT_GE(driver_consecutive, 2) << "Sequential: Drivers should be consolidated (e.g. AABB).";
+        EXPECT_GE(spotter_consecutive, 2) << "Sequential: Spotters should be consolidated (e.g. BBAA).";
+
+        free_jres_solver_output(output);
+    }
 
     free_jres_solver_input(input);
-    free_jres_solver_output(output);
 }
 
 TEST(OptimizationTest, PreferredOverAvailable) {
