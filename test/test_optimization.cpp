@@ -75,3 +75,135 @@ TEST(OptimizationTest, IncentivizeConsecutiveStints) {
     free_jres_solver_input(input);
     free_jres_solver_output(output);
 }
+
+TEST(OptimizationTest, PreferredOverAvailable) {
+    // Scenario: 2 Drivers, 2 Stints. maxStints=1 (Disable consecutive bonus).
+    // Driver A: Stint 1 (Available), Stint 2 (Preferred)
+    // Driver B: Stint 1 (Preferred), Stint 2 (Available)
+    //
+    // Naive/Round-Robin/Alphabetical Order might try: A then B.
+    // - S1 (A, Avail) + S2 (B, Avail) -> Cost 0.
+    //
+    // Optimal Preference Order: B then A.
+    // - S1 (B, Pref) + S2 (A, Pref) -> Cost -2.
+    //
+    // This forces the solver to pick B first, proving it's looking at the "Preferred" weight
+    // and not just assigning in list order.
+
+    json j;
+    j["success"] = true;
+    j["teamMembers"] = {
+        {{"name", "Driver A"}, {"isDriver", true}, {"isSpotter", false}, {"maxStints", 1}, {"minimumRestHours", 0}},
+        {{"name", "Driver B"}, {"isDriver", true}, {"isSpotter", false}, {"maxStints", 1}, {"minimumRestHours", 0}}
+    };
+    j["stints"] = {
+        {{"id", 1}, {"startTime", "2026-01-17T00:00:00.000Z"}, {"endTime", "2026-01-17T01:00:00.000Z"}},
+        {{"id", 2}, {"startTime", "2026-01-17T01:00:00.000Z"}, {"endTime", "2026-01-17T02:00:00.000Z"}}
+    };
+    j["availability"] = {
+        {"Driver A", {{"2026-01-17T00:00:00.000Z", "Available"}, {"2026-01-17T01:00:00.000Z", "Preferred"}}},
+        {"Driver B", {{"2026-01-17T00:00:00.000Z", "Preferred"}, {"2026-01-17T01:00:00.000Z", "Available"}}}
+    };
+    j["firstStintDriver"] = nullptr;
+
+    JresSolverOptions options;
+    options.timeLimit = 5;
+    options.spotterMode = JRES_SPOTTER_MODE_NONE;
+    options.allowNoSpotter = true;
+    options.optimalityGap = 0.0;
+
+    JresSolverInput* input = jres_input_from_json(j.dump().c_str());
+    ASSERT_NE(input, nullptr);
+
+    JresSolverOutput* output = solve_race_schedule(input, &options);
+    ASSERT_NE(output, nullptr);
+    ASSERT_EQ(output->schedule_len, 2);
+
+    // Expect B then A
+    EXPECT_STREQ(output->schedule[0].driver, "Driver B") << "Stint 1 should be Driver B (Preferred)";
+    EXPECT_STREQ(output->schedule[1].driver, "Driver A") << "Stint 2 should be Driver A (Preferred)";
+
+    free_jres_solver_input(input);
+    free_jres_solver_output(output);
+}
+
+TEST(OptimizationTest, ConsecutiveOverPreferred) {
+    // Scenario: 2 Drivers, 4 Stints.
+    // Availability Pattern (Alternating Preference):
+    // Stint 1: A=Pref, B=Avail
+    // Stint 2: A=Avail, B=Pref
+    // Stint 3: A=Pref, B=Avail
+    // Stint 4: A=Avail, B=Pref
+    //
+    // Option 1 (Alternating/Split): A, B, A, B
+    // - Everyone gets their Preferred slots.
+    // - Total Preferred = 4. Cost = -4.0.
+    // - Consecutive Pairs = 0. Cost = 0.0.
+    // - Balance: Perfect (2 each). Cost = 0.
+    // - Total Cost = -4.0.
+    //
+    // Option 2 (Consecutive Blocks): A, A, B, B
+    // - A takes S1(Pref), S2(Avail). B takes S3(Avail), S4(Pref).
+    // - Total Preferred = 2. Cost = -2.0.
+    // - Consecutive Pairs = 2 (A-A, B-B). Cost = 2 * -1.5 = -3.0.
+    // - Balance: Perfect (2 each). Cost = 0.
+    // - Total Cost = -5.0.
+    //
+    // Since -5.0 < -4.0, the solver MUST choose Option 2 (Consecutive Blocks).
+    // This proves that the Consecutive Bonus (-1.5) outweighs the loss of a Preferred slot (1.0 difference).
+
+    json j;
+    j["success"] = true;
+    j["teamMembers"] = {
+        {{"name", "Driver A"}, {"isDriver", true}, {"isSpotter", false}, {"maxStints", 2}, {"minimumRestHours", 0}},
+        {{"name", "Driver B"}, {"isDriver", true}, {"isSpotter", false}, {"maxStints", 2}, {"minimumRestHours", 0}}
+    };
+    j["stints"] = {
+        {{"id", 1}, {"startTime", "2026-01-17T00:00:00.000Z"}, {"endTime", "2026-01-17T01:00:00.000Z"}},
+        {{"id", 2}, {"startTime", "2026-01-17T01:00:00.000Z"}, {"endTime", "2026-01-17T02:00:00.000Z"}},
+        {{"id", 3}, {"startTime", "2026-01-17T02:00:00.000Z"}, {"endTime", "2026-01-17T03:00:00.000Z"}},
+        {{"id", 4}, {"startTime", "2026-01-17T03:00:00.000Z"}, {"endTime", "2026-01-17T04:00:00.000Z"}}
+    };
+    j["availability"] = {
+        {"Driver A", {
+            {"2026-01-17T00:00:00.000Z", "Preferred"}, 
+            {"2026-01-17T01:00:00.000Z", "Available"},
+            {"2026-01-17T02:00:00.000Z", "Preferred"},
+            {"2026-01-17T03:00:00.000Z", "Available"}
+        }},
+        {"Driver B", {
+            {"2026-01-17T00:00:00.000Z", "Available"}, 
+            {"2026-01-17T01:00:00.000Z", "Preferred"},
+            {"2026-01-17T02:00:00.000Z", "Available"},
+            {"2026-01-17T03:00:00.000Z", "Preferred"}
+        }}
+    };
+    j["firstStintDriver"] = nullptr;
+
+    JresSolverOptions options;
+    options.timeLimit = 5;
+    options.spotterMode = JRES_SPOTTER_MODE_NONE;
+    options.allowNoSpotter = true;
+    options.optimalityGap = 0.0;
+
+    JresSolverInput* input = jres_input_from_json(j.dump().c_str());
+    ASSERT_NE(input, nullptr);
+
+    JresSolverOutput* output = solve_race_schedule(input, &options);
+    ASSERT_NE(output, nullptr);
+    ASSERT_EQ(output->schedule_len, 4);
+
+    // Check for consecutive blocks
+    std::string d1 = output->schedule[0].driver;
+    std::string d2 = output->schedule[1].driver;
+    std::string d3 = output->schedule[2].driver;
+    std::string d4 = output->schedule[3].driver;
+
+    // We expect pairs like AA BB or BB AA
+    EXPECT_EQ(d1, d2) << "Stints 1 and 2 should be consecutive";
+    EXPECT_EQ(d3, d4) << "Stints 3 and 4 should be consecutive";
+    EXPECT_NE(d2, d3) << "Drivers should switch between blocks";
+
+    free_jres_solver_input(input);
+    free_jres_solver_output(output);
+}
