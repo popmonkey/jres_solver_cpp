@@ -567,7 +567,8 @@ jres::internal::SolverOutput JresStandardSolver::solve()
 
     // Check for infeasibility
     if (status != HighsModelStatus::kOptimal && status != HighsModelStatus::kTimeLimit) {
-        throw std::runtime_error("Model is infeasible (Status: " + std::to_string((int)status) + ")");
+        output.diagnosis.push_back("Model is infeasible (Status: " + std::to_string((int)status) + ")");
+        return output;
     }
 
     // --- Extract Solution and Diagnostics ---
