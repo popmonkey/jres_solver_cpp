@@ -111,7 +111,7 @@ namespace {
       "teamMembers": [
         { "name": "Lauda", "isDriver": true, "isSpotter": true, "minimumRestHours": 0 },
         { "name": "Prost", "isDriver": true, "isSpotter": true, "minimumRestHours": 0 },
-        { "name": "Senna", "isSpotter": true, "maxStints": 1, "minimumRestHours": 0 }
+        { "name": "Senna", "isDriver": false, "isSpotter": true, "maxStints": 1, "minimumRestHours": 0 }
       ],
       "availability": {
         "Lauda": { "1973-06-09T14:00:00.000Z": "Available" },
