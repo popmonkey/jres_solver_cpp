@@ -88,8 +88,12 @@ SolverInput from_c_input(const JresSolverInput* c_input) {
         std::string name = c_input->availability[i].name;
         for (int j = 0; j < c_input->availability[i].availability_len; ++j) {
             std::string time = c_input->availability[i].availability[j].time;
+            // Normalize time to key format used by solver
+            auto tp = TimeHelpers::stringToTimePoint(time);
+            std::string key = TimeHelpers::timePointToKey(tp);
+            
             JresAvailability availability = c_input->availability[i].availability[j].availability;
-            input.availability[name][time] = to_internal_availability(availability);
+            input.availability[name][key] = to_internal_availability(availability);
         }
     }
 

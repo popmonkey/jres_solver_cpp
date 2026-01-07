@@ -15,7 +15,7 @@
 
 // Penalty Constants
 static const double kPenaltySlack = 1000000.0;
-static const double kPenaltyUnavailable = 1000000.0;
+static const double kPenaltyUnavailable = 10000000.0;
 static const double kRewardPreferred = -1.0;
 static const double kRewardConsecutive = -2.0;
 static const double kRewardProximity = -0.5; // Incentive for spotting adjacent to driving
@@ -426,9 +426,63 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     // --- Build Driver Model ---
     add_participant_model(*m_highs, m_driverPool, m_driverWorkVars);
 
-    // --- Hard Constraint: Fair Share (Relaxed with penalty) ---
-    const double num_stints = m_input.stints.size();
+    // --- Hard Constraint: iRacing Fair Share Rule ---
+    // Rule: Fair Share = 1/4 of (Total Duration / Num Drivers)
+    // We enforce this using Time Duration.
+    // 1. Calculate Total Duration and Stint Durations
+    double total_duration_hours = 0.0;
+    std::vector<double> stint_durations_hours;
+    stint_durations_hours.reserve(m_input.stints.size());
+    
+    for (const auto& stint : m_input.stints) {
+        auto s = jres::internal::TimeHelpers::stringToTimePoint(stint.startTime);
+        auto e = jres::internal::TimeHelpers::stringToTimePoint(stint.endTime);
+        long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count();
+        double h = static_cast<double>(ms) / 3600000.0;
+        stint_durations_hours.push_back(h);
+        total_duration_hours += h;
+    }
+
     const double num_drivers = m_driverPool.size();
+    if (num_drivers > 0) {
+        // "Equal Share" = Total / NumDrivers.
+        // "Fair Share" = Equal Share / 4.
+        double min_fair_share_hours = (total_duration_hours / num_drivers) * 0.25;
+
+        for (const auto &p : m_driverPool) {
+            std::vector<int> idx;
+            std::vector<double> val;
+            
+            for (size_t s = 0; s < m_input.stints.size(); ++s) {
+                if (m_driverWorkVars.count({p.name, s})) {
+                    idx.push_back(m_driverWorkVars.at({p.name, s}));
+                    val.push_back(stint_durations_hours[s]);
+                }
+            }
+
+            if (idx.empty()) continue; // Should catch this elsewhere if they have 0 avail
+
+            // Elastic Constraint: Sum(duration * x) + slack >= min_fair_share
+            int slackVar = m_highs->getNumCol();
+            m_highs->addVar(0.0, kHighsInf);
+            m_highs->changeColCost(slackVar, kPenaltySlack);
+            
+            SlackInfo info;
+            info.type = "Fair Share Rule (Minimum Time)";
+            info.memberName = p.name;
+            info.stintIndex = -1;
+            info.limit = min_fair_share_hours;
+            m_slackInfo[slackVar] = info;
+            
+            idx.push_back(slackVar);
+            val.push_back(1.0);
+
+            m_highs->addRow(min_fair_share_hours, kHighsInf, (int)idx.size(), idx.data(), val.data());
+        }
+    }
+
+    // --- Incentivize Balanced Driving (Soft Constraint) ---
+    const double num_stints = m_input.stints.size();
     const double avg_stints_per_driver = num_drivers > 0 ? num_stints / num_drivers : 0;
 
     if (num_drivers > 0) {

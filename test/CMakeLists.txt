@@ -31,6 +31,7 @@ add_executable(solver_tests
   test_balancing.cpp
   test_optimization.cpp
   test_minimum_rest.cpp
+  test_fair_share.cpp
 )
 
 add_dependencies(solver_tests jres_solver_lib)
