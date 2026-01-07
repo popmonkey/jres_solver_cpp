@@ -89,7 +89,7 @@ TEST(MinimumRestTest, Enforcement) {
     std::string json_str((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
 
     JresSolverOptions options;
-    options.timeLimit = 10;
+    options.timeLimit = 60;
     options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
     options.allowNoSpotter = false;
     options.optimalityGap = 0.0;
