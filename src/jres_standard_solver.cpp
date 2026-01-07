@@ -119,25 +119,15 @@ JresStandardSolver::CapacityAnalysis JresStandardSolver::calculate_max_potential
 
         std::vector<bool> planned_drive(m_input.stints.size(), false);
         int base_capacity = 0;
-        int current_consecutive = 0;
-        int maxConsecutive = (p.maxStints > 0) ? p.maxStints : 1;
-
         double driver_total_hours = 0.0;
 
         for(size_t s=0; s<m_input.stints.size(); ++s) {
             if (is_available[s]) {
-                if (current_consecutive < maxConsecutive) {
-                    planned_drive[s] = true;
-                    base_capacity++;
-                    current_consecutive++;
-                    
-                    auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(endTimes[s] - startTimes[s]).count();
-                    driver_total_hours += static_cast<double>(duration_ms) / 3600000.0;
-                } else {
-                    current_consecutive = 0; // Forced rest
-                }
-            } else {
-                current_consecutive = 0;
+                planned_drive[s] = true;
+                base_capacity++;
+                
+                auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(endTimes[s] - startTimes[s]).count();
+                driver_total_hours += static_cast<double>(duration_ms) / 3600000.0;
             }
         }
         
