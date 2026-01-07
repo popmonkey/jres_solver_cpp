@@ -101,4 +101,4 @@ The formatter takes the JSON output from the solver and can generate different r
 # MODEL INSTRUCTIONS
 - **Verbosity:** Low. Do not explain the code unless asked. Just output the diff or the file.
 - **Reasoning:** Perform deep reasoning internally, but output only the final solution.
-- **Execution:** Don't stage commits or otherwise try to manage the repo.
+- **Git Operations:** READ-ONLY. You may use `git status`, `git log`, or `git diff` to understand the context. You must *NEVER* run `git add`, `git commit`, `git push`, or any command that modifies the git history or index. Leave all version control management to the user.
