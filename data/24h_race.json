@@ -7,7 +7,7 @@
       "isSpotter": true,
       "tzOffset": 1,
       "maxStints": 1,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     },
     {
       "name": "Ayrton",
@@ -15,7 +15,7 @@
       "isSpotter": false,
       "tzOffset": -3,
       "maxStints": 2,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     },
     {
       "name": "Jack",
@@ -23,7 +23,7 @@
       "isSpotter": true,
       "tzOffset": 11,
       "maxStints": 3,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     },
     {
       "name": "James",
@@ -31,7 +31,7 @@
       "isSpotter": true,
       "tzOffset": 0,
       "maxStints": 2,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     },
     {
       "name": "Mario",
@@ -39,7 +39,7 @@
       "isSpotter": true,
       "tzOffset": -5,
       "maxStints": 1,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     },
     {
       "name": "Ricky",
@@ -47,7 +47,7 @@
       "isSpotter": true,
       "tzOffset": -6,
       "maxStints": 2,
-      "minimumRestHours": 8
+      "minimumRestHours": 6
     }
   ],
   "availability": {

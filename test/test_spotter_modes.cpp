@@ -251,7 +251,18 @@ namespace {
       ASSERT_EQ(output->schedule_len, 1);
       
       EXPECT_STREQ(output->schedule[0].driver, "Ayrton");
-      EXPECT_STREQ(output->schedule[0].spotter, "N/A");
+      // Elastic solver will assign Niki despite unavailability, but report violation
+      EXPECT_STREQ(output->schedule[0].spotter, "Niki");
+      
+      bool found = false;
+      for (int i = 0; i < output->diagnosis_len; ++i) {
+          std::string msg(output->diagnosis[i]);
+          if (msg.find("Violation: Unavailable Spotter") != std::string::npos) {
+              found = true;
+              break;
+          }
+      }
+      EXPECT_TRUE(found);
 
       free_jres_solver_input(input);
       free_jres_solver_output(output);

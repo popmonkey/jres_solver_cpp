@@ -161,7 +161,6 @@ add_library(jres_solver_lib
   src/jres_internal_types.cpp
   src/jres_solver_base.cpp
   src/jres_standard_solver.cpp
-  src/jres_diagnostic_solver.cpp
 )
 set_target_properties(jres_solver_lib PROPERTIES OUTPUT_NAME "jres_solver")
 

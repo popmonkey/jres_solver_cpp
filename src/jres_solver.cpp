@@ -6,7 +6,6 @@
 #include "jres_solver/jres_solver.hpp"
 #include "jres_internal_types.hpp"
 #include "jres_standard_solver.hpp"
-#include "jres_diagnostic_solver.hpp"
 
 JRES_SOLVER_API JresSolverOutput* solve_race_schedule(const JresSolverInput* input, const JresSolverOptions* options) {
     try {
@@ -28,8 +27,8 @@ JRES_SOLVER_API JresSolverOutput* solve_race_schedule(const JresSolverInput* inp
 JRES_SOLVER_API JresSolverOutput* diagnose_race_schedule(const JresSolverInput* input, const JresSolverOptions* options) {
     try {
         jres::internal::SolverInput internal_input = jres::internal::from_c_input(input);
-        JresDiagnosticSolver solver(internal_input, *options);
-        jres::internal::SolverOutput internal_output = solver.diagnose();
+        JresStandardSolver solver(internal_input, *options);
+        jres::internal::SolverOutput internal_output = solver.solve();
         return jres::internal::to_c_output(internal_output, *options);
     } catch (const std::exception& e) {
         JresSolverOutput* error_output = new JresSolverOutput();

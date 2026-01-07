@@ -23,15 +23,11 @@ namespace {
         JresSolverOutput* output = diagnose_race_schedule(input, &options);
         ASSERT_NE(output, nullptr);
         ASSERT_GT(output->diagnosis_len, 0);
-        bool found = false;
-        for (int i = 0; i < output->diagnosis_len; ++i) {
-            std::string msg(output->diagnosis[i]);
-            if (msg.find("CRITICAL: No drivers could be assigned") != std::string::npos) {
-                found = true;
-                break;
-            }
-        }
-        EXPECT_TRUE(found) << "Expected diagnosis to contain 'CRITICAL: No drivers could be assigned'";
+        std::string msg(output->diagnosis[0]);
+        bool correctMsg = (msg.find("Insufficient driver capacity") != std::string::npos);
+        EXPECT_TRUE(correctMsg) << "Expected diagnosis to contain 'Insufficient driver capacity', got: " << msg;
+        EXPECT_TRUE(msg.find("Ayrton: 0 stints") != std::string::npos);
+        
         free_jres_solver_input(input);
         free_jres_solver_output(output);
     }
@@ -65,12 +61,12 @@ namespace {
         bool found = false;
         for (int i = 0; i < output->diagnosis_len; ++i) {
             std::string msg(output->diagnosis[i]);
-            if (msg.find("exceeded max consecutive stint limit") != std::string::npos) {
+            if (msg.find("Violation: Max Consecutive Stints") != std::string::npos) {
                 found = true;
                 break;
             }
         }
-        EXPECT_TRUE(found) << "Expected diagnosis to contain 'exceeded max consecutive stint limit'";
+        EXPECT_TRUE(found) << "Expected diagnosis to contain 'Violation: Max Consecutive Stints'";
         free_jres_solver_input(input);
         free_jres_solver_output(output);
     }
@@ -101,12 +97,12 @@ namespace {
         bool found = false;
         for (int i = 0; i < output->diagnosis_len; ++i) {
             std::string msg(output->diagnosis[i]);
-            if (msg.find("CRITICAL: No spotters could be assigned") != std::string::npos) {
+            if (msg.find("Violation: Unavailable Spotter") != std::string::npos) {
                 found = true;
                 break;
             }
         }
-        EXPECT_TRUE(found) << "Expected diagnosis to contain 'CRITICAL: No spotters could be assigned'";
+        EXPECT_TRUE(found) << "Expected diagnosis to contain 'Violation: Unavailable Spotter'";
         free_jres_solver_input(input);
         free_jres_solver_output(output);
     }
@@ -136,16 +132,9 @@ namespace {
         ASSERT_NE(input, nullptr);
         JresSolverOutput* output = diagnose_race_schedule(input, &options);
         ASSERT_NE(output, nullptr);
-        ASSERT_GT(output->diagnosis_len, 0);
-        bool found = false;
-        for (int i = 0; i < output->diagnosis_len; ++i) {
-            std::string msg(output->diagnosis[i]);
-            if (msg.find("Diagnosis complete.") != std::string::npos) {
-                found = true;
-                break;
-            }
-        }
-        EXPECT_TRUE(found) << "Expected diagnosis to contain 'Diagnosis complete.'";
+        EXPECT_GT(output->schedule_len, 0);
+        EXPECT_EQ(output->diagnosis_len, 0);
+        
         free_jres_solver_input(input);
         free_jres_solver_output(output);
     }
