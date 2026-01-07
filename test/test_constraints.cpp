@@ -112,7 +112,10 @@ TEST(ConstraintTest, NoDriverForStint) {
     ASSERT_EQ(output->schedule_len, 0);
     ASSERT_GT(output->diagnosis_len, 0);
     std::string msg(output->diagnosis[0]);
-    EXPECT_STREQ(msg.c_str(), "Model is infeasible.");
+    bool correctMsg = (msg.find("Insufficient driver capacity") != std::string::npos);
+    bool correctDetails = (msg.find(", MaxConsecutive=") != std::string::npos);
+    EXPECT_EQ(correctMsg, true);
+    EXPECT_EQ(correctDetails, true);
 
     free_jres_solver_input(input);
     free_jres_solver_output(output);

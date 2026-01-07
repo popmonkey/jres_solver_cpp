@@ -7,7 +7,7 @@
       "isDriver": true,
       "isSpotter": true,
       "preferredStints": 2,
-      "minimumRestHours": 8
+      "minimumRestHours": 0
     },
     {
       "name": "Ayrton",
@@ -15,7 +15,7 @@
       "isDriver": true,
       "isSpotter": true,
       "preferredStints": 2,
-      "minimumRestHours": 8
+      "minimumRestHours": 0
     },
     {
       "name": "Alain",
@@ -23,7 +23,7 @@
       "isDriver": false,
       "isSpotter": true,
       "preferredStints": 2,
-      "minimumRestHours": 8
+      "minimumRestHours": 0
     }
   ],
   "availability": {

@@ -39,7 +39,7 @@ The C-API uses the following structs to pass data to and from the solver.
 | `isDriver` | `int` | `1` if the member can drive, `0` otherwise. |
 | `isSpotter` | `int` | `1` if the member can spot, `0` otherwise. |
 | `maxStints`| `int` | Hard constraint: Maximum number of consecutive stints a member can perform. |
-| `minimumRestHours` | `int` | Hard constraint: Minimum rest time required after a driving shift before driving again. |
+| `minimumRestHours` | `int` | Hard constraint: Minimum contiguous rest time required once per race. <br> **Integrated Mode:** Applies to combined Driving and Spotting time. <br> **Sequential Mode:** Applies only to Driving. |
 | `tzOffset` | `double` | Timezone offset in hours from UTC. |
 
 `JresStint`
@@ -180,7 +180,7 @@ The `raceDataJson` string passed to `jres_input_from_json` must strictly follow 
 | `isDriver` | Boolean | `true` | Can this member drive? |
 | `isSpotter` | Boolean | `false` | Can this member spot? |
 | `maxStints` | Integer| `1` | Hard constraint: Maximum number of consecutive stints a member can perform. |
-| `minimumRestHours` | Integer| `0` | Hard constraint: Minimum rest time required after a driving shift before driving again. |
+| `minimumRestHours` | Integer| `0` | Hard constraint: Minimum contiguous rest time required once per race. <br> **Integrated Mode:** Applies to combined Driving and Spotting time. <br> **Sequential Mode:** Applies only to Driving. |
 | `tzOffset` | Number | `0.0` | Timezone offset in hours from UTC. |
 
 #### Availability Map & Time Formatting

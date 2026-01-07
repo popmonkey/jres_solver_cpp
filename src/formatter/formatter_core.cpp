@@ -287,13 +287,19 @@ std::string generate_full_text_report(
     for (const auto& [name, itinerary] : itineraries) {
         if (itinerary.items.empty()) continue;
         
+        size_t max_activity_width = 0;
+        for (const auto& item : itinerary.items) {
+            max_activity_width = std::max(max_activity_width, item.activity.length());
+        }
+
         std::string tz_string = std::string("UTC") + (itinerary.tz_offset >= 0 ? "+" : "") + std::to_string(itinerary.tz_offset);
         f << "\nSchedule for " << name << " (" << tz_string << "):\n";
 
         for (const auto& item : itinerary.items) {
              double dur = item.end_local.diff_seconds(item.start_local);
              f << "  " << item.start_local.to_string() << " to " << item.end_local.time_string() 
-               << " (" << DateTime::format_duration((long long)dur) << "): " << item.activity << "\n";
+               << " " << std::left << std::setw(max_activity_width) << item.activity 
+               << " (" << DateTime::format_duration((long long)dur) << ")\n";
         }
     }
     return f.str();

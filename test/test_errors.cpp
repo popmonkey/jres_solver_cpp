@@ -51,7 +51,7 @@ namespace {
         ASSERT_NE(output, nullptr);
         ASSERT_GT(output->diagnosis_len, 0);
         std::string msg(output->diagnosis[0]);
-        EXPECT_STREQ(msg.c_str(), "Model is infeasible.");
+        EXPECT_TRUE(msg.find("No spotters available for Integrated Mode") != std::string::npos);
         free_jres_solver_input(input);
         free_jres_solver_output(output);
     }

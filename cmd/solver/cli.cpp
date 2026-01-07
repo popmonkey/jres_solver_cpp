@@ -135,6 +135,24 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if (!quiet && solverOutput->stats) {
+        std::cout << "\n--- Complexity ---" << std::endl;
+        std::cout << "Rows: " << solverOutput->stats->modelRows << " | "
+                    << "Cols: " << solverOutput->stats->modelColumns << " | "
+                    << "Nodes: " << solverOutput->stats->searchNodes << std::endl;
+        if (solverOutput->stats->finalGap > 0) {
+            std::cout << "Final Gap: " << solverOutput->stats->finalGap << std::endl;
+        }
+
+        std::cout << "\n--- Timing Performance ---" << std::endl;
+        std::cout << std::fixed << std::setprecision(2);
+        std::cout << "Setup/Model Build : " << std::setw(8) << solverOutput->stats->setupDurationMs << " ms" << std::endl;
+        std::cout << "Driver Solve      : " << std::setw(8) << solverOutput->stats->driverSolveDurationMs << " ms" << std::endl;
+        if (solverOutput->stats->spotterSolveDurationMs > 0) {
+            std::cout << "Spotter Solve     : " << std::setw(8) << solverOutput->stats->spotterSolveDurationMs << " ms" << std::endl;
+        }
+    }
+
     if (solverOutput->diagnosis_len > 0) {
         if (runDiagnostics) {
              if (!quiet) {
@@ -150,23 +168,6 @@ int main(int argc, char **argv)
             }
         }
     } else if (!quiet) {
-        if (solverOutput->stats) {
-            std::cout << "\n--- Complexity ---" << std::endl;
-            std::cout << "Rows: " << solverOutput->stats->modelRows << " | "
-                        << "Cols: " << solverOutput->stats->modelColumns << " | "
-                        << "Nodes: " << solverOutput->stats->searchNodes << std::endl;
-            if (solverOutput->stats->finalGap > 0) {
-                std::cout << "Final Gap: " << solverOutput->stats->finalGap << std::endl;
-            }
-
-            std::cout << "\n--- Timing Performance ---" << std::endl;
-            std::cout << std::fixed << std::setprecision(2);
-            std::cout << "Setup/Model Build : " << std::setw(8) << solverOutput->stats->setupDurationMs << " ms" << std::endl;
-            std::cout << "Driver Solve      : " << std::setw(8) << solverOutput->stats->driverSolveDurationMs << " ms" << std::endl;
-            if (solverOutput->stats->spotterSolveDurationMs > 0) {
-                std::cout << "Spotter Solve     : " << std::setw(8) << solverOutput->stats->spotterSolveDurationMs << " ms" << std::endl;
-            }
-        }
         // Print the schedule
         std::cout << "\n--- Race Schedule ---" << std::endl;
         bool hasSpotters = (solverOptions.spotterMode != JRES_SPOTTER_MODE_NONE);
