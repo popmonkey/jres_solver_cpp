@@ -129,7 +129,7 @@ namespace jres {
 
         if (parts.empty()) return "";
         
-        std::string result = "for ";
+        std::string result = "";
         if (parts.size() == 1) {
             result += parts[0];
         } else {
