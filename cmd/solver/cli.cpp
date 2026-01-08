@@ -27,20 +27,25 @@ int main(int argc, char **argv)
 {
     // --- Parse Command-Line Arguments ---
     cxxopts::Options options("solver", "JRES endurance race solver.");
-    options.add_options()
+    
+    options.add_options("General")
         ("i,input", "Path to the race data .json file. Reads from stdin if not provided.", cxxopts::value<std::string>())
         ("o,output", "Optional. Path to save the schedule as a JSON file.", cxxopts::value<std::string>())
-        ("t,time-limit", "Maximum time in seconds to let the solver run.", cxxopts::value<int>()->default_value("5"))
         ("q,quiet", "Suppress INFO logs and final schedule print-out.", cxxopts::value<bool>()->default_value("false"))
-        ("s,spotter-mode", "Method for scheduling spotters (none, integrated, sequential).", cxxopts::value<std::string>()->default_value("none"))
-        ("allow-no-spotter", "Allow stints to have no spotter assigned.", cxxopts::value<bool>()->default_value("false"))
-        ("g,optimality-gap", "Solver stops when the gap to optimal is less than this (e.g., 0.2 for 20%).", cxxopts::value<double>()->default_value("0.2"))
-        ("switching-penalty", "Penalty for switching drivers.", cxxopts::value<double>()->default_value("0.0"))
-        ("role-coupling-weight", "Weight for role coupling incentives.", cxxopts::value<double>()->default_value("0.0"))
-        ("rotation-beat-weight", "Weight for rotation/fairness adherence.", cxxopts::value<double>()->default_value("0.0"))
-        ("d,diagnose", "Run diagnostics to explain why a schedule is infeasible.", cxxopts::value<bool>()->default_value("false"))
         ("v,version", "Print version information and exit.")
         ("h,help", "Print usage.");
+
+    options.add_options("Solver Configuration")
+        ("t,time-limit", "Maximum time in seconds to let the solver run.", cxxopts::value<int>()->default_value("5"))
+        ("d,diagnose", "Run diagnostics to explain why a schedule is infeasible.", cxxopts::value<bool>()->default_value("false"))
+        ("s,spotter-mode", "Method for scheduling spotters (none, integrated, sequential).", cxxopts::value<std::string>()->default_value("none"))
+        ("allow-no-spotter", "Allow stints to have no spotter assigned.", cxxopts::value<bool>()->default_value("false"))
+        ("g,optimality-gap", "Solver stops when the gap to optimal is less than this (e.g., 0.2 for 20%).", cxxopts::value<double>()->default_value("0.2"));
+
+    options.add_options("Advanced Optimization")
+        ("switching-penalty", "Penalty cost for switching drivers (positive disincentivizes switching).", cxxopts::value<double>()->default_value("0.0"))
+        ("role-coupling-weight", "Reward weight for coupling roles (positive incentivizes driver->spotter).", cxxopts::value<double>()->default_value("0.0"))
+        ("rotation-beat-weight", "Penalty weight for rotation deviation (positive incentivizes adherence).", cxxopts::value<double>()->default_value("0.0"));
 
     auto result = options.parse(argc, argv);
 

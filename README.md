@@ -10,6 +10,18 @@ This library can be used to solve for optimal driver and spotter schedules for e
 * **[Tools](./TOOLS.md)** - releases include some command line tools that use the library
 * **[Development](./CONTRIBUTING.md)** - instructions for development of the library
 
+## CLI Quick Start
+
+The `jres_solver` tool supports several optimization parameters:
+
+*   **General:** `-i` (Input), `-o` (Output), `-t` (Time Limit), `-s` (Spotter Mode)
+*   **Advanced Weights:**
+    *   `--switching-penalty`: Cost for driver swaps (positive disincentivizes switching)
+    *   `--role-coupling-weight`: Incentive for role coupling (positive incentivizes coupling)
+    *   `--rotation-beat-weight`: Penalty for fairness deviation (positive incentivizes adherence)
+
+See [TOOLS.md](./TOOLS.md) for full usage.
+
 ## The Library
 
 **JresSolver** is a C++ library designed to optimize endurance racing schedules. It uses the **HiGHS** Mixed Integer Programming (MIP) solver to assign drivers (and optional spotters) to race stints while satisfying constraints such as fuel usage, maximum drive times, minimum rest periods, and driver availability.

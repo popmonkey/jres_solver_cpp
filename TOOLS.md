@@ -53,6 +53,9 @@ jres_solver.exe [options]
 | `-s` | `--spotter-mode`     | Strategy for assigning spotters. Options: `none`, `integrated`, `sequential`.                 | `none`  |
 |      | `--allow-no-spotter` | Allow specific stints to have no spotter assigned (if spotter mode is active).                | `false` |
 | `-g` | `--optimality-gap`   | Stop solver when the solution is within this gap of perfection (e.g., `0.2` for 20%).         | `0.2`   |
+|      | `--switching-penalty`| Penalty cost for switching drivers (positive disincentivizes switching).                      | `0.0`   |
+|      | `--role-coupling-weight`| Reward weight for coupling roles (positive incentivizes driver->spotter).                  | `0.0`   |
+|      | `--rotation-beat-weight`| Penalty weight for rotation deviation (positive incentivizes adherence).                   | `0.0`   |
 | `-d` | `--diagnose`         | Run in **Diagnostic Mode** to explain why a schedule is infeasible.                           | `false` |
 | `-h` | `--help`             | Print usage instructions.                                                                     |         |
 
