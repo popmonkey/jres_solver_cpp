@@ -598,6 +598,40 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         }
     }
 
+    // --- Rotation Beat (Rhythm) Incentive ---
+    if (m_options.rotationBeatWeight > 1e-6) {
+        const size_t N = m_driverPool.size();
+        if (N > 0 && m_input.stints.size() > N) {
+            for (size_t s = N; s < m_input.stints.size(); ++s) {
+                size_t target_s = s % N;
+                
+                for (const auto& p : m_driverPool) {
+                    if (m_driverWorkVars.count({p.name, s}) && m_driverWorkVars.count({p.name, target_s})) {
+                        int var_current = m_driverWorkVars.at({p.name, s});
+                        int var_target = m_driverWorkVars.at({p.name, target_s});
+
+                        // Create deviation variable d >= |current - target|
+                        // We minimize d, so cost is +weight
+                        int devVar = m_highs->getNumCol();
+                        m_highs->addVar(0.0, 1.0);
+                        // Relaxed to continuous is fine for deviation between binary vars
+                        m_highs->changeColCost(devVar, m_options.rotationBeatWeight);
+
+                        // 1. d >= current - target  =>  d - current + target >= 0
+                        m_highs->addRow(0.0, kHighsInf, 3, 
+                            std::vector<int>{devVar, var_current, var_target}.data(), 
+                            std::vector<double>{1.0, -1.0, 1.0}.data());
+
+                        // 2. d >= target - current  =>  d + current - target >= 0
+                        m_highs->addRow(0.0, kHighsInf, 3, 
+                            std::vector<int>{devVar, var_current, var_target}.data(), 
+                            std::vector<double>{1.0, 1.0, -1.0}.data());
+                    }
+                }
+            }
+        }
+    }
+
     // --- Spotter Model (Integrated or Sequential) ---
     if (m_options.spotterMode == JRES_SPOTTER_MODE_INTEGRATED) {
         if (m_spotterPool.empty() && !m_options.allowNoSpotter) {
