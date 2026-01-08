@@ -66,6 +66,8 @@ struct JresSolverOptions {
     double roleCouplingWeight;
     /** @brief Weight for adhering to a rotation beat or fairness metric (default: 0.0). */
     double rotationBeatWeight;
+    /** @brief Global multiplier (0.0 - 1.0) to scale humanity weights if not explicitly set (default: 0.0). */
+    double humanityLevel;
 };
 
 /**

@@ -38,6 +38,7 @@ int main(int argc, char **argv)
         ("switching-penalty", "Penalty for switching drivers.", cxxopts::value<double>()->default_value("0.0"))
         ("role-coupling-weight", "Weight for role coupling incentives.", cxxopts::value<double>()->default_value("0.0"))
         ("rotation-beat-weight", "Weight for rotation/fairness adherence.", cxxopts::value<double>()->default_value("0.0"))
+        ("humanity-level", "Global scaling factor (0.0-1.0) for humanity weights.", cxxopts::value<double>()->default_value("0.0"))
         ("d,diagnose", "Run diagnostics to explain why a schedule is infeasible.", cxxopts::value<bool>()->default_value("false"))
         ("v,version", "Print version information and exit.")
         ("h,help", "Print usage.");
@@ -119,6 +120,7 @@ int main(int argc, char **argv)
     solverOptions.switchingPenalty = result["switching-penalty"].as<double>();
     solverOptions.roleCouplingWeight = result["role-coupling-weight"].as<double>();
     solverOptions.rotationBeatWeight = result["rotation-beat-weight"].as<double>();
+    solverOptions.humanityLevel = result["humanity-level"].as<double>();
 
     // Call the Solver Library
     JresSolverInput* solverInput = jres_input_from_json(raceDataJsonString.c_str());

@@ -76,6 +76,7 @@ struct SolverOutput
     std::vector<std::string> diagnosis;
     SolverStats stats;
     std::vector<TeamMember> teamMembers;
+    JresSolverOptions effectiveOptions;
     // Add any other output fields here, like diagnosis or metrics
 };
 

@@ -146,7 +146,7 @@ JresSolverOutput* to_c_output(const SolverOutput& output, const JresSolverOption
         c_output->teamMembers[i].tzOffset = output.teamMembers[i].tzOffset;
     }
 
-    c_output->options = new JresSolverOptions(options);
+    c_output->options = new JresSolverOptions(output.effectiveOptions);
 
     return c_output;
 }

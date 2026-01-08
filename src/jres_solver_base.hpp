@@ -16,7 +16,7 @@ public:
 
 protected:
     const jres::internal::SolverInput& m_input;
-    const JresSolverOptions& m_options;
+    JresSolverOptions m_options;
 
     // Filtered Participant Pools
     std::vector<jres::internal::TeamMember> m_driverPool;

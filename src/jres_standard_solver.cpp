@@ -90,6 +90,27 @@ JresStandardSolver::JresStandardSolver(const jres::internal::SolverInput& input,
 {
     m_highs = std::make_unique<Highs>();
     
+    // --- Resolve Humanity Level Defaults ---
+    if (m_options.humanityLevel > 1e-6) {
+        // Base Unit Cost (kCostFairness is 10.0)
+        const double kBaseCost = 10.0; 
+        
+        // Humanity 1.0 Settings (Normalized to Base Cost)
+        // Switching: 2.0x (Prefer longer stints over perfect fairness)
+        // Coupling:  1.0x (Reward coupled roles equal to one stint deviation)
+        // Beat:      1.5x (Rhythm is important)
+        
+        if (m_options.switchingPenalty < 1e-6) {
+            m_options.switchingPenalty = m_options.humanityLevel * kBaseCost * 2.0;
+        }
+        if (std::abs(m_options.roleCouplingWeight) < 1e-6) {
+            m_options.roleCouplingWeight = m_options.humanityLevel * kBaseCost * 1.0;
+        }
+        if (m_options.rotationBeatWeight < 1e-6) {
+            m_options.rotationBeatWeight = m_options.humanityLevel * kBaseCost * 1.5;
+        }
+    }
+
     // Set HiGHS Options
     m_highs->setOptionValue("output_flag", false);
     m_highs->setOptionValue("presolve", "on");
@@ -441,6 +462,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     using namespace std::chrono;
     auto startTotal = high_resolution_clock::now();
     jres::internal::SolverOutput output;
+    output.effectiveOptions = m_options;
 
     // --- 1. Arithmetic Pre-flight Check ---
     int totalStints = (int)m_input.stints.size();

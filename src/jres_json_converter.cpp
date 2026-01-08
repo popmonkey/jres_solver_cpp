@@ -185,6 +185,7 @@ JRES_SOLVER_API char* jres_output_to_json(const JresSolverOutput* output) {
             options_json["switchingPenalty"] = output->options->switchingPenalty;
             options_json["roleCouplingWeight"] = output->options->roleCouplingWeight;
             options_json["rotationBeatWeight"] = output->options->rotationBeatWeight;
+            options_json["humanityLevel"] = output->options->humanityLevel;
             j["options"] = options_json;
         }
 
