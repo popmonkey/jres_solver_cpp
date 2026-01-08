@@ -182,6 +182,9 @@ JRES_SOLVER_API char* jres_output_to_json(const JresSolverOutput* output) {
             options_json["spotterMode"] = to_string(output->options->spotterMode);
             options_json["allowNoSpotter"] = output->options->allowNoSpotter;
             options_json["optimalityGap"] = output->options->optimalityGap;
+            options_json["switchingPenalty"] = output->options->switchingPenalty;
+            options_json["roleCouplingWeight"] = output->options->roleCouplingWeight;
+            options_json["rotationBeatWeight"] = output->options->rotationBeatWeight;
             j["options"] = options_json;
         }
 

@@ -542,6 +542,28 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     // --- Incentivize Consecutive Stints ---
     add_consecutive_incentive(m_highs.get(), m_driverPool, m_driverWorkVars, m_input.stints.size(), kRewardConsecutive);
 
+    // --- Switching Penalty ---
+    if (m_options.switchingPenalty > 0.0) {
+        for (size_t s = 1; s < m_input.stints.size(); ++s) {
+            int switchVar = m_highs->getNumCol();
+            m_highs->addVar(0.0, 1.0);
+            m_highs->changeColIntegrality(switchVar, HighsVarType::kInteger);
+            m_highs->changeColCost(switchVar, m_options.switchingPenalty);
+
+            // Constraint: switchVar >= driver_s - driver_{s-1} for each driver
+            // switchVar - driver_s + driver_{s-1} >= 0
+            for (const auto& p : m_driverPool) {
+                if (m_driverWorkVars.count({p.name, s}) && m_driverWorkVars.count({p.name, s - 1})) {
+                    int var_s = m_driverWorkVars.at({p.name, s});
+                    int var_prev = m_driverWorkVars.at({p.name, s - 1});
+                    
+                    std::vector<int> idx = {switchVar, var_s, var_prev};
+                    std::vector<double> val = {1.0, -1.0, 1.0};
+                    m_highs->addRow(0.0, kHighsInf, 3, idx.data(), val.data());
+                }
+            }
+        }
+    }
 
     // --- Spotter Model (Integrated or Sequential) ---
     if (m_options.spotterMode == JRES_SPOTTER_MODE_INTEGRATED) {

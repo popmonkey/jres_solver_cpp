@@ -60,6 +60,12 @@ struct JresSolverOptions {
     bool allowNoSpotter;
     /** @brief The solver will terminate when the gap between the primal and dual objective bound is less than this value. */
     double optimalityGap;
+    /** @brief Penalty applied when switching drivers between stints (default: 0.0). */
+    double switchingPenalty;
+    /** @brief Weight for coupling driver and spotter roles (e.g. proximity or same-person) (default: 0.0). */
+    double roleCouplingWeight;
+    /** @brief Weight for adhering to a rotation beat or fairness metric (default: 0.0). */
+    double rotationBeatWeight;
 };
 
 /**
