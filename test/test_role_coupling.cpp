@@ -1,3 +1,8 @@
+/**
+ * @file test/test_role_coupling.cpp
+ * @brief Tests for role coupling incentives (Driver -> Spotter transition).
+ */
+
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"

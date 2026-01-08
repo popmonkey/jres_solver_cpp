@@ -78,10 +78,6 @@ struct JresTeamMember {
     int isDriver;
     /** @brief 1 if the member can spot, 0 otherwise. */
     int isSpotter;
-    /** @brief Maximum number of consecutive stints a member can perform. */
-    int maxStints;
-    /** @brief Minimum rest time in hours required after a shift. */
-    int minimumRestHours;
     /** @brief Timezone offset, in hours from UTC. */
     double tzOffset;
 };
@@ -124,6 +120,10 @@ struct JresMemberAvailability {
  * @brief The main input struct for the solver.
  */
 struct JresSolverInput {
+    /** @brief Required consecutive stints (drivers must do this many stints in a row, except potentially the last one). */
+    int consecutiveStints;
+    /** @brief Minimum rest time in hours required after a shift. */
+    int minimumRestHours;
     /** @brief A pointer to an array of team members. */
     JresTeamMember* teamMembers;
     /** @brief The number of team members. */

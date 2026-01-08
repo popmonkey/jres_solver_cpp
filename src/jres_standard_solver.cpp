@@ -17,40 +17,8 @@
 static const double kPenaltySlack = 1000000.0;
 static const double kPenaltyUnavailable = 10000000.0;
 static const double kRewardPreferred = -1.0;
-static const double kRewardConsecutive = -2.0;
 static const double kRewardProximity = -0.5; // Incentive for spotting adjacent to driving
-static const double kCostFairness = 10.0; // Reduced from implied infinity, but weighted higher than simple rewards
-
-static void add_consecutive_incentive(
-    Highs* highs,
-    const std::vector<jres::internal::TeamMember>& pool,
-    const std::map<std::pair<std::string, int>, int>& workVars,
-    size_t numStints,
-    double reward)
-{
-    for (const auto &p : pool) {
-        if (p.maxStints <= 1) continue;
-
-        for (size_t s = 0; s < numStints - 1; ++s) {
-            if (workVars.count({p.name, s}) && workVars.count({p.name, s + 1})) {
-                int var_s = workVars.at({p.name, s});
-                int var_next = workVars.at({p.name, s + 1});
-
-                int consecutive_var = highs->getNumCol();
-                highs->addVar(0.0, 1.0);
-                highs->changeColIntegrality(consecutive_var, HighsVarType::kInteger);
-                highs->changeColCost(consecutive_var, reward);
-
-                // z <= x_s
-                highs->addRow(-kHighsInf, 0.0, 2, std::vector<int>{consecutive_var, var_s}.data(), std::vector<double>{1.0, -1.0}.data());
-                // z <= x_{s+1}
-                highs->addRow(-kHighsInf, 0.0, 2, std::vector<int>{consecutive_var, var_next}.data(), std::vector<double>{1.0, -1.0}.data());
-                // z >= x_s + x_{s+1} - 1
-                highs->addRow(-1.0, kHighsInf, 3, std::vector<int>{consecutive_var, var_s, var_next}.data(), std::vector<double>{1.0, -1.0, -1.0}.data());
-            }
-        }
-    }
-}
+static const double kCostFairness = 10.0; 
 
 static void add_role_coupling_incentive(
     Highs* highs,
@@ -71,6 +39,10 @@ static void add_role_coupling_incentive(
                 int d_var = driverVars.at({p.name, s});
                 int s_var = spotterVars.at({p.name, s + 1});
 
+                // If there is a transition from driving (stint s) to spotting (stint s+1), reward it.
+                // If s and s+1 are in the same block, d_var == d_var_next (conceptually).
+                // Actually, d_var is the variable for stint s.
+                
                 int coupling_var = highs->getNumCol();
                 highs->addVar(0.0, 1.0);
                 highs->changeColIntegrality(coupling_var, HighsVarType::kInteger);
@@ -136,7 +108,7 @@ JresStandardSolver::CapacityAnalysis JresStandardSolver::calculate_max_potential
     std::ostringstream ss;
 
     for (const auto& p : participants) {
-        // 1. Build Availability & Greedy MaxConsecutive Pattern
+        // Build Availability
         std::vector<bool> is_available(m_input.stints.size(), true);
         auto member_availability_it = m_input.availability.find(p.name);
         if (member_availability_it != m_input.availability.end()) {
@@ -164,10 +136,10 @@ JresStandardSolver::CapacityAnalysis JresStandardSolver::calculate_max_potential
             }
         }
         
-        // 2. Adjust for Minimum Rest (One Instance)
+        // Adjust for Global Minimum Rest (One Instance)
         int final_capacity = base_capacity;
-        if (p.minimumRestHours > 0) {
-             auto minRestDuration = std::chrono::hours(p.minimumRestHours);
+        if (m_input.minimumRestHours > 0) {
+             auto minRestDuration = std::chrono::hours(m_input.minimumRestHours);
              int min_loss = base_capacity; 
              bool found_valid_window = false;
 
@@ -202,8 +174,7 @@ JresStandardSolver::CapacityAnalysis JresStandardSolver::calculate_max_potential
         
         ss << "\n- " << p.name << ": " << final_capacity 
            << " stints (approx " << std::fixed << std::setprecision(1) << driver_total_hours 
-           << "h, MaxConsecutive=" << p.maxStints 
-           << ", MinRest=" << p.minimumRestHours << "h)";
+           << "h, MinRest=" << m_input.minimumRestHours << "h)";
     }
     analysis.details = ss.str();
     return analysis;
@@ -224,77 +195,115 @@ void JresStandardSolver::add_participant_model(
         startTimes.push_back(jres::internal::TimeHelpers::stringToTimePoint(stint.startTime));
     }
 
+    // Determine Block Structure
+    int consecutive = m_input.consecutiveStints;
+    if (consecutive < 1) consecutive = 1;
+    
+    std::vector<std::vector<int>> blocks;
+    for(size_t s=0; s<m_input.stints.size(); ) {
+        std::vector<int> block;
+        for(int k=0; k<consecutive && s < m_input.stints.size(); ++k) {
+            block.push_back((int)s);
+            s++;
+        }
+        blocks.push_back(block);
+    }
+
     for (const auto &p : participants)
     {
-        for (size_t s = 0; s < m_input.stints.size(); ++s)
-        {
-            std::string availabilityKey = jres::internal::TimeHelpers::timePointToKey(startTimes[s]);
-
-            bool isUnavailable = false;
-            bool isPreferred = false;
-
-            auto member_availability_it = m_input.availability.find(p.name);
-            if (member_availability_it != m_input.availability.end()) {
-                auto time_availability_it = member_availability_it->second.find(availabilityKey);
-                if (time_availability_it != member_availability_it->second.end()) {
-                    if (time_availability_it->second == jres::internal::Availability::Unavailable) {
-                        isUnavailable = true;
-                    } else if (time_availability_it->second == jres::internal::Availability::Preferred) {
-                        isPreferred = true;
-                    }
-                }
-            }
-
-            // Create variable for ALL slots, even if unavailable (Elastic)
+        int prevWorkVarIdx = -1;
+        for (const auto& block : blocks) {
             int workVarIdx = highs.getNumCol();
             highs.addVar(0.0, 1.0); // Binary variable
-            workVars[{p.name, s}] = workVarIdx;
             highs.changeColIntegrality(workVarIdx, HighsVarType::kInteger);
-            
-            double cost = 0.0;
-            if (isUnavailable) {
-                cost = kPenaltyUnavailable;
-                m_unavailableVars.insert(workVarIdx);
-            } else if (isPreferred) {
-                cost = kRewardPreferred;
-            }
-            highs.changeColCost(workVarIdx, cost);
-        }
 
-        // --- Elastic Constraint: Max Consecutive Stints ---
-        int maxConsecutive = p.maxStints;
-        if (maxConsecutive > 0 && m_input.stints.size() >= static_cast<size_t>(maxConsecutive + 1)) {
-             for (size_t s = 0; s <= m_input.stints.size() - (maxConsecutive + 1); ++s) {
-                std::vector<int> consIdx;
-                std::vector<double> consVal;
-                for (size_t i = 0; i < maxConsecutive + 1; ++i) { 
-                    if (workVars.count({p.name, s + i})) {
-                        consIdx.push_back(workVars.at({p.name, s + i}));
-                        consVal.push_back(1.0);
+            if (prevWorkVarIdx != -1) {
+                 // Constraint: Cannot drive adjacent blocks (Strict consecutiveStints limit)
+                 // x_{block_i} + x_{block_{i+1}} <= 1
+                 std::vector<int> idx = {prevWorkVarIdx, workVarIdx};
+                 std::vector<double> val = {1.0, 1.0};
+                 highs.addRow(-kHighsInf, 1.0, 2, idx.data(), val.data());
+            }
+            prevWorkVarIdx = workVarIdx;
+
+            double total_cost = 0.0;
+            bool any_unavailable = false;
+
+            // Map all stints in this block to this variable and accumulate cost
+            for (int s_idx : block) {
+                workVars[{p.name, s_idx}] = workVarIdx;
+
+                std::string availabilityKey = jres::internal::TimeHelpers::timePointToKey(startTimes[s_idx]);
+                auto member_availability_it = m_input.availability.find(p.name);
+                if (member_availability_it != m_input.availability.end()) {
+                    auto time_availability_it = member_availability_it->second.find(availabilityKey);
+                    if (time_availability_it != member_availability_it->second.end()) {
+                        if (time_availability_it->second == jres::internal::Availability::Unavailable) {
+                            total_cost += kPenaltyUnavailable;
+                            any_unavailable = true;
+                        } else if (time_availability_it->second == jres::internal::Availability::Preferred) {
+                            total_cost += kRewardPreferred;
+                        }
                     }
                 }
-                if (consIdx.empty()) continue; 
+            }
 
-                // Create slack variable s >= 0
-                int slackVar = highs.getNumCol();
-                highs.addVar(0.0, kHighsInf);
-                highs.changeColCost(slackVar, kPenaltySlack);
-                
-                // Track slack
-                SlackInfo info;
-                info.type = "Max Consecutive Stints";
-                info.memberName = p.name;
-                info.stintIndex = (int)s; // Start of the window
-                info.limit = (double)maxConsecutive;
-                m_slackInfo[slackVar] = info;
+            if (any_unavailable) {
+                m_unavailableVars.insert(workVarIdx);
+            }
+            
+            highs.changeColCost(workVarIdx, total_cost);
+        }
+    }
+}
 
-                // sum(x) - slack <= maxConsecutive
-                consIdx.push_back(slackVar);
-                consVal.push_back(-1.0);
-                
-                highs.addRow(-kHighsInf, maxConsecutive, (int)consIdx.size(), consIdx.data(), consVal.data());
+void JresStandardSolver::add_balancing_constraints(
+    Highs &highs,
+    const std::vector<jres::internal::TeamMember> &participants,
+    const std::map<std::pair<std::string, int>, int>& workVars,
+    double avgStints)
+{
+    for (const auto &p : participants) {
+        std::vector<int> stint_indices;
+        std::vector<double> stint_values;
+        
+        std::map<int, double> varCounts;
+        for (size_t s = 0; s < m_input.stints.size(); ++s) {
+            if (workVars.count({p.name, (int)s})) {
+                int v = workVars.at({p.name, (int)s});
+                varCounts[v] += 1.0;
             }
         }
+        for(auto const& [v, count] : varCounts) {
+            stint_indices.push_back(v);
+            stint_values.push_back(count);
+        }
+
+        if (stint_indices.empty()) continue;
+
+        int total_stints_var = highs.getNumCol();
+        highs.addVar(0.0, kHighsInf);
+        stint_indices.push_back(total_stints_var);
+        stint_values.push_back(-1.0);
+        highs.addRow(0.0, 0.0, (int)stint_indices.size(), stint_indices.data(), stint_values.data());
+
+        int over_avg_var = highs.getNumCol();
+        highs.addVar(0.0, kHighsInf);
+        int under_avg_var = highs.getNumCol();
+        highs.addVar(0.0, kHighsInf);
+        
+        std::vector<int> idx_over = {over_avg_var, total_stints_var};
+        std::vector<double> val_over = {1.0, -1.0};
+        highs.addRow(0.0, kHighsInf, 2, idx_over.data(), val_over.data());
+        highs.changeRowBounds(highs.getNumRow() - 1, -avgStints, kHighsInf);
+        
+        std::vector<int> idx_under = {under_avg_var, total_stints_var};
+        std::vector<double> val_under = {1.0, 1.0};
+        highs.addRow(0.0, kHighsInf, 2, idx_under.data(), val_under.data());
+        highs.changeRowBounds(highs.getNumRow() - 1, avgStints, kHighsInf);
+
+        highs.changeColCost(over_avg_var, kCostFairness);
+        highs.changeColCost(under_avg_var, kCostFairness);
     }
 }
 
@@ -335,15 +344,15 @@ void JresStandardSolver::apply_minimum_rest_constraints(
 
     for (const auto &p : participants)
     {
-        if (p.minimumRestHours <= 0) continue;
-        auto minRestDuration = std::chrono::hours(p.minimumRestHours);
+        if (m_input.minimumRestHours <= 0) continue;
+        auto minRestDuration = std::chrono::hours(m_input.minimumRestHours);
             
-        // 1. Generate Candidates
+        // Generate Candidates
         std::vector<std::chrono::system_clock::time_point> candidateStarts;
         candidateStarts.push_back(raceStart);
         for(const auto& t : endTimes) candidateStarts.push_back(t);
 
-        // 2. Build Block Sets
+        // Build Block Sets
         std::vector<std::set<int>> blockSets;
         blockSets.reserve(candidateStarts.size());
         
@@ -368,7 +377,7 @@ void JresStandardSolver::apply_minimum_rest_constraints(
             blockSets.push_back(blocked);
         }
 
-        // 3. Prune Supersets
+        // Prune Supersets
         std::vector<bool> keep(blockSets.size(), true);
         bool anyEmpty = false;
 
@@ -394,7 +403,7 @@ void JresStandardSolver::apply_minimum_rest_constraints(
                 }
             }
 
-            // 4. Create Variables
+            // Create Variables
             std::vector<int> restOptionVars;
             for(size_t i=0; i<blockSets.size(); ++i) {
                 if(!keep[i]) continue;
@@ -442,7 +451,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     auto startTotal = high_resolution_clock::now();
     jres::internal::SolverOutput output;
 
-    // --- 1. Arithmetic Pre-flight Check ---
+    // --- Arithmetic Pre-flight Check ---
     int totalStints = (int)m_input.stints.size();
     CapacityAnalysis capAnalysis = calculate_max_potential_capacity(m_driverPool);
     
@@ -461,8 +470,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
 
     // --- Hard Constraint: iRacing Fair Share Rule ---
     // Rule: Fair Share = 1/4 of (Total Duration / Num Drivers)
-    // We enforce this using Time Duration.
-    // 1. Calculate Total Duration and Stint Durations
     double total_duration_hours = 0.0;
     std::vector<double> stint_durations_hours;
     stint_durations_hours.reserve(m_input.stints.size());
@@ -478,22 +485,28 @@ jres::internal::SolverOutput JresStandardSolver::solve()
 
     const double num_drivers = m_driverPool.size();
     if (num_drivers > 0) {
-        // "Equal Share" = Total / NumDrivers.
-        // "Fair Share" = Equal Share / 4.
         double min_fair_share_hours = (total_duration_hours / num_drivers) * 0.25;
 
         for (const auto &p : m_driverPool) {
             std::vector<int> idx;
             std::vector<double> val;
             
+            // Map: varIdx -> totalDuration
+            std::map<int, double> varDurations;
+
             for (size_t s = 0; s < m_input.stints.size(); ++s) {
                 if (m_driverWorkVars.count({p.name, s})) {
-                    idx.push_back(m_driverWorkVars.at({p.name, s}));
-                    val.push_back(stint_durations_hours[s]);
+                    int v = m_driverWorkVars.at({p.name, s});
+                    varDurations[v] += stint_durations_hours[s];
                 }
             }
 
-            if (idx.empty()) continue; // Should catch this elsewhere if they have 0 avail
+            for(auto const& [v, dur] : varDurations) {
+                idx.push_back(v);
+                val.push_back(dur);
+            }
+
+            if (idx.empty()) continue; 
 
             // Elastic Constraint: Sum(duration * x) + slack >= min_fair_share
             int slackVar = m_highs->getNumCol();
@@ -519,39 +532,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     const double avg_stints_per_driver = num_drivers > 0 ? num_stints / num_drivers : 0;
 
     if (num_drivers > 0) {
-        // Balancing variables
-        for (const auto &p : m_driverPool) {
-            std::vector<int> driver_stint_indices;
-            std::vector<double> driver_stint_values;
-            for (size_t s = 0; s < m_input.stints.size(); ++s) {
-                if (m_driverWorkVars.count({p.name, s})) {
-                    driver_stint_indices.push_back(m_driverWorkVars.at({p.name, s}));
-                    driver_stint_values.push_back(1.0);
-                }
-            }
-
-            if (driver_stint_indices.empty()) continue;
-
-            int total_stints_var = m_highs->getNumCol();
-            m_highs->addVar(0.0, kHighsInf);
-            driver_stint_indices.push_back(total_stints_var);
-            driver_stint_values.push_back(-1.0);
-            m_highs->addRow(0.0, 0.0, (int)driver_stint_indices.size(), driver_stint_indices.data(), driver_stint_values.data());
-
-            int over_avg_var = m_highs->getNumCol();
-            m_highs->addVar(0.0, kHighsInf);
-            int under_avg_var = m_highs->getNumCol();
-            m_highs->addVar(0.0, kHighsInf);
-            
-            m_highs->addRow(0.0, kHighsInf, 2, std::vector<int>{over_avg_var, total_stints_var}.data(), std::vector<double>{1.0, -1.0}.data());
-            m_highs->changeRowBounds(m_highs->getNumRow() - 1, -avg_stints_per_driver, kHighsInf);
-            
-            m_highs->addRow(0.0, kHighsInf, 2, std::vector<int>{under_avg_var, total_stints_var}.data(), std::vector<double>{1.0, 1.0}.data());
-            m_highs->changeRowBounds(m_highs->getNumRow() - 1, avg_stints_per_driver, kHighsInf);
-
-            m_highs->changeColCost(over_avg_var, kCostFairness);
-            m_highs->changeColCost(under_avg_var, kCostFairness);
-        }
+        add_balancing_constraints(*m_highs, m_driverPool, m_driverWorkVars, avg_stints_per_driver);
     }
 
     // --- Coverage Constraints (One driver per stint) ---
@@ -572,9 +553,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         m_highs->addRow(1.0, 1.0, (int)indices.size(), indices.data(), values.data());
     }
 
-    // --- Incentivize Consecutive Stints ---
-    add_consecutive_incentive(m_highs.get(), m_driverPool, m_driverWorkVars, m_input.stints.size(), kRewardConsecutive);
-
     // --- Switching Penalty ---
     if (m_options.switchingPenalty > 0.0) {
         for (size_t s = 1; s < m_input.stints.size(); ++s) {
@@ -590,9 +568,11 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                     int var_s = m_driverWorkVars.at({p.name, s});
                     int var_prev = m_driverWorkVars.at({p.name, s - 1});
                     
-                    std::vector<int> idx = {switchVar, var_s, var_prev};
-                    std::vector<double> val = {1.0, -1.0, 1.0};
-                    m_highs->addRow(0.0, kHighsInf, 3, idx.data(), val.data());
+                    if (var_s != var_prev) { // Only add if different variables (blocks changed)
+                        std::vector<int> idx = {switchVar, var_s, var_prev};
+                        std::vector<double> val = {1.0, -1.0, 1.0};
+                        m_highs->addRow(0.0, kHighsInf, 3, idx.data(), val.data());
+                    }
                 }
             }
         }
@@ -617,12 +597,12 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                         // Relaxed to continuous is fine for deviation between binary vars
                         m_highs->changeColCost(devVar, m_options.rotationBeatWeight);
 
-                        // 1. d >= current - target  =>  d - current + target >= 0
+                        // d >= current - target  =>  d - current + target >= 0
                         m_highs->addRow(0.0, kHighsInf, 3, 
                             std::vector<int>{devVar, var_current, var_target}.data(), 
                             std::vector<double>{1.0, -1.0, 1.0}.data());
 
-                        // 2. d >= target - current  =>  d + current - target >= 0
+                        // d >= target - current  =>  d + current - target >= 0
                         m_highs->addRow(0.0, kHighsInf, 3, 
                             std::vector<int>{devVar, var_current, var_target}.data(), 
                             std::vector<double>{1.0, 1.0, -1.0}.data());
@@ -636,14 +616,17 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     if (m_options.spotterMode == JRES_SPOTTER_MODE_INTEGRATED) {
         if (m_spotterPool.empty() && !m_options.allowNoSpotter) {
              output.diagnosis.push_back("No spotters available for Integrated Mode.");
-             // We can proceed, but coverage will fail (likely leading to infeasibility or slack usage if we made coverage elastic - which we didn't).
-             // If coverage is hard constraint, this will throw "Model is infeasible".
-             // Let's rely on the coverage constraint check later.
         }
         
         add_participant_model(*m_highs, m_spotterPool, m_spotterWorkVars);
-        add_consecutive_incentive(m_highs.get(), m_spotterPool, m_spotterWorkVars, m_input.stints.size(), kRewardConsecutive);
+
         add_role_coupling_incentive(m_highs.get(), m_driverPool, m_driverWorkVars, m_spotterWorkVars, m_input.stints.size(), m_options.roleCouplingWeight);
+
+        // Spotter Balancing
+        if (!m_spotterPool.empty()) {
+            double avg_stints_per_spotter = static_cast<double>(m_input.stints.size()) / m_spotterPool.size();
+            add_balancing_constraints(*m_highs, m_spotterPool, m_spotterWorkVars, avg_stints_per_spotter);
+        }
 
         // Spotter Coverage
         for (size_t s = 0; s < m_input.stints.size(); ++s) {
@@ -658,9 +641,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             if (!indices.empty()) {
                 double lower = m_options.allowNoSpotter ? 0.0 : 1.0;
                 m_highs->addRow(lower, 1.0, (int)indices.size(), indices.data(), values.data());
-            } else if (!m_options.allowNoSpotter) {
-                 // No candidates for this stint
-                 // Since coverage is hard, this will be infeasible.
             }
         }
 
@@ -679,12 +659,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     }
     
     // Apply Rest Constraints
-    // Integrated: Enforce Combined (Drive + Spot)
-    // Sequential (Driver Phase): Enforce Drive Only
     bool enforceCombinedRest = (m_options.spotterMode == JRES_SPOTTER_MODE_INTEGRATED);
-    
-    // For Sequential mode, we only have driver vars populated right now. Spotter vars are empty.
-    // So passing m_spotterWorkVars is fine (it's empty).
     apply_minimum_rest_constraints(*m_highs, m_input.teamMembers, m_driverWorkVars, m_spotterWorkVars, enforceCombinedRest);
 
 
@@ -797,7 +772,10 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             spotterSolver.setOptionValue("mip_rel_gap", m_options.optimalityGap);
 
             add_participant_model(spotterSolver, m_spotterPool, m_spotterWorkVars);
-            add_consecutive_incentive(&spotterSolver, m_spotterPool, m_spotterWorkVars, m_input.stints.size(), kRewardConsecutive);
+
+            // Spotter Balancing
+            double avg_stints_per_spotter = static_cast<double>(m_input.stints.size()) / m_spotterPool.size();
+            add_balancing_constraints(spotterSolver, m_spotterPool, m_spotterWorkVars, avg_stints_per_spotter);
 
             // Spotter Coverage Constraints
             for (size_t s = 0; s < m_input.stints.size(); ++s) {
@@ -824,50 +802,31 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             }
 
             // Incentivize Spotting Adjacent to Driving (Proximity & Role Coupling)
+            // Calculate Rewards per Block Var
+            std::map<int, double> spotterRewards;
             for (const auto& p : m_spotterPool) {
                 for (size_t s = 0; s < m_input.stints.size(); ++s) {
-                    if (!m_spotterWorkVars.count({p.name, s})) continue;
-                    
-                    double additionalReward = 0.0;
-                    
-                    // Check s-1: Driver(s-1) -> Spotter(s) [Role Coupling]
-                    if (s > 0 && output.schedule[s-1].driver == p.name) {
-                         if (std::abs(m_options.roleCouplingWeight) > 1e-6) {
-                             additionalReward += -m_options.roleCouplingWeight;
-                         } else {
-                             additionalReward += kRewardProximity;
-                         }
-                    }
-                    
-                    // Check s+1: Spotter(s) -> Driver(s+1) [Proximity]
-                    if (s < m_input.stints.size() - 1 && output.schedule[s+1].driver == p.name) {
+                     if (!m_spotterWorkVars.count({p.name, s})) continue;
+                     int varIdx = m_spotterWorkVars.at({p.name, s});
+                     
+                     double additionalReward = 0.0;
+                     if (s > 0 && output.schedule[s-1].driver == p.name) {
+                         additionalReward += (std::abs(m_options.roleCouplingWeight) > 1e-6) ? -m_options.roleCouplingWeight : kRewardProximity;
+                     }
+                     if (s < m_input.stints.size() - 1 && output.schedule[s+1].driver == p.name) {
                         additionalReward += kRewardProximity;
-                    }
-
-                    if (std::abs(additionalReward) > 1e-6) {
-                        int varIdx = m_spotterWorkVars.at({p.name, s});
-                        
-                        // Re-calculate base cost to ensure we add to it
-                         std::string availabilityKey = jres::internal::TimeHelpers::timePointToKey(jres::internal::TimeHelpers::stringToTimePoint(m_input.stints[s].startTime));
-                         bool isPreferred = false;
-                         bool isUnavailableExplicit = false;
-                         auto member_availability_it = m_input.availability.find(p.name);
-                         if (member_availability_it != m_input.availability.end()) {
-                            auto time_availability_it = member_availability_it->second.find(availabilityKey);
-                            if (time_availability_it != member_availability_it->second.end()) {
-                                if (time_availability_it->second == jres::internal::Availability::Preferred) isPreferred = true;
-                                if (time_availability_it->second == jres::internal::Availability::Unavailable) isUnavailableExplicit = true;
-                            }
-                         }
-
-                         double newCost = 0.0;
-                         if (isUnavailableExplicit) newCost = kPenaltyUnavailable;
-                         else if (isPreferred) newCost = kRewardPreferred;
-                         
-                         newCost += additionalReward;
-                         
-                         spotterSolver.changeColCost(varIdx, newCost);
-                    }
+                     }
+                     spotterRewards[varIdx] += additionalReward;
+                }
+            }
+            
+            // Retrieve base costs 
+            const std::vector<double>& currentCosts = spotterSolver.getLp().col_cost_;
+            
+            // Apply
+            for(const auto& [varIdx, reward] : spotterRewards) {
+                if(varIdx < (int)currentCosts.size()) {
+                    spotterSolver.changeColCost(varIdx, currentCosts[varIdx] + reward);
                 }
             }
 

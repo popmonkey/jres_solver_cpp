@@ -1,3 +1,8 @@
+/**
+ * @file test/test_formatter_csv.cpp
+ * @brief Tests for CSV output formatting.
+ */
+
 #include "gtest/gtest.h"
 #include "formatter/formatter_core.hpp"
 #include "nlohmann/json.hpp"
@@ -6,7 +11,7 @@
 using json = nlohmann::json;
 
 TEST(FormatterCSVTest, ScheduleGeneration) {
-    // 1. Create Mock Data
+    // Create Mock Data
     std::vector<json> schedule;
     schedule.push_back({
         {"id", 1},
@@ -16,10 +21,10 @@ TEST(FormatterCSVTest, ScheduleGeneration) {
         {"spotter", "SpotterB"}
     });
 
-    // 2. Run Function
+    // Run Function
     std::string result = jres::generate_schedule_csv_string(schedule, true);
 
-    // 3. Assertions
+    // Assertions
     EXPECT_NE(result.find("Stint,Start Time (UTC),End Time (UTC)"), std::string::npos) << "Header is incorrect";
     EXPECT_NE(result.find("Assigned Spotter"), std::string::npos) << "Spotter column missing";
     EXPECT_EQ(result.find("Laps"), std::string::npos) << "Laps column should not exist";

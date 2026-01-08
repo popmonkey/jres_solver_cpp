@@ -1,3 +1,8 @@
+/**
+ * @file test/test_rotation_beat.cpp
+ * @brief Tests for rotation beat (rhythm) enforcement.
+ */
+
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"
@@ -77,7 +82,7 @@ TEST(RotationBeatTest, EnforcesPattern) {
     JresSolverInput* input = jres_input_from_json(json_str.c_str());
     ASSERT_NE(input, nullptr);
 
-    // --- Case 1: Without Rotation Beat ---
+    // --- Case: Without Rotation Beat ---
     {
         JresSolverOptions options;
         options.timeLimit = 5;
@@ -101,7 +106,7 @@ TEST(RotationBeatTest, EnforcesPattern) {
         free_jres_solver_output(output);
     }
 
-    // --- Case 2: With Rotation Beat ---
+    // --- Case: With Rotation Beat ---
     {
         JresSolverOptions options;
         options.timeLimit = 5;

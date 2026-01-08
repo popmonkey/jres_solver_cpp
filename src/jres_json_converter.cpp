@@ -73,6 +73,10 @@ JRES_SOLVER_API JresSolverInput* jres_input_from_json(const char* jsonData) {
             throw std::runtime_error("Missing 'availability' key in input JSON.");
         }
 
+        // Global Constraints
+        input->consecutiveStints = j.value("consecutiveStints", 1);
+        input->minimumRestHours = j.value("minimumRestHours", 0);
+
         // Team Members
         input->teamMembers_len = j["teamMembers"].size();
         input->teamMembers = new JresTeamMember[input->teamMembers_len];
@@ -81,8 +85,6 @@ JRES_SOLVER_API JresSolverInput* jres_input_from_json(const char* jsonData) {
             input->teamMembers[i].name = allocate_and_copy(member_json["name"]);
             input->teamMembers[i].isDriver = member_json.value("isDriver", true);
             input->teamMembers[i].isSpotter = member_json.value("isSpotter", false);
-            input->teamMembers[i].maxStints = member_json.value("maxStints", 1);
-            input->teamMembers[i].minimumRestHours = member_json.value("minimumRestHours", 0);
             input->teamMembers[i].tzOffset = member_json.value("tzOffset", 0.0);
         }
 
@@ -157,8 +159,6 @@ JRES_SOLVER_API char* jres_output_to_json(const JresSolverOutput* output) {
                 member_entry["name"] = output->teamMembers[i].name;
                 member_entry["isDriver"] = output->teamMembers[i].isDriver;
                 member_entry["isSpotter"] = output->teamMembers[i].isSpotter;
-                member_entry["maxStints"] = output->teamMembers[i].maxStints;
-                member_entry["minimumRestHours"] = output->teamMembers[i].minimumRestHours;
                 member_entry["tzOffset"] = output->teamMembers[i].tzOffset;
                 j["teamMembers"].push_back(member_entry);
             }

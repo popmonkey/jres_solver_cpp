@@ -1,3 +1,8 @@
+/**
+ * @file test/test_errors.cpp
+ * @brief Tests for error handling and input validation.
+ */
+
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include <string>

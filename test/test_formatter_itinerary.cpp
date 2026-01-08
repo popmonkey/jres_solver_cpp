@@ -1,3 +1,8 @@
+/**
+ * @file test/test_formatter_itinerary.cpp
+ * @brief Tests for itinerary generation logic.
+ */
+
 #include "gtest/gtest.h"
 #include "formatter/formatter_core.hpp"
 #include "nlohmann/json.hpp"
@@ -44,22 +49,22 @@ TEST(FormatterItineraryTest, ConsolidationAndTimezones) {
     // Check timezone offset
     EXPECT_EQ(itinerary.tz_offset, 2);
 
-    // Expecting: 1. Driving, 2. Resting, 3. Driving
+    // Expecting: Driving, Resting, Driving
     ASSERT_EQ(itinerary.items.size(), 3);
     
-    // Check Item 1: Driving Stint #1
+    // Check Item: Driving Stint #1
     const auto& drive_block1 = itinerary.items[0];
     EXPECT_EQ(drive_block1.activity, "Driving Stint #1");
     EXPECT_EQ(drive_block1.start_local.to_string(), "2023-01-01 14:00:00"); // 12:00 UTC + 2h
     EXPECT_EQ(drive_block1.end_local.to_string(), "2023-01-01 15:00:00");   // 13:00 UTC + 2h
 
-    // Check Item 2: Resting block between stints
+    // Check Item: Resting block between stints
     const auto& rest_block = itinerary.items[1];
     EXPECT_EQ(rest_block.activity, "Resting");
     EXPECT_EQ(rest_block.start_local.to_string(), "2023-01-01 15:00:00");
     EXPECT_EQ(rest_block.end_local.to_string(), "2023-01-01 15:05:00"); // 13:05 UTC + 2h
 
-    // Check Item 3: Driving Stint #2
+    // Check Item: Driving Stint #2
     const auto& drive_block2 = itinerary.items[2];
     EXPECT_EQ(drive_block2.activity, "Driving Stint #2");
     EXPECT_EQ(drive_block2.start_local.to_string(), "2023-01-01 15:05:00");
@@ -99,7 +104,7 @@ TEST(FormatterItineraryTest, NegativeTimezone) {
 
     ASSERT_EQ(itinerary.items.size(), 1);
 
-    // Check Item 1: Driving Stint #1
+    // Check Item: Driving Stint #1
     const auto& drive_block1 = itinerary.items[0];
     EXPECT_EQ(drive_block1.activity, "Driving Stint #1");
     EXPECT_EQ(drive_block1.start_local.to_string(), "2022-12-31 21:00:00"); // 02:00 UTC - 5h

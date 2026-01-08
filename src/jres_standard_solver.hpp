@@ -29,6 +29,14 @@ private:
         std::map<std::pair<std::string, int>, int>& workVars
     );
 
+    // Incentivize balanced participation (Soft Constraint)
+    void add_balancing_constraints(
+        Highs &highs,
+        const std::vector<jres::internal::TeamMember> &participants,
+        const std::map<std::pair<std::string, int>, int>& workVars,
+        double avgStints
+    );
+
     // Enforce minimum rest constraints (potentially across both roles)
     void apply_minimum_rest_constraints(
         Highs &highs,

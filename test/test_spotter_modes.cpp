@@ -1,3 +1,8 @@
+/**
+ * @file test/test_spotter_modes.cpp
+ * @brief Tests for different spotter scheduling modes (None, Integrated, Sequential).
+ */
+
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"

@@ -1,3 +1,8 @@
+/**
+ * @file test/test_constraints.cpp
+ * @brief Tests for various hard constraints (infeasibility, preferred slots, coverage).
+ */
+
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"
@@ -41,9 +46,11 @@ TEST(ConstraintTest, InfeasibleModel) {
 }
 
 const char* PREFERRED_SLOT_V2_JSON = R"({
+  "consecutiveStints": 1,
+  "minimumRestHours": 0,
   "teamMembers": [
-    { "name": "Driver A", "isDriver": true, "maxStints": 2, "minimumRestHours": 0 },
-    { "name": "Driver B", "isDriver": true, "maxStints": 2, "minimumRestHours": 0 }
+    { "name": "Driver A", "isDriver": true },
+    { "name": "Driver B", "isDriver": true }
   ],
   "availability": {
     "Driver A": {
@@ -77,12 +84,14 @@ TEST(ConstraintTest, PreferredSlot) {
 }
 
 const char* NO_DRIVER_FOR_STINT_V2_JSON = R"({
+  "consecutiveStints": 2,
+  "minimumRestHours": 0,
   "teamMembers": [
-    { "name": "Brandon", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 },
-    { "name": "Cesar", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 },
-    { "name": "Harvey", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 },
-    { "name": "Jay", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 },
-    { "name": "Jack", "isDriver": true, "isSpotter": true, "maxStints": 2, "minimumRestHours": 0 }
+    { "name": "Brandon", "isDriver": true, "isSpotter": true },
+    { "name": "Cesar", "isDriver": true, "isSpotter": true },
+    { "name": "Harvey", "isDriver": true, "isSpotter": true },
+    { "name": "Jay", "isDriver": true, "isSpotter": true },
+    { "name": "Jack", "isDriver": true, "isSpotter": true }
   ],
   "availability": {
     "Brandon": { "2025-11-22T14:00:00.000Z": "Unavailable" },
@@ -113,7 +122,7 @@ TEST(ConstraintTest, NoDriverForStint) {
     ASSERT_GT(output->diagnosis_len, 0);
     std::string msg(output->diagnosis[0]);
     bool correctMsg = (msg.find("Insufficient driver capacity") != std::string::npos);
-    bool correctDetails = (msg.find(", MaxConsecutive=") != std::string::npos);
+    bool correctDetails = (msg.find(", MinRest=") != std::string::npos);
     EXPECT_EQ(correctMsg, true);
     EXPECT_EQ(correctDetails, true);
 

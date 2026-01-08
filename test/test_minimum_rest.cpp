@@ -1,3 +1,8 @@
+/**
+ * @file test/test_minimum_rest.cpp
+ * @brief Tests for minimum rest time enforcement.
+ */
+
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "jres_internal_types.hpp"
@@ -37,19 +42,19 @@ void check_rest_times(const jres::internal::SolverOutput& output, int minimumRes
         const auto& stints = pair.second;
         
         // We need to find ONE valid rest gap of duration >= MinRest WITHIN [RaceStart, RaceEnd].
-        // 1. Check Start Gap: [RaceStart, stints[0].start]
-        // 2. Check Inter-stint Gaps.
-        // 3. Check End Gap: [stints[last].end, RaceEnd]
+        // Check Start Gap: [RaceStart, stints[0].start]
+        // Check Inter-stint Gaps.
+        // Check End Gap: [stints[last].end, RaceEnd]
         
         bool satisfied = false;
         
-        // 1. Start Gap
+        // Start Gap
         auto firstStart = jres::internal::TimeHelpers::stringToTimePoint(stints[0].startTime);
         if (firstStart - raceStart >= minRestDuration) {
             satisfied = true;
         }
 
-        // 2. Middle Gaps
+        // Middle Gaps
         if (!satisfied) {
             for (size_t i = 0; i < stints.size() - 1; ++i) {
                 auto endTime = jres::internal::TimeHelpers::stringToTimePoint(stints[i].endTime);
@@ -61,7 +66,7 @@ void check_rest_times(const jres::internal::SolverOutput& output, int minimumRes
             }
         }
         
-        // 3. End Gap
+        // End Gap
         if (!satisfied) {
             auto lastEnd = jres::internal::TimeHelpers::stringToTimePoint(stints.back().endTime);
             if (raceEnd - lastEnd >= minRestDuration) {
@@ -81,10 +86,11 @@ TEST(MinimumRestTest, Enforcement) {
     // to avoid long runtimes and external dependencies.
     // Scenario: 3 Drivers, 6 Stints (1 hour each), 2 hours minimum rest.
     std::string json_str = R"({
+      "minimumRestHours": 2,
       "teamMembers": [
-        { "name": "D1", "isDriver": true, "minimumRestHours": 2 },
-        { "name": "D2", "isDriver": true, "minimumRestHours": 2 },
-        { "name": "D3", "isDriver": true, "minimumRestHours": 2 }
+        { "name": "D1", "isDriver": true },
+        { "name": "D2", "isDriver": true },
+        { "name": "D3", "isDriver": true }
       ],
       "availability": {
         "D1": {}, "D2": {}, "D3": {}
@@ -151,9 +157,10 @@ TEST(MinimumRestTest, FeasibleScenario) {
     // Using JSON construction
     std::string json_content = R"({
       "success": true,
+      "minimumRestHours": 1,
       "teamMembers": [
-        { "name": "D1", "isDriver": true, "minimumRestHours": 1 },
-        { "name": "D2", "isDriver": true, "minimumRestHours": 1 }
+        { "name": "D1", "isDriver": true },
+        { "name": "D2", "isDriver": true }
       ],
       "availability": {
         "D1": {}, "D2": {}
@@ -201,9 +208,10 @@ TEST(MinimumRestTest, IntegratedCombinedRest) {
     // Constraint should prevent D1 from spotting S2 OR S3 if that's the only rest window.
     
     std::string json_content = R"({
+      "minimumRestHours": 2,
       "teamMembers": [
-        { "name": "D1", "isDriver": true, "isSpotter": true, "minimumRestHours": 2 },
-        { "name": "D2", "isDriver": true, "isSpotter": true, "minimumRestHours": 0 }
+        { "name": "D1", "isDriver": true, "isSpotter": true },
+        { "name": "D2", "isDriver": true, "isSpotter": true }
       ],
       "availability": { "D1": {}, "D2": {} },
       "stints": [
