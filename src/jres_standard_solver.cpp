@@ -52,6 +52,39 @@ static void add_consecutive_incentive(
     }
 }
 
+static void add_role_coupling_incentive(
+    Highs* highs,
+    const std::vector<jres::internal::TeamMember>& pool,
+    const std::map<std::pair<std::string, int>, int>& driverVars,
+    const std::map<std::pair<std::string, int>, int>& spotterVars,
+    size_t numStints,
+    double weight)
+{
+    if (std::abs(weight) < 1e-6) return;
+
+    for (const auto &p : pool) {
+        for (size_t s = 0; s < numStints - 1; ++s) {
+            bool hasDriver = driverVars.count({p.name, s});
+            bool hasSpotter = spotterVars.count({p.name, s + 1});
+
+            if (hasDriver && hasSpotter) {
+                int d_var = driverVars.at({p.name, s});
+                int s_var = spotterVars.at({p.name, s + 1});
+
+                int coupling_var = highs->getNumCol();
+                highs->addVar(0.0, 1.0);
+                highs->changeColIntegrality(coupling_var, HighsVarType::kInteger);
+                highs->changeColCost(coupling_var, -weight);
+
+                // z <= d_var
+                highs->addRow(-kHighsInf, 0.0, 2, std::vector<int>{coupling_var, d_var}.data(), std::vector<double>{1.0, -1.0}.data());
+                // z <= s_var
+                highs->addRow(-kHighsInf, 0.0, 2, std::vector<int>{coupling_var, s_var}.data(), std::vector<double>{1.0, -1.0}.data());
+            }
+        }
+    }
+}
+
 JresStandardSolver::JresStandardSolver(const jres::internal::SolverInput& input, const JresSolverOptions& options)
     : JresSolverBase(input, options)
 {
@@ -576,6 +609,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         
         add_participant_model(*m_highs, m_spotterPool, m_spotterWorkVars);
         add_consecutive_incentive(m_highs.get(), m_spotterPool, m_spotterWorkVars, m_input.stints.size(), kRewardConsecutive);
+        add_role_coupling_incentive(m_highs.get(), m_driverPool, m_driverWorkVars, m_spotterWorkVars, m_input.stints.size(), m_options.roleCouplingWeight);
 
         // Spotter Coverage
         for (size_t s = 0; s < m_input.stints.size(); ++s) {
@@ -755,50 +789,31 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                 }
             }
 
-            // Incentivize Spotting Adjacent to Driving (Proximity Reward)
+            // Incentivize Spotting Adjacent to Driving (Proximity & Role Coupling)
             for (const auto& p : m_spotterPool) {
                 for (size_t s = 0; s < m_input.stints.size(); ++s) {
                     if (!m_spotterWorkVars.count({p.name, s})) continue;
                     
-                    bool adjacentDrive = false;
-                    // Check s-1
-                    if (s > 0) {
-                        if (output.schedule[s-1].driver == p.name) adjacentDrive = true;
+                    double additionalReward = 0.0;
+                    
+                    // Check s-1: Driver(s-1) -> Spotter(s) [Role Coupling]
+                    if (s > 0 && output.schedule[s-1].driver == p.name) {
+                         if (std::abs(m_options.roleCouplingWeight) > 1e-6) {
+                             additionalReward += -m_options.roleCouplingWeight;
+                         } else {
+                             additionalReward += kRewardProximity;
+                         }
                     }
-                    // Check s+1
-                    if (s < m_input.stints.size() - 1) {
-                        if (output.schedule[s+1].driver == p.name) adjacentDrive = true;
+                    
+                    // Check s+1: Spotter(s) -> Driver(s+1) [Proximity]
+                    if (s < m_input.stints.size() - 1 && output.schedule[s+1].driver == p.name) {
+                        additionalReward += kRewardProximity;
                     }
 
-                    if (adjacentDrive) {
+                    if (std::abs(additionalReward) > 1e-6) {
                         int varIdx = m_spotterWorkVars.at({p.name, s});
-                        // Get current cost
-                        double currentCost = 0.0;
-                        // Getting current cost is not directly supported by simple API in all versions, 
-                        // but we know we set it based on preference/unavailability.
-                        // We can just add a separate term or modify existing.
-                        // HiGHS `changeColCost` sets the absolute cost.
-                        // We should retrieve it first? Or assume base costs.
-                        // Let's assume we can query it? No simple getColCost in the minimal binding I recall.
-                        // However, we know the cost construction logic: 
-                        // Unavailable(1e6) | Preferred(-1) | Neutral(0).
                         
-                        // Let's just track it or blindly apply offset if we know it's not unavailable.
-                        // We shouldn't incentivize unavailable slots.
-                        
-                        // Re-check availability
-                        bool isUnavailable = false; 
-                         // ... (Availability lookup logic duplicated or helper needed?)
-                         // Actually, we can check if it's already "Unavailable" penalty.
-                         // But we don't have easy access to the cost.
-                         
-                         // Safer: Re-evaluate availability or trust that if it's unavailable, the 1M penalty swamps this -0.5.
-                         // Yes, 1,000,000 - 0.5 is still huge.
-                         
-                         // How to add? `changeColCost` replaces. 
-                         // We don't want to overwrite "Preferred".
-                         // We can look up availability again.
-                         
+                        // Re-calculate base cost to ensure we add to it
                          std::string availabilityKey = jres::internal::TimeHelpers::timePointToKey(jres::internal::TimeHelpers::stringToTimePoint(m_input.stints[s].startTime));
                          bool isPreferred = false;
                          bool isUnavailableExplicit = false;
@@ -815,7 +830,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                          if (isUnavailableExplicit) newCost = kPenaltyUnavailable;
                          else if (isPreferred) newCost = kRewardPreferred;
                          
-                         newCost += kRewardProximity; // Add the incentive
+                         newCost += additionalReward;
                          
                          spotterSolver.changeColCost(varIdx, newCost);
                     }

@@ -33,6 +33,7 @@ add_executable(solver_tests
   test_minimum_rest.cpp
   test_fair_share.cpp
   test_switching_penalty.cpp
+  test_role_coupling.cpp
 )
 
 add_dependencies(solver_tests jres_solver_lib)
