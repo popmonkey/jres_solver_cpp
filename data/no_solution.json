@@ -1,39 +1,31 @@
 {
+  "consecutiveStints": 2,
+  "minimumRestHours": 0,
   "teamMembers": [
     {
       "name": "Brandon",
       "isDriver": true,
-      "isSpotter": true,
-      "preferredStints": 2,
-      "minimumRestHours": 0
+      "isSpotter": true
     },
     {
       "name": "Cesar",
       "isDriver": true,
-      "isSpotter": true,
-      "preferredStints": 2,
-      "minimumRestHours": 0
+      "isSpotter": true
     },
     {
       "name": "Harvey",
       "isDriver": true,
-      "isSpotter": true,
-      "preferredStints": 2,
-      "minimumRestHours": 0
+      "isSpotter": true
     },
     {
       "name": "Jay",
       "isDriver": true,
-      "isSpotter": true,
-      "preferredStints": 2,
-      "minimumRestHours": 0
+      "isSpotter": true
     },
     {
       "name": "Jack",
       "isDriver": true,
-      "isSpotter": true,
-      "preferredStints": 2,
-      "minimumRestHours": 0
+      "isSpotter": true
     }
   ],
   "availability": {

@@ -1,3 +1,8 @@
+/**
+ * @file test/test_optimization.cpp
+ * @brief Tests for optimization incentives (consecutive stints, preferences, penalties).
+ */
+
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"
@@ -6,13 +11,15 @@
 
 using json = nlohmann::json;
 
-TEST(OptimizationTest, IncentivizeConsecutiveStints) {
+TEST(OptimizationTest, EnforceConsecutiveStints) {
     // Scenario: 2 Team Members (can drive and spot), 4 Stints.
-    // Each member can do max 2 stints.
     // We want to see AABB or BBAA patterns for BOTH drivers and spotters.
+    // Global requirement: consecutiveStints = 2.
     
     json j;
     j["success"] = true;
+    j["consecutiveStints"] = 2;
+    j["minimumRestHours"] = 0;
     
     json members = json::array();
     std::vector<std::string> names = {"Member A", "Member B"};
@@ -20,9 +27,7 @@ TEST(OptimizationTest, IncentivizeConsecutiveStints) {
         members.push_back({
             {"name", name},
             {"isDriver", true},
-            {"isSpotter", true},
-            {"maxStints", 2},
-            {"minimumRestHours", 0}
+            {"isSpotter", true}
         });
     }
     j["teamMembers"] = members;
@@ -43,9 +48,9 @@ TEST(OptimizationTest, IncentivizeConsecutiveStints) {
     JresSolverInput* input = jres_input_from_json(json_str.c_str());
     ASSERT_NE(input, nullptr);
 
-    // --- Sub-test 1: Integrated Mode ---
+    // --- Sub-test: Integrated Mode ---
     {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
         options.allowNoSpotter = false;
@@ -66,18 +71,20 @@ TEST(OptimizationTest, IncentivizeConsecutiveStints) {
             }
         }
 
-        // With 4 stints and maxStints=2, perfect consolidation is 2 switches (one middle break for each role, or AABB/BBAA)
-        // Consecutive pairs in AABB is 2: (A,A) and (B,B).
-        // Minimal acceptable is AABB or BBAA => 2 consecutive pairs.
+        // With 4 stints and consecutiveStints=2, we have 2 blocks.
+        // Block 0: Stints 0,1. Block 1: Stints 2,3.
+        // Stint 0 and 1 MUST be same driver. Stint 2 and 3 MUST be same driver.
+        // So we guarantee at least 2 consecutive pairs (0-1 and 2-3).
+        // If driver stays for both blocks (AAAA), we get 3 consecutive pairs.
         EXPECT_GE(driver_consecutive, 2) << "Integrated: Drivers should be consolidated (e.g. AABB).";
         EXPECT_GE(spotter_consecutive, 2) << "Integrated: Spotters should be consolidated (e.g. BBAA).";
 
         free_jres_solver_output(output);
     }
 
-    // --- Sub-test 2: Sequential Mode ---
+    // --- Sub-test: Sequential Mode ---
     {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
         options.allowNoSpotter = false;
@@ -108,7 +115,7 @@ TEST(OptimizationTest, IncentivizeConsecutiveStints) {
 }
 
 TEST(OptimizationTest, PreferredOverAvailable) {
-    // Scenario: 2 Drivers, 2 Stints. maxStints=1 (Disable consecutive bonus).
+    // Scenario: 2 Drivers, 2 Stints. consecutiveStints=1.
     // Driver A: Stint 1 (Available), Stint 2 (Preferred)
     // Driver B: Stint 1 (Preferred), Stint 2 (Available)
     //
@@ -118,14 +125,15 @@ TEST(OptimizationTest, PreferredOverAvailable) {
     // Optimal Preference Order: B then A.
     // - S1 (B, Pref) + S2 (A, Pref) -> Cost -2.
     //
-    // This forces the solver to pick B first, proving it's looking at the "Preferred" weight
-    // and not just assigning in list order.
+    // This forces the solver to pick B first, proving it's looking at the "Preferred" weight.
 
     json j;
     j["success"] = true;
+    j["consecutiveStints"] = 1;
+    j["minimumRestHours"] = 0;
     j["teamMembers"] = {
-        {{"name", "Driver A"}, {"isDriver", true}, {"isSpotter", false}, {"maxStints", 1}, {"minimumRestHours", 0}},
-        {{"name", "Driver B"}, {"isDriver", true}, {"isSpotter", false}, {"maxStints", 1}, {"minimumRestHours", 0}}
+        {{"name", "Driver A"}, {"isDriver", true}, {"isSpotter", false}},
+        {{"name", "Driver B"}, {"isDriver", true}, {"isSpotter", false}}
     };
     j["stints"] = {
         {{"id", 1}, {"startTime", "2026-01-17T00:00:00.000Z"}, {"endTime", "2026-01-17T01:00:00.000Z"}},
@@ -137,7 +145,7 @@ TEST(OptimizationTest, PreferredOverAvailable) {
     };
     j["firstStintDriver"] = nullptr;
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 5;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = true;
@@ -166,28 +174,33 @@ TEST(OptimizationTest, ConsecutiveOverPreferred) {
     // Stint 3: A=Pref, B=Avail
     // Stint 4: A=Avail, B=Pref
     //
-    // Option 1 (Alternating/Split): A, B, A, B
-    // - Everyone gets their Preferred slots.
-    // - Total Preferred = 4. Cost = -4.0.
-    // - Consecutive Pairs = 0. Cost = 0.0.
-    // - Balance: Perfect (2 each). Cost = 0.
-    // - Total Cost = -4.0.
+    // Global Requirement: consecutiveStints = 2.
+    // This forces blocks of 2 stints.
+    // Block 0 (S1, S2):
+    // - A: Pref + Avail = Cost -1.
+    // - B: Avail + Pref = Cost -1.
+    // Cost is equal.
     //
-    // Option 2 (Consecutive Blocks): A, A, B, B
-    // - A takes S1(Pref), S2(Avail). B takes S3(Avail), S4(Pref).
-    // - Total Preferred = 2. Cost = -2.0.
-    // - Consecutive Pairs = 2 (A-A, B-B). Cost = 2 * -1.5 = -3.0.
-    // - Balance: Perfect (2 each). Cost = 0.
-    // - Total Cost = -5.0.
+    // Block 1 (S3, S4):
+    // - A: Pref + Avail = Cost -1.
+    // - B: Avail + Pref = Cost -1.
+    // Cost is equal.
     //
-    // Since -5.0 < -4.0, the solver MUST choose Option 2 (Consecutive Blocks).
-    // This proves that the Consecutive Bonus (-1.5) outweighs the loss of a Preferred slot (1.0 difference).
+    // So AA BB or BB AA have same cost (-2).
+    // Mixed AB AB is IMPOSSIBLE because it violates consecutiveStints=2 (A would drive S1 only).
+    //
+    // So the solver MUST output AABB or BBAA or AAAA or BBBB.
+    // AAAA cost: (-1) + (-1) = -2.
+    // So all valid solutions have same cost.
+    // We just check that we get blocks.
 
     json j;
     j["success"] = true;
+    j["consecutiveStints"] = 2;
+    j["minimumRestHours"] = 0;
     j["teamMembers"] = {
-        {{"name", "Driver A"}, {"isDriver", true}, {"isSpotter", false}, {"maxStints", 2}, {"minimumRestHours", 0}},
-        {{"name", "Driver B"}, {"isDriver", true}, {"isSpotter", false}, {"maxStints", 2}, {"minimumRestHours", 0}}
+        {{"name", "Driver A"}, {"isDriver", true}, {"isSpotter", false}},
+        {{"name", "Driver B"}, {"isDriver", true}, {"isSpotter", false}}
     };
     j["stints"] = {
         {{"id", 1}, {"startTime", "2026-01-17T00:00:00.000Z"}, {"endTime", "2026-01-17T01:00:00.000Z"}},
@@ -211,7 +224,7 @@ TEST(OptimizationTest, ConsecutiveOverPreferred) {
     };
     j["firstStintDriver"] = nullptr;
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 5;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = true;
@@ -233,8 +246,14 @@ TEST(OptimizationTest, ConsecutiveOverPreferred) {
     // We expect pairs like AA BB or BB AA
     EXPECT_EQ(d1, d2) << "Stints 1 and 2 should be consecutive";
     EXPECT_EQ(d3, d4) << "Stints 3 and 4 should be consecutive";
-    EXPECT_NE(d2, d3) << "Drivers should switch between blocks";
-
+    // We don't necessarily expect a switch between blocks if cost is identical, 
+    // but typically the solver will find one of the optimal solutions.
+    // The previous test asserted EXPECT_NE(d2, d3). 
+    // If we have AAAA, it fails.
+    // But AAAA has same cost.
+    // However, usually we want to see distribution.
+    // Let's relax the check to just verifying blocks are consistent.
+    
     free_jres_solver_input(input);
     free_jres_solver_output(output);
 }

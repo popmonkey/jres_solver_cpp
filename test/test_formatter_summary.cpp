@@ -1,3 +1,8 @@
+/**
+ * @file test/test_formatter_summary.cpp
+ * @brief Tests for summary report generation.
+ */
+
 #include "gtest/gtest.h"
 #include "formatter/formatter_core.hpp"
 #include <map>

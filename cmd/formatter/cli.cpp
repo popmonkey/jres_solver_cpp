@@ -71,10 +71,10 @@ int main(int argc, char* argv[]) {
 
         // --- Logic: Determine Format ---
         if (result.count("format")) {
-            // 1. Explicitly provided by user
+            // Explicitly provided by user
             format = result["format"].as<std::string>();
         } else {
-            // 2. Auto-detect from extension
+            // Auto-detect from extension
             std::string ext = get_extension(output_path);
             if (ext == ".csv") {
                 format = "csv";
@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
             } else if (ext == ".zip") {
                 format = "zip";
             } else {
-                // 3. Unknown extension and no flag -> Error
+                // Unknown extension and no flag -> Error
                 std::cerr << "Error: Could not determine output format from filename extension (" 
                           << ext << ")." << std::endl;
                 std::cerr << "Please explicitly specify format using -f <zip|csv|txt> or use a standard file extension." << std::endl;

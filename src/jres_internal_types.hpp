@@ -34,8 +34,6 @@ struct TeamMember
     std::string name;
     bool isDriver = true;
     bool isSpotter = false;
-    int maxStints = 1;
-    int minimumRestHours = 0;
     double tzOffset = 0.0;
 };
 
@@ -47,6 +45,8 @@ struct Stint {
 
 struct SolverInput
 {
+    int consecutiveStints = 1;
+    int minimumRestHours = 0;
     std::vector<TeamMember> teamMembers;
     std::map<std::string, std::map<std::string, Availability>> availability;
     std::vector<Stint> stints;
@@ -58,6 +58,14 @@ struct ScheduleEntry {
     std::string endTime;
     std::string driver;
     std::string spotter;
+};
+
+struct SlackInfo {
+    std::string type;
+    std::string memberName;
+    int stintIndex;
+    double limit = 0.0;
+    double actual = 0.0;
 };
 
 struct SolverStats {

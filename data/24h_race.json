@@ -1,53 +1,43 @@
 {
   "success": true,
+  "consecutiveStints": 2,
+  "minimumRestHours": 6,
   "teamMembers": [
     {
       "name": "Niki",
       "isDriver": true,
       "isSpotter": true,
-      "tzOffset": 1,
-      "maxStints": 1,
-      "minimumRestHours": 6
+      "tzOffset": 1
     },
     {
       "name": "Ayrton",
       "isDriver": true,
       "isSpotter": false,
-      "tzOffset": -3,
-      "maxStints": 2,
-      "minimumRestHours": 6
+      "tzOffset": -3
     },
     {
       "name": "Jack",
       "isDriver": true,
       "isSpotter": true,
-      "tzOffset": 11,
-      "maxStints": 3,
-      "minimumRestHours": 6
+      "tzOffset": 11
     },
     {
       "name": "James",
       "isDriver": true,
       "isSpotter": true,
-      "tzOffset": 0,
-      "maxStints": 2,
-      "minimumRestHours": 6
+      "tzOffset": 0
     },
     {
       "name": "Mario",
       "isDriver": true,
       "isSpotter": true,
-      "tzOffset": -5,
-      "maxStints": 1,
-      "minimumRestHours": 6
+      "tzOffset": -5
     },
     {
       "name": "Ricky",
       "isDriver": false,
       "isSpotter": true,
-      "tzOffset": -6,
-      "maxStints": 2,
-      "minimumRestHours": 6
+      "tzOffset": -6
     }
   ],
   "availability": {

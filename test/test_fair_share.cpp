@@ -1,3 +1,8 @@
+/**
+ * @file test/test_fair_share.cpp
+ * @brief Tests for the "Fair Share" rule enforcement.
+ */
+
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include <string>
@@ -15,13 +20,11 @@ JresStint create_stint(int id, const char* start, const char* end) {
 }
 
 // Helper to create a driver
-JresTeamMember create_driver(const char* name, int maxStints = 10) {
+JresTeamMember create_driver(const char* name) {
     JresTeamMember m;
     m.name = name;
     m.isDriver = 1;
     m.isSpotter = 0;
-    m.maxStints = maxStints;
-    m.minimumRestHours = 0;
     m.tzOffset = 0.0;
     return m;
 }
@@ -70,8 +73,8 @@ TEST(FairShareTest, EnforcesMinimumRequirement) {
     }
 
     std::vector<JresTeamMember> members;
-    members.push_back(create_driver("DriverA", 5)); // MaxConsecutive is fine
-    members.push_back(create_driver("DriverB", 20));
+    members.push_back(create_driver("DriverA")); 
+    members.push_back(create_driver("DriverB"));
 
     // Create Availability for DriverA
     // Available for 0 and 1. Unavailable for 2..19.
@@ -98,6 +101,8 @@ TEST(FairShareTest, EnforcesMinimumRequirement) {
     availabilities.push_back(mavA);
 
     JresSolverInput input;
+    input.consecutiveStints = 20;
+    input.minimumRestHours = 0;
     input.stints = stints.data();
     input.stints_len = (int)stints.size();
     input.teamMembers = members.data();
@@ -105,7 +110,7 @@ TEST(FairShareTest, EnforcesMinimumRequirement) {
     input.availability = availabilities.data();
     input.availability_len = (int)availabilities.size();
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 5;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = true;
@@ -157,10 +162,12 @@ TEST(FairShareTest, SuccessScenario) {
     }
 
     std::vector<JresTeamMember> members;
-    members.push_back(create_driver("DriverA", 3)); // 3 stints >= 2.5h
-    members.push_back(create_driver("DriverB", 20));
+    members.push_back(create_driver("DriverA")); 
+    members.push_back(create_driver("DriverB"));
 
     JresSolverInput input;
+    input.consecutiveStints = 1;
+    input.minimumRestHours = 0;
     input.stints = stints.data();
     input.stints_len = (int)stints.size();
     input.teamMembers = members.data();
@@ -168,7 +175,7 @@ TEST(FairShareTest, SuccessScenario) {
     input.availability = nullptr;
     input.availability_len = 0;
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 5;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = true;

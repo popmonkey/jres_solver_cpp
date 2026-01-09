@@ -1,29 +1,25 @@
 {
   "success": true,
+  "consecutiveStints": 2,
+  "minimumRestHours": 0,
   "teamMembers": [
     {
       "name": "Niki",
       "tzOffset": 1,
       "isDriver": true,
-      "isSpotter": true,
-      "preferredStints": 2,
-      "minimumRestHours": 0
+      "isSpotter": true
     },
     {
       "name": "Ayrton",
       "tzOffset": -3,
       "isDriver": true,
-      "isSpotter": true,
-      "preferredStints": 2,
-      "minimumRestHours": 0
+      "isSpotter": true
     },
     {
       "name": "Alain",
       "tzOffset": 1,
       "isDriver": false,
-      "isSpotter": true,
-      "preferredStints": 2,
-      "minimumRestHours": 0
+      "isSpotter": true
     }
   ],
   "availability": {

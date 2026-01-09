@@ -1,3 +1,8 @@
+/**
+ * @file test/test_balancing.cpp
+ * @brief Tests for the driver stint balancing logic.
+ */
+
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "nlohmann/json.hpp"
@@ -36,13 +41,11 @@ TEST(BalancingTest, FairBalance) {
     json data = json::parse(f);
 
     // Relax minimumRestHours to allow better balancing
-    for (auto& member : data["teamMembers"]) {
-        member["minimumRestHours"] = 2; 
-    }
+    data["minimumRestHours"] = 2;
 
     std::string json_str = data.dump();
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = false;
