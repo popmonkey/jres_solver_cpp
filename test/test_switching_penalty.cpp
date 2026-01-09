@@ -34,7 +34,7 @@ TEST(SwitchingPenaltyTest, ForceMinimumSwitches) {
     j["availability"] = json::object(); // All available
     j["firstStintDriver"] = nullptr;
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 5;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = true;

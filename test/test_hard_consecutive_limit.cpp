@@ -1,5 +1,5 @@
 /**
- * @file test/reproduce_issue.cpp
+ * @file test/test_hard_consecutive_limit.cpp
  * @brief Tests for hard constraints on consecutive stints.
  */
 
@@ -45,7 +45,7 @@ TEST(ConstraintTest, EnforceConsecutiveStintsHardLimit) {
     JresSolverInput* input = jres_input_from_json(json_str.c_str());
     ASSERT_NE(input, nullptr);
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_NONE; // Focus on drivers
     options.allowNoSpotter = true;

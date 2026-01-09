@@ -41,7 +41,7 @@ namespace {
   })";
 
   TEST(SpotterModeTest, BasicIntegratedSolve) {
-      JresSolverOptions options;
+      JresSolverOptions options = {};
       options.timeLimit = 30;
       options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
       options.allowNoSpotter = false;
@@ -78,7 +78,7 @@ namespace {
   })";
 
   TEST(SpotterModeTest, ModeNone) {
-      JresSolverOptions options;
+      JresSolverOptions options = {};
       options.timeLimit = 10;
       options.spotterMode = JRES_SPOTTER_MODE_NONE;
       options.allowNoSpotter = false;
@@ -111,7 +111,7 @@ namespace {
   })";
 
   TEST(SpotterModeTest, IntegratedConflictInfeasible) {
-      JresSolverOptions options;
+      JresSolverOptions options = {};
       options.timeLimit = 10;
       options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
       options.allowNoSpotter = false;
@@ -147,7 +147,7 @@ namespace {
   })";
 
   TEST(SpotterModeTest, SequentialConflictSolvable) {
-      JresSolverOptions options;
+      JresSolverOptions options = {};
       options.timeLimit = 10;
       options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
       options.allowNoSpotter = false;
@@ -183,7 +183,7 @@ namespace {
   })";
 
   TEST(SpotterModeTest, AllowNoSpotterIntegrated) {
-      JresSolverOptions options;
+      JresSolverOptions options = {};
       options.timeLimit = 10;
       options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
       options.allowNoSpotter = true;
@@ -205,7 +205,7 @@ namespace {
   }
 
   TEST(SpotterModeTest, AllowNoSpotterSequential) {
-      JresSolverOptions options;
+      JresSolverOptions options = {};
       options.timeLimit = 10;
       options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
       options.allowNoSpotter = true;
@@ -241,7 +241,7 @@ namespace {
   })";
 
   TEST(SpotterModeTest, SequentialInfeasibleSpotter) {
-      JresSolverOptions options;
+      JresSolverOptions options = {};
       options.timeLimit = 10;
       options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
       options.allowNoSpotter = false;

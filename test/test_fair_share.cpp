@@ -110,7 +110,7 @@ TEST(FairShareTest, EnforcesMinimumRequirement) {
     input.availability = availabilities.data();
     input.availability_len = (int)availabilities.size();
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 5;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = true;
@@ -175,7 +175,7 @@ TEST(FairShareTest, SuccessScenario) {
     input.availability = nullptr;
     input.availability_len = 0;
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 5;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = true;

@@ -26,7 +26,7 @@ namespace {
       "stints": [ { "id": 1, "startTime": "1973-06-09T14:37:00.000Z", "endTime": "1973-06-09T15:00:00.000Z" } ]
     })";
     TEST(ErrorTest, NoDrivers) {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_NONE;
         JresSolverInput* input = jres_input_from_json(NO_DRIVERS_V2_JSON);
@@ -46,7 +46,7 @@ namespace {
       "stints": [ { "id": 1, "startTime": "1973-06-09T14:37:00.000Z", "endTime": "1973-06-09T15:00:00.000Z" } ]
     })";
     TEST(ErrorTest, NoSpottersRequired) {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
         options.allowNoSpotter = false;
@@ -67,7 +67,7 @@ namespace {
       "stints": []
     })";
     TEST(ErrorTest, ZeroStints) {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_NONE;
         JresSolverInput* input = jres_input_from_json(ZERO_STINTS_V2_JSON);

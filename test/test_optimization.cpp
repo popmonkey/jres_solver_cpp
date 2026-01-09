@@ -50,7 +50,7 @@ TEST(OptimizationTest, EnforceConsecutiveStints) {
 
     // --- Sub-test: Integrated Mode ---
     {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
         options.allowNoSpotter = false;
@@ -84,7 +84,7 @@ TEST(OptimizationTest, EnforceConsecutiveStints) {
 
     // --- Sub-test: Sequential Mode ---
     {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
         options.allowNoSpotter = false;
@@ -145,7 +145,7 @@ TEST(OptimizationTest, PreferredOverAvailable) {
     };
     j["firstStintDriver"] = nullptr;
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 5;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = true;
@@ -224,7 +224,7 @@ TEST(OptimizationTest, ConsecutiveOverPreferred) {
     };
     j["firstStintDriver"] = nullptr;
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 5;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = true;

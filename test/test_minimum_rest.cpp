@@ -105,7 +105,7 @@ TEST(MinimumRestTest, Enforcement) {
       ]
     })";
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 10; // Reduced time limit for simpler problem
     options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
     options.allowNoSpotter = false;
@@ -173,7 +173,7 @@ TEST(MinimumRestTest, FeasibleScenario) {
       ]
     })";
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     
     JresSolverInput* input = jres_input_from_json(json_content.c_str());
@@ -227,7 +227,7 @@ TEST(MinimumRestTest, IntegratedCombinedRest) {
     // Let's rely on the fact that D1 must have *some* 2h block free.
     // If we force D1 to participate in S1, S2, S3, S4, it should fail (infeasible).
     
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
     options.allowNoSpotter = false; 
 

@@ -26,7 +26,7 @@ const char* INFEASIBLE_V2_JSON = R"({
 })";
 
 TEST(ConstraintTest, InfeasibleModel) {
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = false;
@@ -66,7 +66,7 @@ const char* PREFERRED_SLOT_V2_JSON = R"({
 })";
 
 TEST(ConstraintTest, PreferredSlot) {
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = false;
@@ -106,7 +106,7 @@ const char* NO_DRIVER_FOR_STINT_V2_JSON = R"({
 })";
 
 TEST(ConstraintTest, NoDriverForStint) {
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = false;

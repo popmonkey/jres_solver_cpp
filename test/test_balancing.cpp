@@ -45,7 +45,7 @@ TEST(BalancingTest, FairBalance) {
 
     std::string json_str = data.dump();
 
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_NONE;
     options.allowNoSpotter = false;

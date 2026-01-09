@@ -33,7 +33,7 @@ TEST(SpotterBalancingTest, IntegratedBalancing) {
     })";
 
     JresSolverInput* input = jres_input_from_json(input_json);
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
     options.allowNoSpotter = false;
@@ -81,7 +81,7 @@ TEST(SpotterBalancingTest, SequentialBalancing) {
     })";
 
     JresSolverInput* input = jres_input_from_json(input_json);
-    JresSolverOptions options;
+    JresSolverOptions options = {};
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
     options.allowNoSpotter = false;

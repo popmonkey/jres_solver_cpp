@@ -84,7 +84,7 @@ TEST(RotationBeatTest, EnforcesPattern) {
 
     // --- Case: Without Rotation Beat ---
     {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 5;
         options.spotterMode = JRES_SPOTTER_MODE_NONE;
         options.allowNoSpotter = true;
@@ -108,7 +108,7 @@ TEST(RotationBeatTest, EnforcesPattern) {
 
     // --- Case: With Rotation Beat ---
     {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 5;
         options.spotterMode = JRES_SPOTTER_MODE_NONE;
         options.allowNoSpotter = true;

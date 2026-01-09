@@ -56,7 +56,7 @@ TEST(RoleCouplingTest, SelectionLogic) {
 
     // --- Integrated Mode ---
     {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 5;
         options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
         options.allowNoSpotter = false;
@@ -80,7 +80,7 @@ TEST(RoleCouplingTest, SelectionLogic) {
 
     // --- Sequential Mode ---
     {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 5;
         options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
         options.allowNoSpotter = false;

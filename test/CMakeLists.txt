@@ -36,7 +36,7 @@ add_executable(solver_tests
   test_role_coupling.cpp
   test_rotation_beat.cpp
   test_spotter_balancing.cpp
-  reproduce_issue.cpp
+  test_hard_consecutive_limit.cpp
 )
 
 add_dependencies(solver_tests jres_solver_lib)

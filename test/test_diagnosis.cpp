@@ -20,7 +20,7 @@ namespace {
       ]
     })";
     TEST(DiagnosisTest, UnavailableDriver) {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_NONE;
         JresSolverInput* input = jres_input_from_json(UNAVAILABLE_V2_JSON);
@@ -51,7 +51,7 @@ namespace {
       ]
     })";
     TEST(DiagnosisTest, UnavailableSpotterIntegrated) {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
         options.allowNoSpotter = false;
@@ -90,7 +90,7 @@ namespace {
       ]
     })";
     TEST(DiagnosisTest, SequentialSpotterMode) {
-        JresSolverOptions options;
+        JresSolverOptions options = {};
         options.timeLimit = 10;
         options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
         options.allowNoSpotter = false;
