@@ -1,0 +1,21 @@
+#pragma once
+#include "../jres_internal_types.hpp"
+#include <map>
+#include <vector>
+#include <set>
+
+class Highs;
+
+namespace jres::constraints {
+
+    void apply_minimum_rest_constraints(
+        Highs &highs,
+        const jres::internal::SolverInput& input,
+        const std::vector<jres::internal::TeamMember> &participants,
+        const std::map<std::pair<std::string, int>, int>& driverVars,
+        const std::map<std::pair<std::string, int>, int>& spotterVars,
+        bool enforceCombined,
+        std::map<int, jres::internal::SlackInfo>& slackInfo
+    );
+
+}

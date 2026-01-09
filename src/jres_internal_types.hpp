@@ -60,6 +60,14 @@ struct ScheduleEntry {
     std::string spotter;
 };
 
+struct SlackInfo {
+    std::string type;
+    std::string memberName;
+    int stintIndex;
+    double limit = 0.0;
+    double actual = 0.0;
+};
+
 struct SolverStats {
     int modelColumns = 0;
     int modelRows = 0;
