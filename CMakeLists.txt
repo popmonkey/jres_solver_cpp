@@ -164,6 +164,7 @@ add_library(jres_solver_lib
   src/analysis/capacity_analyzer.cpp
   src/constraints/balancing.cpp
   src/constraints/minimum_rest.cpp
+  src/constraints/max_busy_time.cpp
 )
 set_target_properties(jres_solver_lib PROPERTIES OUTPUT_NAME "jres_solver")
 

@@ -36,6 +36,9 @@ add_executable(solver_tests
   test_rotation_beat.cpp
   test_spotter_balancing.cpp
   test_first_stint.cpp
+  test_max_busy.cpp
+  test_max_busy_mixed_roles.cpp
+  test_max_busy_defaults.cpp
 )
 
 add_dependencies(solver_tests jres_solver_lib)

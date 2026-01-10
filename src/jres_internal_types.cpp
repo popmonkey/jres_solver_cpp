@@ -67,6 +67,7 @@ SolverInput from_c_input(const JresSolverInput* c_input) {
 
     input.consecutiveStints = c_input->consecutiveStints;
     input.minimumRestHours = c_input->minimumRestHours;
+    input.maxBusyHours = c_input->maxBusyHours;
     if (c_input->firstStintDriver) {
         input.firstStintDriver = c_input->firstStintDriver;
     }
