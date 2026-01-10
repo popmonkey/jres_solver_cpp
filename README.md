@@ -22,6 +22,9 @@ See [TOOLS.md](./TOOLS.md) for full usage.
 
 **JresSolver** is a C++ library designed to optimize endurance racing schedules. It uses the **HiGHS** Mixed Integer Programming (MIP) solver to assign drivers (and optional spotters) to race stints while satisfying constraints such as fuel usage, maximum drive times, minimum rest periods, and driver availability. The library utilizes a modular constraint architecture for flexibility and extensibility.
 
+> [!IMPORTANT]
+> When linking against `libjres_solver`, you must also link the **HiGHS** library in your project.
+
 ### Data Structures
 
 The C-API uses the following structs to pass data to and from the solver.
