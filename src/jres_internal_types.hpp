@@ -47,6 +47,7 @@ struct SolverInput
 {
     int consecutiveStints = 1;
     int minimumRestHours = 0;
+    int maxBusyHours = 8;
     std::string firstStintDriver;
     std::vector<TeamMember> teamMembers;
     std::map<std::string, std::map<std::string, Availability>> availability;

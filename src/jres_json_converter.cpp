@@ -76,6 +76,7 @@ JRES_SOLVER_API JresSolverInput* jres_input_from_json(const char* jsonData) {
         // Global Constraints
         input->consecutiveStints = j.value("consecutiveStints", 1);
         input->minimumRestHours = j.value("minimumRestHours", 0);
+        input->maxBusyHours = j.value("maxBusyHours", 8);
         
         if (j.contains("firstStintDriver") && !j["firstStintDriver"].is_null()) {
             input->firstStintDriver = allocate_and_copy(j["firstStintDriver"]);

@@ -58,6 +58,10 @@ jres_solver.exe [options]
 | `-d` | `--diagnose`         | Run in **Diagnostic Mode** to explain why a schedule is infeasible.                           | `false` |
 | `-h` | `--help`             | Print usage instructions.                                                                     |         |
 
+> [!TIP]
+> **Constraint Configuration:**
+> While some options are available as CLI flags, core schedule constraints such as `maxBusyHours`, `minimumRestHours`, and `consecutiveStints` are defined strictly within the **Input JSON** file. See [README](./README.md#input-json-specification) for details.
+
 ### Spotter Modes
 
 #### Integrated Mode (`JRES_SPOTTER_MODE_INTEGRATED`)

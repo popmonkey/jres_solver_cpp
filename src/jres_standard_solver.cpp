@@ -7,6 +7,7 @@
 #include "analysis/capacity_analyzer.hpp"
 #include "constraints/balancing.hpp"
 #include "constraints/minimum_rest.hpp"
+#include "constraints/max_busy_time.hpp"
 #include <algorithm>
 #include <cmath>
 #include <chrono>
@@ -322,6 +323,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     // Apply Rest Constraints
     bool enforceCombinedRest = (m_options.spotterMode == JRES_SPOTTER_MODE_INTEGRATED);
     jres::constraints::apply_minimum_rest_constraints(*m_highs, m_input, m_input.teamMembers, m_driverWorkVars, m_spotterWorkVars, enforceCombinedRest, m_slackInfo);
+    jres::constraints::apply_max_busy_time_constraints(*m_highs, m_input, m_input.teamMembers, m_driverWorkVars, m_spotterWorkVars, enforceCombinedRest, m_slackInfo);
 
 
     // --- Solve Main Model (Drivers + Spotters if Integrated) ---
@@ -461,6 +463,9 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                     spotterSolver.changeColBounds(m_spotterWorkVars.at({driverName, (int)s}), 0.0, 0.0);
                 }
             }
+
+            // Apply Max Busy Constraints (taking fixed drivers into account)
+            jres::constraints::apply_max_busy_time_constraints(spotterSolver, m_input, m_input.teamMembers, m_driverWorkVars, m_spotterWorkVars, true, m_slackInfo, &output.schedule);
 
             // Incentivize Spotting Adjacent to Driving (Proximity & Role Coupling)
             // Calculate Rewards per Block Var
