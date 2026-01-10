@@ -2,9 +2,6 @@
 
 This library can be used to solve for optimal driver and spotter schedules for endurance racing events. It uses the **HiGHS** optimization library.
 
->[!NOTE]
->this is based on the python JRES Solver https://github.com/popmonkey/jres_solver
-
 ## Additional Documentation
 
 * **[Tools](./TOOLS.md)** - releases include some command line tools that use the library
@@ -324,6 +321,10 @@ When the solver fails, the `schedule` array will be empty, and the `diagnosis` a
   "diagnosis": []
 }
 ```
+
+---
+>[!NOTE]
+>this is based on the python JRES Solver https://github.com/popmonkey/jres_solver
 
 ---
 

@@ -404,6 +404,15 @@ void jres::write_output(
 
     auto member_itineraries = generate_member_itineraries(sched_vec, data, has_spotters);
 
+    if (output_file.empty()) {
+        if (format == "txt") {
+             std::cout << generate_full_text_report(sched_vec, driver_stats, spotter_stats, member_itineraries, has_spotters);
+        } else {
+             std::cerr << "Error: Output to stdout is only supported for 'txt' format." << std::endl;
+        }
+        return;
+    }
+
     if (format == "csv") {
         _write_to_csv_file(sched_vec, output_file, has_spotters);
     } else if (format == "txt") {

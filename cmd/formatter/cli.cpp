@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
 
     options.add_options()
         ("i,input", "Input JSON file (solved schedule)", cxxopts::value<std::string>())
-        ("o,output", "Output file path", cxxopts::value<std::string>())
+        ("o,output", "Output file path (optional, defaults to stdout if omitted)", cxxopts::value<std::string>())
         ("f,format", "Output format (zip, csv, txt). Auto-detected from output filename if omitted.", cxxopts::value<std::string>()) 
         ("v,version", "Print version information and exit.")
         ("h,help", "Print usage")
@@ -60,13 +60,12 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        if (!result.count("output")) {
-            std::cerr << "Error: Output file is required (-o)" << std::endl;
-            return 1;
-        }
-
         std::string input_path = result["input"].as<std::string>();
-        std::string output_path = result["output"].as<std::string>();
+        std::string output_path = "";
+        if (result.count("output")) {
+            output_path = result["output"].as<std::string>();
+        }
+        
         std::string format;
 
         // --- Logic: Determine Format ---
@@ -74,22 +73,26 @@ int main(int argc, char* argv[]) {
             // Explicitly provided by user
             format = result["format"].as<std::string>();
         } else {
-            // Auto-detect from extension
-            std::string ext = get_extension(output_path);
-            if (ext == ".csv") {
-                format = "csv";
-            } else if (ext == ".txt") {
+            if (output_path.empty()) {
                 format = "txt";
-            } else if (ext == ".zip") {
-                format = "zip";
             } else {
-                // Unknown extension and no flag -> Error
-                std::cerr << "Error: Could not determine output format from filename extension (" 
-                          << ext << ")." << std::endl;
-                std::cerr << "Please explicitly specify format using -f <zip|csv|txt> or use a standard file extension." << std::endl;
-                return 1;
+                // Auto-detect from extension
+                std::string ext = get_extension(output_path);
+                if (ext == ".csv") {
+                    format = "csv";
+                } else if (ext == ".txt") {
+                    format = "txt";
+                } else if (ext == ".zip") {
+                    format = "zip";
+                } else {
+                    // Unknown extension and no flag -> Error
+                    std::cerr << "Error: Could not determine output format from filename extension (" 
+                              << ext << ")." << std::endl;
+                    std::cerr << "Please explicitly specify format using -f <zip|csv|txt> or use a standard file extension." << std::endl;
+                    return 1;
+                }
+                std::cout << "Auto-detected format: " << format << std::endl;
             }
-            std::cout << "Auto-detected format: " << format << std::endl;
         }
 
         std::ifstream f(input_path);
@@ -113,7 +116,10 @@ int main(int argc, char* argv[]) {
 
         // Call into our library
         jres::write_output(solved_data, output_path, format);
-        std::cout << "Successfully generated " << format << " output: " << output_path << std::endl;
+        
+        if (!output_path.empty()) {
+            std::cout << "Successfully generated " << format << " output: " << output_path << std::endl;
+        }
 
     } catch (const cxxopts::exceptions::exception& e) {
         std::cerr << "Error parsing options: " << e.what() << std::endl;

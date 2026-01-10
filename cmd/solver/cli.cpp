@@ -29,7 +29,7 @@ int main(int argc, char **argv)
     cxxopts::Options options("solver", "JRES endurance race solver.");
     
     options.add_options("General")
-        ("i,input", "Path to the race data .json file. Reads from stdin if not provided.", cxxopts::value<std::string>())
+        ("i,input", "Path to the race data .json file. (Required)", cxxopts::value<std::string>())
         ("o,output", "Optional. Path to save the schedule as a JSON file.", cxxopts::value<std::string>())
         ("q,quiet", "Suppress INFO logs and final schedule print-out.", cxxopts::value<bool>()->default_value("false"))
         ("v,version", "Print version information and exit.")
@@ -60,6 +60,14 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    // Input file is now required
+    if (!result.count("input"))
+    {
+        std::cerr << "Error: Input file is required." << std::endl;
+        std::cout << options.help() << std::endl;
+        return 1;
+    }
+
     bool quiet = result["quiet"].as<bool>();
     bool runDiagnostics = result["diagnose"].as<bool>();
 
@@ -71,28 +79,17 @@ int main(int argc, char **argv)
     std::string raceDataJsonString;
     try
     {
-        if (result.count("input"))
+        std::string inputPath = result["input"].as<std::string>();
+        if (!quiet)
+            std::cout << "[App] Loading data from file: " << inputPath << std::endl;
+        std::ifstream f(inputPath);
+        if (!f.is_open())
         {
-            std::string inputPath = result["input"].as<std::string>();
-            if (!quiet)
-                std::cout << "[App] Loading data from file: " << inputPath << std::endl;
-            std::ifstream f(inputPath);
-            if (!f.is_open())
-            {
-                throw std::runtime_error("Could not open input file: " + inputPath);
-            }
-            std::stringstream buffer;
-            buffer << f.rdbuf();
-            raceDataJsonString = buffer.str();
+            throw std::runtime_error("Could not open input file: " + inputPath);
         }
-        else
-        {
-            if (!quiet)
-                std::cout << "[App] Loading data from stdin..." << std::endl;
-            std::stringstream buffer;
-            buffer << std::cin.rdbuf();
-            raceDataJsonString = buffer.str();
-        }
+        std::stringstream buffer;
+        buffer << f.rdbuf();
+        raceDataJsonString = buffer.str();
     }
     catch (const std::exception &e)
     {

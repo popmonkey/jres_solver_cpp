@@ -74,8 +74,8 @@ The compiled executables are located in the `build/` directory.
 # Run with an input file
 ./jres_solver -i ../data/short_race.json -s integrated
 
-# Pipe data from stdin and output to a file
-cat ../data/24h_race.json | ./jres_solver -s sequential -o /tmp/24_race_solution.json
+# Run with an input file and output to a file
+./jres_solver -i ../data/24h_race.json -s sequential -o /tmp/24_race_solution.json
 
 # Run diagnostics on an infeasible schedule
 ./jres_solver -i ../data/short_race_no_solution.json --diagnose

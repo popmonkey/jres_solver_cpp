@@ -3,7 +3,7 @@
 This suite consists of two command-line tools designed to generate and format driver schedules for endurance racing events.
 
 > [!NOTE]
-Currently the easiest way to generate input for the tools (and library) is to use [the JRES Availability Planner spreadsheet](https://docs.google.com/spreadsheets/d/1k2WaNDhXjyHXLirju2IQKxrYExQpDCT5z6jCBM71KVc/edit?usp=sharing)
+Currently the easiest way to generate input for the tools (and library) is to use [the JRES Availability Planner spreadsheet](https://docs.google.com/spreadsheets/d/1hayKeug7IdZqwmta68PlqOCc8Y1JaL-QeaVal_-APxA/edit?usp=sharing)
 
 ## Platform Support
 
@@ -39,14 +39,14 @@ jres_solver.exe [options]
 
 ### Input/Output Behavior
 
-* **Input:** Accepts a JSON file via the `-i` flag. If no input flag is provided, it reads from **Standard Input (stdin)**.
+* **Input:** Accepts a JSON file via the `-i` flag (Required).
 * **Output:** Prints the schedule summary to **stdout** (unless `-q` is used). To save the raw solution for the Formatter, use the `-o` flag.
 
 ### Options
 
 | Flag | Long Flag            | Description                                                                                   | Default |
 | :--- | :------------------- | :-------------------------------------------------------------------------------------------- | :------ |
-| `-i` | `--input`            | Path to the race data `.json` file. Reads from `stdin` if omitted.                            | `stdin` |
+| `-i` | `--input`            | Path to the race data `.json` file. (Required)                                                |         |
 | `-o` | `--output`           | Path to save the calculated schedule (JSON). **Required for the Formatter.** | `stdout`|
 | `-t` | `--time-limit`       | Maximum time (in seconds) to let the optimizer run.                                           | `5`     |
 | `-q` | `--quiet`            | Suppress INFO logs and the printed schedule summary.                                          | `false` |
@@ -112,16 +112,7 @@ For complex schedules, allow more time while maintaining a practical optimality 
 ./jres_solver -i race_config.json -o solution.json -t 30 --optimality-gap 0.2
 ```
 
-**Pipeline Usage:**
-Pipe a JSON generator directly into the solver.
 
-```sh
-# Linux / macOS
-cat race_data.json | ./jres_solver -o solution.json
-
-# Windows PowerShell
-Get-Content race_data.json | .\jres_solver.exe -o solution.json
-```
 
 ---
 
