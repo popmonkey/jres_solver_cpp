@@ -49,8 +49,7 @@ TEST(ConstraintTest, EnforceConsecutiveStintsHardLimit) {
     options.timeLimit = 10;
     options.spotterMode = JRES_SPOTTER_MODE_NONE; // Focus on drivers
     options.allowNoSpotter = true;
-    options.optimalityGap = 0.0;
-    options.switchingPenalty = 0.0; 
+    options.optimalityGap = 0.0; 
 
     JresSolverOutput* output = solve_race_schedule(input, &options);
     ASSERT_NE(output, nullptr);

@@ -225,31 +225,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         m_highs->addRow(1.0, 1.0, (int)indices.size(), indices.data(), values.data());
     }
 
-    // --- Switching Penalty ---
-    if (m_options.switchingPenalty > 0.0) {
-        for (size_t s = 1; s < m_input.stints.size(); ++s) {
-            int switchVar = m_highs->getNumCol();
-            m_highs->addVar(0.0, 1.0);
-            m_highs->changeColIntegrality(switchVar, HighsVarType::kInteger);
-            m_highs->changeColCost(switchVar, m_options.switchingPenalty);
-
-            // Constraint: switchVar >= driver_s - driver_{s-1} for each driver
-            // switchVar - driver_s + driver_{s-1} >= 0
-            for (const auto& p : m_driverPool) {
-                if (m_driverWorkVars.count({p.name, (int)s}) && m_driverWorkVars.count({p.name, (int)s - 1})) {
-                    int var_s = m_driverWorkVars.at({p.name, (int)s});
-                    int var_prev = m_driverWorkVars.at({p.name, (int)s - 1});
-                    
-                    if (var_s != var_prev) { // Only add if different variables (blocks changed)
-                        std::vector<int> idx = {switchVar, var_s, var_prev};
-                        std::vector<double> val = {1.0, -1.0, 1.0};
-                        m_highs->addRow(0.0, kHighsInf, 3, idx.data(), val.data());
-                    }
-                }
-            }
-        }
-    }
-
     // --- Rotation Beat (Rhythm) Incentive ---
     if (m_options.rotationBeatWeight > 1e-6) {
         const size_t N = m_driverPool.size();

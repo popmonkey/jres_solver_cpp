@@ -32,7 +32,6 @@ add_executable(solver_tests
   test_optimization.cpp
   test_minimum_rest.cpp
   test_fair_share.cpp
-  test_switching_penalty.cpp
   test_role_coupling.cpp
   test_rotation_beat.cpp
   test_spotter_balancing.cpp

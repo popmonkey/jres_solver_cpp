@@ -43,7 +43,6 @@ int main(int argc, char **argv)
         ("g,optimality-gap", "Solver stops when the gap to optimal is less than this (e.g., 0.2 for 20%).", cxxopts::value<double>()->default_value("0.2"));
 
     options.add_options("Advanced Optimization")
-        ("switching-penalty", "Penalty cost for switching drivers (positive disincentivizes switching).", cxxopts::value<double>()->default_value("0.0"))
         ("role-coupling-weight", "Reward weight for coupling roles (positive incentivizes driver->spotter).", cxxopts::value<double>()->default_value("0.0"))
         ("rotation-beat-weight", "Penalty weight for rotation deviation (positive incentivizes adherence).", cxxopts::value<double>()->default_value("0.0"));
 
@@ -121,7 +120,6 @@ int main(int argc, char **argv)
 
     solverOptions.allowNoSpotter = result["allow-no-spotter"].as<bool>();
     solverOptions.optimalityGap = result["optimality-gap"].as<double>();
-    solverOptions.switchingPenalty = result["switching-penalty"].as<double>();
     solverOptions.roleCouplingWeight = result["role-coupling-weight"].as<double>();
     solverOptions.rotationBeatWeight = result["rotation-beat-weight"].as<double>();
 
