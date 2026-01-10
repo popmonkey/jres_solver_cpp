@@ -289,7 +289,9 @@ std::string generate_full_text_report(
         
         size_t max_activity_width = 0;
         for (const auto& item : itinerary.items) {
-            max_activity_width = std::max(max_activity_width, item.activity.length());
+            size_t len = item.activity.length();
+            if (item.activity == "Resting") len += 2;
+            max_activity_width = std::max(max_activity_width, len);
         }
 
         std::string tz_string = std::string("UTC") + (itinerary.tz_offset >= 0 ? "+" : "") + std::to_string(itinerary.tz_offset);
@@ -297,8 +299,11 @@ std::string generate_full_text_report(
 
         for (const auto& item : itinerary.items) {
              double dur = item.end_local.diff_seconds(item.start_local);
+             std::string display_act = item.activity;
+             if (display_act == "Resting") display_act = "  " + display_act;
+
              f << "  " << item.start_local.to_string() << " to " << item.end_local.time_string() 
-               << " " << std::left << std::setw(max_activity_width) << item.activity 
+               << " " << std::left << std::setw(max_activity_width) << display_act 
                << " (" << DateTime::format_duration((long long)dur) << ")\n";
         }
     }
