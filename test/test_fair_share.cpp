@@ -100,7 +100,7 @@ TEST(FairShareTest, EnforcesMinimumRequirement) {
     std::vector<JresMemberAvailability> availabilities;
     availabilities.push_back(mavA);
 
-    JresSolverInput input;
+    JresSolverInput input = {};
     input.consecutiveStints = 20;
     input.minimumRestHours = 0;
     input.stints = stints.data();
@@ -165,7 +165,7 @@ TEST(FairShareTest, SuccessScenario) {
     members.push_back(create_driver("DriverA")); 
     members.push_back(create_driver("DriverB"));
 
-    JresSolverInput input;
+    JresSolverInput input = {};
     input.consecutiveStints = 1;
     input.minimumRestHours = 0;
     input.stints = stints.data();
