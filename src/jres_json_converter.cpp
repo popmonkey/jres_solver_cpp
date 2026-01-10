@@ -76,6 +76,12 @@ JRES_SOLVER_API JresSolverInput* jres_input_from_json(const char* jsonData) {
         // Global Constraints
         input->consecutiveStints = j.value("consecutiveStints", 1);
         input->minimumRestHours = j.value("minimumRestHours", 0);
+        
+        if (j.contains("firstStintDriver") && !j["firstStintDriver"].is_null()) {
+            input->firstStintDriver = allocate_and_copy(j["firstStintDriver"]);
+        } else {
+            input->firstStintDriver = nullptr;
+        }
 
         // Team Members
         input->teamMembers_len = j["teamMembers"].size();
@@ -235,8 +241,8 @@ JRES_SOLVER_API void free_jres_solver_output(JresSolverOutput* output) {
 }
 
 JRES_SOLVER_API void free_jres_solver_input(JresSolverInput* input) {
-    if (!input) {
-        return;
+    if (input->firstStintDriver) {
+        delete[] input->firstStintDriver;
     }
 
     for (int i = 0; i < input->teamMembers_len; ++i) {

@@ -36,7 +36,8 @@ The C-API uses the following structs to pass data to and from the solver.
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `consecutiveStints` | `int` | Hard constraint: Required number of consecutive stints a driver must perform (block size). |
-| `minimumRestHours` | `int` | Hard constraint: Minimum contiguous rest time required once per race. <br> **Integrated Mode:** Applies to combined Driving and Spotting time. <br> **Sequential Mode:** Applies only to Driving. |
+| `minimumRestHours` | `int` | Hard constraint: Minimum contiguous rest time required once per race. |
+| `firstStintDriver` | `const char*` | Hard constraint: The name of the team member who must drive the first stint. |
 | `teamMembers` | `JresTeamMember*` | A pointer to an array of team members. |
 | `teamMembers_len` | `int` | The number of team members. |
 | `availability` | `JresMemberAvailability*` | A pointer to an array of availability information. |
@@ -183,7 +184,8 @@ The `raceDataJson` string passed to `jres_input_from_json` must strictly follow 
 | Field | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `consecutiveStints` | Integer | No (Default `1`) | Hard constraint: Required number of consecutive stints a driver must perform (block size). |
-| `minimumRestHours` | Integer | No (Default `0`) | Hard constraint: Minimum contiguous rest time required once per race. <br> **Integrated Mode:** Applies to combined Driving and Spotting time. <br> **Sequential Mode:** Applies only to Driving. |
+| `minimumRestHours` | Integer | No (Default `0`) | Hard constraint: Minimum contiguous rest time required once per race. |
+| `firstStintDriver` | String | No | Hard constraint: The name of the team member who must drive the first stint. |
 | `teamMembers` | Array | Yes | List of drivers and spotters (see below). |
 | `availability` | Object | Yes | Map of availability constraints (see below). |
 | `stints` | Array | Yes | List of pre-defined race stints (see below). |
@@ -227,6 +229,7 @@ The `availability` object maps a **Team Member's Name** to a dictionary of **Tim
 {
   "consecutiveStints": 2,
   "minimumRestHours": 4,
+  "firstStintDriver": "Niki",
   "teamMembers": [
     {
       "name": "Niki",

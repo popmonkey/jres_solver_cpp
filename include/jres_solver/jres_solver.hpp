@@ -122,6 +122,8 @@ struct JresSolverInput {
     int consecutiveStints;
     /** @brief Minimum rest time in hours required after a shift. */
     int minimumRestHours;
+    /** @brief The name of the team member who must drive the first stint. */
+    const char* firstStintDriver;
     /** @brief A pointer to an array of team members. */
     JresTeamMember* teamMembers;
     /** @brief The number of team members. */

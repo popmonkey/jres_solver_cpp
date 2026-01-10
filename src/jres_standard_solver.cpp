@@ -140,6 +140,20 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     // --- Build Driver Model ---
     add_participant_model(*m_highs, m_driverPool, m_driverWorkVars);
 
+    // --- Hard Constraint: First Stint Driver ---
+    if (!m_input.firstStintDriver.empty()) {
+        bool found = false;
+        if (m_driverWorkVars.count({m_input.firstStintDriver, 0})) {
+            int varIdx = m_driverWorkVars.at({m_input.firstStintDriver, 0});
+            m_highs->changeColBounds(varIdx, 1.0, 1.0);
+            found = true;
+        }
+
+        if (!found) {
+             throw std::runtime_error("First stint driver '" + m_input.firstStintDriver + "' is not a valid driver or is unavailable.");
+        }
+    }
+
     // --- Hard Constraint: iRacing Fair Share Rule ---
     // Rule: Fair Share = 1/4 of (Total Duration / Num Drivers)
     double total_duration_hours = 0.0;
