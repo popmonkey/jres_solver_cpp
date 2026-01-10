@@ -67,6 +67,9 @@ SolverInput from_c_input(const JresSolverInput* c_input) {
 
     input.consecutiveStints = c_input->consecutiveStints;
     input.minimumRestHours = c_input->minimumRestHours;
+    if (c_input->firstStintDriver) {
+        input.firstStintDriver = c_input->firstStintDriver;
+    }
 
     for (int i = 0; i < c_input->teamMembers_len; ++i) {
         TeamMember member;

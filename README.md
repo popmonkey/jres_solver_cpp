@@ -2,9 +2,6 @@
 
 This library can be used to solve for optimal driver and spotter schedules for endurance racing events. It uses the **HiGHS** optimization library.
 
->[!NOTE]
->this is based on the python JRES Solver https://github.com/popmonkey/jres_solver
-
 ## Additional Documentation
 
 * **[Tools](./TOOLS.md)** - releases include some command line tools that use the library
@@ -16,7 +13,6 @@ The `jres_solver` tool supports several optimization parameters:
 
 *   **General:** `-i` (Input), `-o` (Output), `-t` (Time Limit), `-s` (Spotter Mode)
 *   **Advanced Weights:**
-    *   `--switching-penalty`: Cost for driver swaps (positive disincentivizes switching)
     *   `--role-coupling-weight`: Incentive for role coupling (positive incentivizes coupling)
     *   `--rotation-beat-weight`: Penalty for fairness deviation (positive incentivizes adherence)
 
@@ -37,7 +33,8 @@ The C-API uses the following structs to pass data to and from the solver.
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `consecutiveStints` | `int` | Hard constraint: Required number of consecutive stints a driver must perform (block size). |
-| `minimumRestHours` | `int` | Hard constraint: Minimum contiguous rest time required once per race. <br> **Integrated Mode:** Applies to combined Driving and Spotting time. <br> **Sequential Mode:** Applies only to Driving. |
+| `minimumRestHours` | `int` | Hard constraint: Minimum contiguous rest time required once per race. |
+| `firstStintDriver` | `const char*` | Hard constraint: The name of the team member who must drive the first stint. |
 | `teamMembers` | `JresTeamMember*` | A pointer to an array of team members. |
 | `teamMembers_len` | `int` | The number of team members. |
 | `availability` | `JresMemberAvailability*` | A pointer to an array of availability information. |
@@ -98,7 +95,6 @@ These structs are used to represent the availability of team members.
 | `spotterMode` | `JresSpotterMode` | Type of spotter scheduling to use (`NONE`, `INTEGRATED`, `SEQUENTIAL`). |
 | `allowNoSpotter` | `bool` | Allow stints to have no spotter assigned. |
 | `optimalityGap` | `double` | Solver stops when the gap to optimal is less than this (e.g., `0.2`). |
-| `switchingPenalty`| `double` | Penalty applied when switching drivers between stints (default: `0.0`). |
 | `roleCouplingWeight`| `double` | Weight for coupling driver and spotter roles (default: `0.0`). |
 | `rotationBeatWeight`| `double` | Weight for adhering to a rotation beat or fairness metric (default: `0.0`). |
 
@@ -123,7 +119,6 @@ options.timeLimit = 5;
 options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
 options.allowNoSpotter = false;
 options.optimalityGap = 0.2;
-options.switchingPenalty = 10.0; // Encourage longer driver shifts
 
 // Create input struct from JSON
 JresSolverInput* input = jres_input_from_json(raceDataJson);
@@ -165,14 +160,6 @@ Mixed Integer Programming problems like race scheduling are NP-hard. The solver 
 
 The solver prioritizes hard constraints (rest times, fuel, availability) first. The optimality gap only affects soft preferences like minimizing consecutive stints. A 20% gap on these preferences is imperceptible in real-world use.
 
-#### Switching Penalty
-
-The `switchingPenalty` option adds a cost to the optimization objective every time the driver changes between two consecutive stints.
-
-*   **Goal**: To encourage the solver to keep the same driver in the car for multiple stints (e.g., doing a "double stint"), even if it's not strictly required by the `consecutiveStints` constraint.
-*   **Relationship to `consecutiveStints`**: `consecutiveStints` is a **hard constraint** (the solver *must* schedule blocks of this size). The `switchingPenalty` is a **soft incentive** that applies at the boundaries of these blocks to discourage swapping drivers even when a block ends.
-*   **Recommended Value**: Start with `10.0`. If the solver still switches drivers too often for your preference, increase it. If it starts violating preferred availability slots just to avoid a switch, decrease it.
-
 -----
 
 ### JSON Helper Functions
@@ -194,7 +181,8 @@ The `raceDataJson` string passed to `jres_input_from_json` must strictly follow 
 | Field | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `consecutiveStints` | Integer | No (Default `1`) | Hard constraint: Required number of consecutive stints a driver must perform (block size). |
-| `minimumRestHours` | Integer | No (Default `0`) | Hard constraint: Minimum contiguous rest time required once per race. <br> **Integrated Mode:** Applies to combined Driving and Spotting time. <br> **Sequential Mode:** Applies only to Driving. |
+| `minimumRestHours` | Integer | No (Default `0`) | Hard constraint: Minimum contiguous rest time required once per race. |
+| `firstStintDriver` | String | No | Hard constraint: The name of the team member who must drive the first stint. |
 | `teamMembers` | Array | Yes | List of drivers and spotters (see below). |
 | `availability` | Object | Yes | Map of availability constraints (see below). |
 | `stints` | Array | Yes | List of pre-defined race stints (see below). |
@@ -238,6 +226,7 @@ The `availability` object maps a **Team Member's Name** to a dictionary of **Tim
 {
   "consecutiveStints": 2,
   "minimumRestHours": 4,
+  "firstStintDriver": "Niki",
   "teamMembers": [
     {
       "name": "Niki",
@@ -332,6 +321,10 @@ When the solver fails, the `schedule` array will be empty, and the `diagnosis` a
   "diagnosis": []
 }
 ```
+
+---
+>[!NOTE]
+>this is based on the python JRES Solver https://github.com/popmonkey/jres_solver
 
 ---
 

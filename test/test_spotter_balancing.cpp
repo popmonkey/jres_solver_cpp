@@ -38,7 +38,6 @@ TEST(SpotterBalancingTest, IntegratedBalancing) {
     options.spotterMode = JRES_SPOTTER_MODE_INTEGRATED;
     options.allowNoSpotter = false;
     options.optimalityGap = 0.0;
-    options.switchingPenalty = 0.0;
     options.rotationBeatWeight = 0.0;
 
     JresSolverOutput* output = solve_race_schedule(input, &options);
@@ -86,7 +85,6 @@ TEST(SpotterBalancingTest, SequentialBalancing) {
     options.spotterMode = JRES_SPOTTER_MODE_SEQUENTIAL;
     options.allowNoSpotter = false;
     options.optimalityGap = 0.0;
-    options.switchingPenalty = 0.0;
     options.rotationBeatWeight = 0.0;
 
     JresSolverOutput* output = solve_race_schedule(input, &options);

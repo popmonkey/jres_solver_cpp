@@ -135,9 +135,6 @@ The `jres_solver` executable is a client that uses the `jres_solver` library.
 # Run with a file
 ./jres_solver -i ../data/short_race.json -s integrated
 
-# Pipe from stdin
-cat ../data/24h_race.json | ./jres_solver -s sequential --allow-no-spotter
-
 # Run diagnostics on a failing schedule
 ./jres_solver -i ../data/infeasible.json --diagnose
 

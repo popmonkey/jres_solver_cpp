@@ -140,6 +140,20 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     // --- Build Driver Model ---
     add_participant_model(*m_highs, m_driverPool, m_driverWorkVars);
 
+    // --- Hard Constraint: First Stint Driver ---
+    if (!m_input.firstStintDriver.empty()) {
+        bool found = false;
+        if (m_driverWorkVars.count({m_input.firstStintDriver, 0})) {
+            int varIdx = m_driverWorkVars.at({m_input.firstStintDriver, 0});
+            m_highs->changeColBounds(varIdx, 1.0, 1.0);
+            found = true;
+        }
+
+        if (!found) {
+             throw std::runtime_error("First stint driver '" + m_input.firstStintDriver + "' is not a valid driver or is unavailable.");
+        }
+    }
+
     // --- Hard Constraint: iRacing Fair Share Rule ---
     // Rule: Fair Share = 1/4 of (Total Duration / Num Drivers)
     double total_duration_hours = 0.0;
@@ -223,31 +237,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             throw std::runtime_error("Model is infeasible (Stint " + std::to_string(s) + " has no candidates).");
         }
         m_highs->addRow(1.0, 1.0, (int)indices.size(), indices.data(), values.data());
-    }
-
-    // --- Switching Penalty ---
-    if (m_options.switchingPenalty > 0.0) {
-        for (size_t s = 1; s < m_input.stints.size(); ++s) {
-            int switchVar = m_highs->getNumCol();
-            m_highs->addVar(0.0, 1.0);
-            m_highs->changeColIntegrality(switchVar, HighsVarType::kInteger);
-            m_highs->changeColCost(switchVar, m_options.switchingPenalty);
-
-            // Constraint: switchVar >= driver_s - driver_{s-1} for each driver
-            // switchVar - driver_s + driver_{s-1} >= 0
-            for (const auto& p : m_driverPool) {
-                if (m_driverWorkVars.count({p.name, (int)s}) && m_driverWorkVars.count({p.name, (int)s - 1})) {
-                    int var_s = m_driverWorkVars.at({p.name, (int)s});
-                    int var_prev = m_driverWorkVars.at({p.name, (int)s - 1});
-                    
-                    if (var_s != var_prev) { // Only add if different variables (blocks changed)
-                        std::vector<int> idx = {switchVar, var_s, var_prev};
-                        std::vector<double> val = {1.0, -1.0, 1.0};
-                        m_highs->addRow(0.0, kHighsInf, 3, idx.data(), val.data());
-                    }
-                }
-            }
-        }
     }
 
     // --- Rotation Beat (Rhythm) Incentive ---
