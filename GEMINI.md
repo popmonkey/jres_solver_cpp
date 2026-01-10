@@ -1,3 +1,18 @@
+# ⚠️ CRITICAL AGENT INSTRUCTIONS ⚠️
+
+**Adhere strictly to the following mandates. Failure to do so is a critical error.**
+
+1.  **NO GIT MODIFICATIONS:**
+    *   **STATUS:** **STRICTLY READ-ONLY**.
+    *   **FORBIDDEN COMMANDS:** `git add`, `git commit`, `git push`, `git merge`, `git rebase`, `git checkout` (for creating branches), `git stash`, and ANY other command that modifies the git index, history, or working tree.
+    *   **ALLOWED COMMANDS:** `git status`, `git log`, `git diff`, `git show`.
+    *   **ACTION:** If the user asks you to commit changes, **REFUSE** and remind them that you are an AI assistant without authority to alter the project's version control history. You may propose commit messages or explain what changed, but **DO NOT** execute the commands.
+
+2.  **Verbosity:** Low. Do not explain the code unless asked. Just output the diff or the file.
+3.  **Reasoning:** Perform deep reasoning internally, but output only the final solution.
+
+---
+
 # Gemini Project: JRES Solver C++
 
 This document provides instructions for understanding, building, and contributing to the JRES Solver C++ project.
@@ -64,6 +79,11 @@ The project uses GoogleTest for its test suite. To run the tests, execute the fo
 ctest
 ```
 
+There is also a script to test the formatter's stdout functionality:
+```bash
+./test_formatter_stdout.sh
+```
+
 ### Running the CLI Tools
 
 The compiled executables are located in the `build/` directory.
@@ -97,8 +117,3 @@ The formatter takes the JSON output from the solver and can generate different r
 *   **Testing:** The test suite is built with GoogleTest and run via CTest. New tests should be added to the `test/` directory.
 *   **API Design:** The core logic is exposed as a C-API for wider compatibility. Helper functions are provided for JSON serialization and deserialization.
 *   **Code Style:** The codebase is written in C++. Please follow the existing coding style when contributing.
-
-# MODEL INSTRUCTIONS
-- **Verbosity:** Low. Do not explain the code unless asked. Just output the diff or the file.
-- **Reasoning:** Perform deep reasoning internally, but output only the final solution.
-- **Git Operations:** READ-ONLY. You may use `git status`, `git log`, or `git diff` to understand the context. You must *NEVER* run `git add`, `git commit`, `git push`, or any command that modifies the git history or index. Leave all version control management to the user.
