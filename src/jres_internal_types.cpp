@@ -159,6 +159,16 @@ JresSolverOutput* to_c_output(const SolverOutput& output, const JresSolverOption
         c_output->config->firstStintDriver = nullptr;
     }
 
+    // Copy teamMembers
+    c_output->teamMembers_len = output.teamMembers.size();
+    c_output->teamMembers = new JresTeamMember[c_output->teamMembers_len];
+    for (size_t i = 0; i < output.teamMembers.size(); ++i) {
+        c_output->teamMembers[i].name = allocate_and_copy(output.teamMembers[i].name);
+        c_output->teamMembers[i].isDriver = output.teamMembers[i].isDriver;
+        c_output->teamMembers[i].isSpotter = output.teamMembers[i].isSpotter;
+        c_output->teamMembers[i].tzOffset = output.teamMembers[i].tzOffset;
+    }
+
     return c_output;
 }
 
