@@ -34,6 +34,7 @@ jobs:
       HIGHS_TAG: highs-static-v1.12.0
       HIGHS_DIR: ${{ github.workspace }}/highs
       ASSET_NAME: "" 
+      ROOT_DIR: ""
       SAFE_VERSION: ""
       SAFE_ARCH: ""
       SAFE_PLATFORM: ""
@@ -159,30 +160,33 @@ jobs:
           echo "SAFE_ARCH=$(sanitize "${{ inputs.arch }}")" >> $GITHUB_ENV
           
       - name: Set Asset Name
-        run: echo "ASSET_NAME=jres-solver-${{ env.SAFE_VERSION }}-${{ env.SAFE_PLATFORM }}-${{ env.SAFE_ARCH }}.${{ inputs.asset_ext }}" >> $GITHUB_ENV
+        run: |
+          ROOT_DIR="jres_solver-${{ env.SAFE_VERSION }}-${{ env.SAFE_PLATFORM }}-${{ env.SAFE_ARCH }}"
+          echo "ROOT_DIR=$ROOT_DIR" >> $GITHUB_ENV
+          echo "ASSET_NAME=$ROOT_DIR.${{ inputs.asset_ext }}" >> $GITHUB_ENV
 
       - name: Package (Curated Selection)
         run: |
-          mkdir -p package/bin
-          mkdir -p package/lib
-          mkdir -p package/include/jres_solver
+          mkdir -p package/${{ env.ROOT_DIR }}/bin
+          mkdir -p package/${{ env.ROOT_DIR }}/lib
+          mkdir -p package/${{ env.ROOT_DIR }}/include/jres_solver
 
           echo "Packaging Binary Artifacts..."
           
           # Executables
-          cp dist/bin/jres_solver package/bin/
-          cp dist/bin/jres_formatter package/bin/
+          cp dist/bin/jres_solver package/${{ env.ROOT_DIR }}/bin/
+          cp dist/bin/jres_formatter package/${{ env.ROOT_DIR }}/bin/
           
           # Library (Grab .a or .so depending on build, likely .a)
           # Using find/cp with wildcard to be robust against lib vs lib64 differences
-          find dist -name "libjres_solver.*" -exec cp {} package/lib/ \;
+          find dist -name "libjres_solver.*" -exec cp {} package/${{ env.ROOT_DIR }}/lib/ \;
           
           # Public Headers
-          cp dist/include/jres_solver/*.hpp package/include/jres_solver/
+          cp dist/include/jres_solver/*.hpp package/${{ env.ROOT_DIR }}/include/jres_solver/
           
           # Archive the 'package' folder content
           cd package
-          tar -czvf "../${{ env.ASSET_NAME }}" .
+          tar -czvf "../${{ env.ASSET_NAME }}" "${{ env.ROOT_DIR }}"
           
       # ---------------------------------------------------------
       # Generate Signature (Checksum)

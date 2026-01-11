@@ -23,6 +23,7 @@ jobs:
       HIGHS_ZIP: highs-v1.12.0-windows-x64.zip
       HIGHS_DIR: ${{ github.workspace }}\highs
       ASSET_NAME: "" 
+      ROOT_DIR: ""
       SAFE_VERSION: ""
       SAFE_ARCH: ""
       
@@ -109,34 +110,41 @@ jobs:
     - name: Set Asset Name
       shell: pwsh
       run: | 
-        $assetName = "jres-solver-${{ env.SAFE_VERSION }}-windows-${{ env.SAFE_ARCH }}.zip"
+        $rootDir = "jres_solver-${{ env.SAFE_VERSION }}-windows-${{ env.SAFE_ARCH }}"
+        $assetName = "$rootDir.zip"
+        echo "ROOT_DIR=$rootDir" >> $env:GITHUB_ENV
         echo "ASSET_NAME=$assetName" >> $env:GITHUB_ENV
 
     - name: Package (Curated Selection)
       shell: pwsh
       run: |
         $pkg = "package"
-        New-Item -ItemType Directory -Path "$pkg\bin" -Force | Out-Null
-        New-Item -ItemType Directory -Path "$pkg\lib" -Force | Out-Null
-        New-Item -ItemType Directory -Path "$pkg\include\jres_solver" -Force | Out-Null
+        $rootDir = "${{ env.ROOT_DIR }}"
+        $base = Join-Path $pkg $rootDir
+
+        New-Item -ItemType Directory -Path (Join-Path $base "bin") -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $base "lib") -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $base "include\jres_solver") -Force | Out-Null
 
         Write-Host "Packaging Binary Artifacts..."
         
         # Executables
-        Copy-Item "dist\bin\jres_solver.exe" -Destination "$pkg\bin\"
-        Copy-Item "dist\bin\jres_formatter.exe" -Destination "$pkg\bin\"
+        Copy-Item "dist\bin\jres_solver.exe" -Destination (Join-Path $base "bin")
+        Copy-Item "dist\bin\jres_formatter.exe" -Destination (Join-Path $base "bin")
         
         # Library (static)
         if (Test-Path "dist\lib\jres_solver.lib") {
-            Copy-Item "dist\lib\jres_solver.lib" -Destination "$pkg\lib\"
+            Copy-Item "dist\lib\jres_solver.lib" -Destination (Join-Path $base "lib")
         }
         
         # Public Headers
-        Copy-Item "dist\include\jres_solver\*.hpp" -Destination "$pkg\include\jres_solver\"
+        Copy-Item "dist\include\jres_solver\*.hpp" -Destination (Join-Path $base "include\jres_solver")
 
         # Zip the package folder
         $assetPath = "$env:ASSET_NAME"
         Write-Host "Zipping curated package to $assetPath..."
+        
+        # Zip the contents of 'package' (which is just the ROOT_DIR folder)
         Get-ChildItem -Path $pkg | Compress-Archive -DestinationPath $assetPath
 
     # ---------------------------------------------------------
