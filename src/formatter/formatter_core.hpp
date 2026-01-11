@@ -31,6 +31,11 @@ namespace jres {
                       const std::string& output_file, 
                       const std::string& format);
 
+    /**
+     * @brief Returns the version string of the library.
+     */
+    const char* get_version();
+
     // --- Exposed Helpers (for Testing) ---
 
     std::string generate_schedule_csv_string(

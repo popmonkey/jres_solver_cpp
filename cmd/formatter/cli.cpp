@@ -11,7 +11,6 @@
 #include <algorithm>
 
 #include "formatter/formatter_core.hpp"
-#include "version.h"
 
 using json = nlohmann::json;
 
@@ -44,7 +43,7 @@ int main(int argc, char* argv[]) {
         auto result = options.parse(argc, argv);
 
         if (result.count("version")) {
-            std::cout << "JRES Solver Version: " << JRES_VERSION_STRING << std::endl;
+            std::cout << "JRES Solver (formatter) Version: " << jres::get_version() << std::endl;
             return 0;
         }
 
@@ -53,7 +52,7 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        std::cout << "[App] JRES Solver " << JRES_VERSION_STRING << std::endl;
+        std::cout << "[App] JRES Solver (formatter) " << jres::get_version() << std::endl;
 
         if (!result.count("input")) {
             std::cerr << "Error: Input file is required (-i)" << std::endl;

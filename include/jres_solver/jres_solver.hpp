@@ -219,6 +219,12 @@ struct JresSolverOutput {
 JRES_SOLVER_API JresSolverOutput* solve_race_schedule(const JresSolverInput* input, const JresSolverOptions* options);
 JRES_SOLVER_API JresSolverOutput* diagnose_race_schedule(const JresSolverInput* input, const JresSolverOptions* options);
 
+/**
+ * @brief Returns the version string of the library.
+ * @return A null-terminated string containing the version (e.g., "1.0.0").
+ */
+JRES_SOLVER_API const char* jres_get_version();
+
 JRES_SOLVER_API JresSolverInput* jres_input_from_json(const char* jsonData);
 JRES_SOLVER_API char* jres_output_to_json(const JresSolverOutput* output);
 
