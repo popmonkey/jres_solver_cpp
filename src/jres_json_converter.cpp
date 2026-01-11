@@ -143,6 +143,7 @@ JRES_SOLVER_API char* jres_output_to_json(const JresSolverOutput* output) {
 
     try {
         json j;
+        j["version"] = jres_get_version();
         j["schedule"] = json::array();
         for (int i = 0; i < output->schedule_len; ++i) {
             json entry;
