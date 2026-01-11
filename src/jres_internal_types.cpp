@@ -67,7 +67,7 @@ SolverInput from_c_input(const JresSolverInput* c_input) {
 
     input.consecutiveStints = c_input->consecutiveStints;
     input.minimumRestHours = c_input->minimumRestHours;
-    input.maxBusyHours = c_input->maxBusyHours;
+    input.maximumBusyHours = c_input->maximumBusyHours;
     if (c_input->firstStintDriver) {
         input.firstStintDriver = c_input->firstStintDriver;
     }
@@ -131,25 +131,33 @@ JresSolverOutput* to_c_output(const SolverOutput& output, const JresSolverOption
         c_output->diagnosis[i] = allocate_and_copy(output.diagnosis[i]);
     }
 
-    c_output->stats = new JresSolverStats();
-    c_output->stats->modelColumns = output.stats.modelColumns;
-    c_output->stats->modelRows = output.stats.modelRows;
-    c_output->stats->searchNodes = output.stats.searchNodes;
-    c_output->stats->finalGap = output.stats.finalGap;
-    c_output->stats->setupDurationMs = output.stats.setupDurationMs;
-    c_output->stats->driverSolveDurationMs = output.stats.driverSolveDurationMs;
-    c_output->stats->spotterSolveDurationMs = output.stats.spotterSolveDurationMs;
-
-    c_output->teamMembers_len = output.teamMembers.size();
-    c_output->teamMembers = new JresTeamMember[c_output->teamMembers_len];
-    for (size_t i = 0; i < output.teamMembers.size(); ++i) {
-        c_output->teamMembers[i].name = allocate_and_copy(output.teamMembers[i].name);
-        c_output->teamMembers[i].isDriver = output.teamMembers[i].isDriver;
-        c_output->teamMembers[i].isSpotter = output.teamMembers[i].isSpotter;
-        c_output->teamMembers[i].tzOffset = output.teamMembers[i].tzOffset;
+    if (output.stats.modelRows > 0 || output.stats.modelColumns > 0) {
+        c_output->stats = new JresSolverStats();
+        c_output->stats->modelColumns = output.stats.modelColumns;
+        c_output->stats->modelRows = output.stats.modelRows;
+        c_output->stats->searchNodes = output.stats.searchNodes;
+        c_output->stats->finalGap = output.stats.finalGap;
+        c_output->stats->setupDurationMs = output.stats.setupDurationMs;
+        c_output->stats->driverSolveDurationMs = output.stats.driverSolveDurationMs;
+        c_output->stats->spotterSolveDurationMs = output.stats.spotterSolveDurationMs;
+    } else {
+        c_output->stats = nullptr;
     }
+    
+    // Copy options
+    c_output->options = new JresSolverOptions();
+    *c_output->options = options;
 
-    c_output->options = new JresSolverOptions(options);
+    // Copy config
+    c_output->config = new JresInputConfig();
+    c_output->config->consecutiveStints = output.config.consecutiveStints;
+    c_output->config->minimumRestHours = output.config.minimumRestHours;
+    c_output->config->maximumBusyHours = output.config.maximumBusyHours;
+    if (!output.config.firstStintDriver.empty()) {
+        c_output->config->firstStintDriver = allocate_and_copy(output.config.firstStintDriver);
+    } else {
+        c_output->config->firstStintDriver = nullptr;
+    }
 
     return c_output;
 }

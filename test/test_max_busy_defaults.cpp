@@ -44,7 +44,7 @@ TEST(MaxBusyDefaults, DefaultValueCheck) {
     // Verify manually that input->maxBusyHours is 8 (if we can inspect it? It's in the opaque struct)
     // Actually we can inspect it because we have the struct definition in header.
     // But JresSolverInput definition is in jres_solver.hpp which is included.
-    EXPECT_EQ(input->maxBusyHours, 8);
+    EXPECT_EQ(input->maximumBusyHours, 8);
 
     JresSolverOutput* output = solve_race_schedule(input, &options);
     
@@ -56,7 +56,7 @@ TEST(MaxBusyDefaults, DefaultValueCheck) {
     }
     
     if (feasible) {
-         FAIL() << "Solver found schedule despite default maxBusyHours=8 violation.";
+         FAIL() << "Solver found schedule despite default maximumBusyHours=8 violation.";
     }
 
     free_jres_solver_output(output);

@@ -10,7 +10,7 @@ TEST(MaxBusyTest, MaxBusyHoursInfeasible) {
     // Driver cannot do S1, S2, S3 continuously.
     
     std::string json_str = R"({
-      "maxBusyHours": 2,
+      "maximumBusyHours": 2,
       "teamMembers": [
         { "name": "D1", "isDriver": true }
       ],
@@ -56,7 +56,7 @@ TEST(MaxBusyTest, MaxBusyHoursFeasible) {
     // D1: S1, S2. D2: S3. Valid.
     
     std::string json_str = R"({
-      "maxBusyHours": 2,
+      "maximumBusyHours": 2,
       "teamMembers": [
         { "name": "D1", "isDriver": true },
         { "name": "D2", "isDriver": true }
@@ -101,7 +101,7 @@ TEST(MaxBusyTest, MaxBusySpotterIntegrated) {
     // Spotter cannot do S1, S2, S3 continuously.
     
      std::string json_str = R"({
-      "maxBusyHours": 2,
+      "maximumBusyHours": 2,
       "teamMembers": [
         { "name": "D1", "isDriver": true, "isSpotter": false },
         { "name": "D2", "isDriver": true, "isSpotter": false },
@@ -153,7 +153,7 @@ TEST(MaxBusyTest, MaxBusySequential) {
     // Combined Kyle = 8h. > 6h.
     
     std::string json_str = R"({
-      "maxBusyHours": 6,
+      "maximumBusyHours": 6,
       "teamMembers": [
         { "name": "Kyle", "isDriver": true, "isSpotter": true },
         { "name": "D2", "isDriver": true, "isSpotter": false },

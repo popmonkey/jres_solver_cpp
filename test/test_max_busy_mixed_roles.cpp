@@ -19,7 +19,7 @@ TEST(MaxBusyMixedRoles, AlternatingWorkload) {
     
     std::string json_str = R"({
       "consecutiveStints": 2,
-      "maxBusyHours": 8,
+      "maximumBusyHours": 8,
       "teamMembers": [
         { "name": "Kyle", "isDriver": true, "isSpotter": true }
       ],
@@ -68,7 +68,7 @@ TEST(MaxBusyMixedRoles, AlternatingWorkload) {
         for(int i=0; i<12; ++i) {
             std::cout << i << ": " << output->schedule[i].driver << " / " << output->schedule[i].spotter << std::endl;
         }
-        FAIL() << "Solver produced a schedule violating maxBusyHours with alternating roles.";
+        FAIL() << "Solver produced a schedule violating maximumBusyHours with alternating roles.";
     }
 
     free_jres_solver_output(output);

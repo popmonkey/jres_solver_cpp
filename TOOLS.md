@@ -60,7 +60,7 @@ jres_solver.exe [options]
 
 > [!TIP]
 > **Constraint Configuration:**
-> While some options are available as CLI flags, core schedule constraints such as `maxBusyHours`, `minimumRestHours`, and `consecutiveStints` are defined strictly within the **Input JSON** file. See [README](./README.md#input-json-specification) for details.
+> While some options are available as CLI flags, core schedule constraints such as `maximumBusyHours`, `minimumRestHours`, and `consecutiveStints` are defined strictly within the **Input JSON** file. See [README](./README.md#input-json-specification) for details.
 
 ### Spotter Modes
 

@@ -186,7 +186,7 @@ The `raceDataJson` string passed to `jres_input_from_json` must strictly follow 
 | :--- | :--- | :--- | :--- |
 | `consecutiveStints` | Integer | No (Default `1`) | Hard constraint: Required number of consecutive stints a driver must perform (block size). |
 | `minimumRestHours` | Integer | No (Default `0`) | Hard constraint: Minimum contiguous rest time required once per race. |
-| `maxBusyHours` | Integer | No (Default `8`) | Hard constraint: Maximum total time (driving + spotting) a member can work before a required rest. |
+| `maximumBusyHours` | Integer | No (Default `8`) | Hard constraint: Maximum total time (driving + spotting) a member can work before a required rest. |
 | `firstStintDriver` | String | No | Hard constraint: The name of the team member who must drive the first stint. |
 | `teamMembers` | Array | Yes | List of drivers and spotters (see below). |
 | `availability` | Object | Yes | Map of availability constraints (see below). |
