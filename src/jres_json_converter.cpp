@@ -76,7 +76,7 @@ JRES_SOLVER_API JresSolverInput* jres_input_from_json(const char* jsonData) {
         // Global Constraints
         input->consecutiveStints = j.value("consecutiveStints", 1);
         input->minimumRestHours = j.value("minimumRestHours", 0);
-        input->maxBusyHours = j.value("maxBusyHours", 8);
+        input->maximumBusyHours = j.value("maximumBusyHours", 8);
         
         if (j.contains("firstStintDriver") && !j["firstStintDriver"].is_null()) {
             input->firstStintDriver = allocate_and_copy(j["firstStintDriver"]);
@@ -194,6 +194,17 @@ JRES_SOLVER_API char* jres_output_to_json(const JresSolverOutput* output) {
             j["options"] = options_json;
         }
 
+        if (output->config) {
+            json config_json;
+            config_json["consecutiveStints"] = output->config->consecutiveStints;
+            config_json["minimumRestHours"] = output->config->minimumRestHours;
+            config_json["maximumBusyHours"] = output->config->maximumBusyHours;
+            if (output->config->firstStintDriver) {
+                config_json["firstStintDriver"] = output->config->firstStintDriver;
+            }
+            j["configuration"] = config_json;
+        }
+
         std::string json_str = j.dump();
         return allocate_and_copy(json_str);
 
@@ -237,6 +248,12 @@ JRES_SOLVER_API void free_jres_solver_output(JresSolverOutput* output) {
     }
     if (output->options) {
         delete output->options;
+    }
+    if (output->config) {
+        if (output->config->firstStintDriver) {
+             delete[] output->config->firstStintDriver; // allocated via allocate_and_copy
+        }
+        delete output->config;
     }
     delete output;
 }

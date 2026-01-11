@@ -18,7 +18,7 @@ void apply_max_busy_time_constraints(
 {
     using namespace jres::internal;
 
-    if (input.maxBusyHours <= 0) return;
+    if (input.maximumBusyHours <= 0) return;
     
     // Calculate durations
     std::vector<double> stintDurations;
@@ -37,7 +37,7 @@ void apply_max_busy_time_constraints(
             for (size_t e = s; e < input.stints.size(); ++e) {
                 currentDuration += stintDurations[e];
                 
-                if (currentDuration > input.maxBusyHours) {
+                if (currentDuration > input.maximumBusyHours) {
                     // Violation if assigned to ALL stints in [s, e]
                     // Constraint: Sum(coeff * x[k]) <= (e - s)
                     

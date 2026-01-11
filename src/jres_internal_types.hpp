@@ -47,7 +47,7 @@ struct SolverInput
 {
     int consecutiveStints = 1;
     int minimumRestHours = 0;
-    int maxBusyHours = 8;
+    int maximumBusyHours = 8;
     std::string firstStintDriver;
     std::vector<TeamMember> teamMembers;
     std::map<std::string, std::map<std::string, Availability>> availability;
@@ -80,12 +80,20 @@ struct SolverStats {
     double spotterSolveDurationMs = 0.0;
 };
 
+struct InputConfig {
+    int consecutiveStints = 1;
+    int minimumRestHours = 0;
+    int maximumBusyHours = 8;
+    std::string firstStintDriver;
+};
+
 struct SolverOutput
 {
     std::vector<ScheduleEntry> schedule;
     std::vector<std::string> diagnosis;
     SolverStats stats;
     std::vector<TeamMember> teamMembers;
+    InputConfig config;
     // Add any other output fields here, like diagnosis or metrics
 };
 

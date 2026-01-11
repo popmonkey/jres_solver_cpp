@@ -124,6 +124,12 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     auto startTotal = high_resolution_clock::now();
     jres::internal::SolverOutput output;
 
+    // Populate Config
+    output.config.consecutiveStints = m_input.consecutiveStints;
+    output.config.minimumRestHours = m_input.minimumRestHours;
+    output.config.maximumBusyHours = m_input.maximumBusyHours;
+    output.config.firstStintDriver = m_input.firstStintDriver;
+
     // --- Arithmetic Pre-flight Check ---
     int totalStints = (int)m_input.stints.size();
     auto capAnalysis = jres::internal::CapacityAnalyzer::calculate_max_potential_capacity(m_driverPool, m_input);
