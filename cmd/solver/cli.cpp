@@ -16,8 +16,6 @@
 
 #include "jres_solver/jres_solver.hpp"
 
-#include "version.h"
-
 using json = nlohmann::json;
 
 /**
@@ -50,7 +48,7 @@ int main(int argc, char **argv)
 
     if (result.count("version"))
     {
-        std::cout << "JRES Solver Version: " << JRES_VERSION_STRING << std::endl;
+        std::cout << "JRES Solver Version: " << jres_get_version() << std::endl;
         return 0;
     }
 
@@ -72,7 +70,7 @@ int main(int argc, char **argv)
     bool runDiagnostics = result["diagnose"].as<bool>();
 
     if (!quiet) {
-        std::cout << "[App] JRES Solver " << JRES_VERSION_STRING << std::endl;
+        std::cout << "[App] JRES Solver " << jres_get_version() << std::endl;
     }
 
     // Load Input JSON Data into a std::string

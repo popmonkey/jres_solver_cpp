@@ -6,6 +6,11 @@
 #include "jres_solver/jres_solver.hpp"
 #include "jres_internal_types.hpp"
 #include "jres_standard_solver.hpp"
+#include "version.h"
+
+JRES_SOLVER_API const char* jres_get_version() {
+    return JRES_VERSION_STRING;
+}
 
 JRES_SOLVER_API JresSolverOutput* solve_race_schedule(const JresSolverInput* input, const JresSolverOptions* options) {
     try {

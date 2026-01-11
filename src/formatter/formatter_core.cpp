@@ -8,6 +8,7 @@
 
 #include "utils/date_utils.hpp"
 #include "utils/zip_writer.hpp"
+#include "version.h"
 
 #include <iostream>
 #include <fstream>
@@ -18,6 +19,10 @@
 
 using namespace jres;
 using json = nlohmann::json;
+
+const char* jres::get_version() {
+    return JRES_VERSION_STRING;
+}
 
 // --- Internal Structures ---
 struct DutyBlock {

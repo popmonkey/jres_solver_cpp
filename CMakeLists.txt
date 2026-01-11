@@ -212,7 +212,10 @@ target_link_libraries(solver PRIVATE jres_solver_lib cxxopts nlohmann_json)
 # --- JRES Formatter Logic ---
 add_library(jres_formatter_lib STATIC src/formatter/formatter_core.cpp)
 target_link_libraries(jres_formatter_lib PUBLIC jres_utils nlohmann_json)
-target_include_directories(jres_formatter_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(jres_formatter_lib PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
+)
 
 # --- Formatter CLI ---
 add_executable(formatter cmd/formatter/cli.cpp)
