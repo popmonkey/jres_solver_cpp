@@ -51,9 +51,12 @@ void JresStandardSolver::add_participant_model(
     // Pre-parse stint times
     std::vector<std::chrono::system_clock::time_point> startTimes;
     startTimes.reserve(m_input.stints.size());
+    std::vector<std::chrono::system_clock::time_point> endTimes;
+    endTimes.reserve(m_input.stints.size());
 
     for (const auto& stint : m_input.stints) {
         startTimes.push_back(jres::internal::TimeHelpers::stringToTimePoint(stint.startTime));
+        endTimes.push_back(jres::internal::TimeHelpers::stringToTimePoint(stint.endTime));
     }
 
     // Determine Block Structure
@@ -94,18 +97,28 @@ void JresStandardSolver::add_participant_model(
             for (int s_idx : block) {
                 workVars[{p.name, s_idx}] = workVarIdx;
 
-                std::string availabilityKey = jres::internal::TimeHelpers::timePointToKey(startTimes[s_idx]);
-                auto member_availability_it = m_input.availability.find(p.name);
-                if (member_availability_it != m_input.availability.end()) {
-                    auto time_availability_it = member_availability_it->second.find(availabilityKey);
-                    if (time_availability_it != member_availability_it->second.end()) {
-                        if (time_availability_it->second == jres::internal::Availability::Unavailable) {
-                            total_cost += kPenaltyUnavailable;
-                            any_unavailable = true;
-                        } else if (time_availability_it->second == jres::internal::Availability::Preferred) {
-                            total_cost += kRewardPreferred;
+                auto s_time = startTimes[s_idx];
+                auto e_time = endTimes[s_idx];
+
+                // Start checking from the hour bucket where the stint starts
+                std::string startKey = jres::internal::TimeHelpers::timePointToKey(s_time);
+                auto t_cursor = jres::internal::TimeHelpers::stringToTimePoint(startKey);
+
+                while (t_cursor < e_time) {
+                    std::string availabilityKey = jres::internal::TimeHelpers::timePointToKey(t_cursor);
+                    auto member_availability_it = m_input.availability.find(p.name);
+                    if (member_availability_it != m_input.availability.end()) {
+                        auto time_availability_it = member_availability_it->second.find(availabilityKey);
+                        if (time_availability_it != member_availability_it->second.end()) {
+                            if (time_availability_it->second == jres::internal::Availability::Unavailable) {
+                                total_cost += kPenaltyUnavailable;
+                                any_unavailable = true;
+                            } else if (time_availability_it->second == jres::internal::Availability::Preferred) {
+                                total_cost += kRewardPreferred;
+                            }
                         }
                     }
+                    t_cursor += std::chrono::hours(1);
                 }
             }
 

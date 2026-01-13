@@ -39,6 +39,8 @@ add_executable(solver_tests
   test_max_busy.cpp
   test_max_busy_mixed_roles.cpp
   test_max_busy_defaults.cpp
+  test_availability_overlap.cpp
+  test_availability_boundaries.cpp
 )
 
 add_dependencies(solver_tests jres_solver_lib)
