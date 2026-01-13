@@ -24,6 +24,7 @@ See [TOOLS.md](./TOOLS.md) for full usage.
 
 > [!IMPORTANT]
 > When linking against `libjres_solver`, you must also link the **HiGHS** library in your project.
+> Pre-built static binaries for HiGHS are available [here](https://github.com/popmonkey/jres_solver_cpp/releases/tag/highs-static-v1.12.0).
 
 ### Data Structures
 
