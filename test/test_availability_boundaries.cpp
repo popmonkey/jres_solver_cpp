@@ -57,7 +57,7 @@ TEST(AvailabilityBoundaryTest, StintOverlapsUnavailableByOneMinute) {
     JresSolverOutput* output = solve_race_schedule(input, &options);
     bool hasViolation = false;
     for (int i = 0; i < output->diagnosis_len; ++i) {
-        if (std::string(output->diagnosis[i]).find("Violation: Unavailable Driver") != std::string::npos) hasViolation = true;
+        if (std::string(output->diagnosis[i]).find("No one could drive without being Unavailable") != std::string::npos) hasViolation = true;
     }
 
     EXPECT_TRUE(hasViolation);

@@ -388,25 +388,11 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     const auto& solution = m_highs->getSolution();
     const std::vector<double>& colValues = solution.col_value;
 
-    // Check Slacks (Covers both Drivers and Spotters in Integrated mode)
-    for (const auto& [varIdx, info] : m_slackInfo) {
-        if (varIdx < colValues.size() && colValues[varIdx] > 0.001) {
-            std::ostringstream ss;
-            ss << "Violation: " << info.type << " for " << info.memberName;
-            if (info.stintIndex >= 0) {
-               ss << " at Stint " << info.stintIndex;
-            }
-            ss << " (Value: " << colValues[varIdx] << ")";
-            output.diagnosis.push_back(ss.str());
-        }
-    }
-    
-    // Check Unavailable Assignments
-    for (int varIdx : m_unavailableVars) {
-         if (varIdx < colValues.size() && colValues[varIdx] > 0.5) {
-             // We can defer detailed message generation to the loop below
-         }
-    }
+    std::vector<std::string> humanDiags = jres::analysis::formatHumanDiagnostic(
+        m_slackInfo, m_unavailableVars, m_driverWorkVars, m_spotterWorkVars, 
+        colValues, m_input, m_driverPool, m_spotterPool
+    );
+    output.diagnosis.insert(output.diagnosis.end(), humanDiags.begin(), humanDiags.end());
 
     for (size_t s = 0; s < m_input.stints.size(); ++s) {
         jres::internal::ScheduleEntry entry;
@@ -422,10 +408,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                 int idx = m_driverWorkVars.at({p.name, (int)s});
                 if (colValues[idx] > 0.5) {
                     entry.driver = p.name;
-                    if (m_unavailableVars.count(idx)) {
-                        output.diagnosis.push_back("Violation: Unavailable Driver " + p.name + " assigned to Stint " + std::to_string(s));
-                        output.diagnosis.push_back(jres::analysis::explain_assignment_failure((int)s, p.name, m_input, m_driverPool, m_driverWorkVars, colValues));
-                    }
                     break;
                 }
             }
@@ -438,9 +420,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                     int idx = m_spotterWorkVars.at({p.name, (int)s});
                     if (colValues[idx] > 0.5) {
                         entry.spotter = p.name;
-                        if (m_unavailableVars.count(idx)) {
-                            output.diagnosis.push_back("Violation: Unavailable Spotter " + p.name + " assigned to Stint " + std::to_string(s));
-                        }
                         break;
                     }
                 }
@@ -539,17 +518,12 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                 const auto& spotterSolution = spotterSolver.getSolution();
                 const std::vector<double>& sColValues = spotterSolution.col_value;
 
-                // Check Spotter Slacks
-                for (const auto& [varIdx, info] : m_slackInfo) {
-                    if (varIdx < sColValues.size() && sColValues[varIdx] > 0.001) {
-                        std::ostringstream ss;
-                        ss << "Violation: " << info.type << " for Spotter " << info.memberName;
-                        if (info.stintIndex >= 0) {
-                            ss << " at Stint " << info.stintIndex;
-                        }
-                        output.diagnosis.push_back(ss.str());
-                    }
-                }
+                // Human-Friendly Spotter Diagnostics
+                std::vector<std::string> spotterDiags = jres::analysis::formatHumanDiagnostic(
+                    m_slackInfo, m_unavailableVars, m_driverWorkVars, m_spotterWorkVars, 
+                    sColValues, m_input, m_driverPool, m_spotterPool
+                );
+                output.diagnosis.insert(output.diagnosis.end(), spotterDiags.begin(), spotterDiags.end());
 
                 for (size_t s = 0; s < m_input.stints.size(); ++s) {
                     for (const auto& p : m_spotterPool) {
@@ -557,9 +531,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                             int idx = m_spotterWorkVars.at({p.name, (int)s});
                             if (sColValues[idx] > 0.5) {
                                 output.schedule[s].spotter = p.name;
-                                if (m_unavailableVars.count(idx)) {
-                                    output.diagnosis.push_back("Violation: Unavailable Spotter " + p.name + " assigned to Stint " + std::to_string(s));
-                                }
                                 break;
                             }
                         }

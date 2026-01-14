@@ -262,7 +262,7 @@ namespace {
       bool found = false;
       for (int i = 0; i < output->diagnosis_len; ++i) {
           std::string msg(output->diagnosis[i]);
-          if (msg.find("Violation: Unavailable Spotter") != std::string::npos) {
+          if (msg.find("No one could spot without being Unavailable") != std::string::npos) {
               found = true;
               break;
           }

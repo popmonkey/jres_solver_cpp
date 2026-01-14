@@ -1,9 +1,13 @@
 #include "solver_diagnostics.hpp"
+#include "capacity_analyzer.hpp"
 #include "../utils/date_utils.hpp"
 #include <sstream>
 #include <iomanip>
 #include <set>
 #include <chrono>
+#include <algorithm>
+#include <cmath>
+#include <tuple>
 
 namespace jres::analysis {
 
@@ -15,124 +19,199 @@ std::string explain_assignment_failure(
     const std::map<std::pair<std::string, int>, int>& driverWorkVars,
     const std::vector<double>& colValues)
 {
+    // Keeping this for backward compatibility if needed, but not used in new flow
+    return "";
+}
+
+std::vector<std::string> formatHumanDiagnostic(
+    const std::map<int, jres::internal::SlackInfo>& slackInfo,
+    const std::set<int>& unavailableVars,
+    const std::map<std::pair<std::string, int>, int>& driverWorkVars,
+    const std::map<std::pair<std::string, int>, int>& spotterWorkVars,
+    const std::vector<double>& colValues,
+    const jres::internal::SolverInput& input,
+    const std::vector<jres::internal::TeamMember>& driverPool,
+    const std::vector<jres::internal::TeamMember>& spotterPool)
+{
     using namespace jres::internal;
-    std::ostringstream ss;
+    std::vector<std::string> report;
 
-    // Time points for the target stint
-    auto tStart = TimeHelpers::stringToTimePoint(input.stints[stintIndex].startTime);
-    auto tEnd = TimeHelpers::stringToTimePoint(input.stints[stintIndex].endTime);
+    double raceDurationHours = 0.0;
+    for (const auto& s : input.stints) {
+        auto t1 = TimeHelpers::stringToTimePoint(s.startTime);
+        auto t2 = TimeHelpers::stringToTimePoint(s.endTime);
+        raceDurationHours += std::chrono::duration<double, std::ratio<3600>>(t2 - t1).count();
+    }
 
-    // Identify which drivers are assigned to which stints in the CURRENT solution
-    std::map<std::string, std::set<int>> driverAssignments;
-    for (size_t s = 0; s < input.stints.size(); ++s) {
-        for (const auto& p : driverPool) {
-            if (driverWorkVars.count({p.name, (int)s})) {
-                int idx = driverWorkVars.at({p.name, (int)s});
-                if (idx < (int)colValues.size() && colValues[idx] > 0.5) {
-                    driverAssignments[p.name].insert((int)s);
+    // --- Roster Health Check (Drivers) ---
+    if (!driverPool.empty()) {
+        auto cap = CapacityAnalyzer::calculate_max_potential_capacity(driverPool, input);
+        if (cap.totalCapacity < raceDurationHours) {
+            std::ostringstream ss;
+            ss << "Driver Roster Understaffed: You have " << std::fixed << std::setprecision(1) 
+               << cap.totalCapacity << " hours of coverage for a " 
+               << raceDurationHours << " hour race.";
+            report.push_back(ss.str());
+        }
+    }
+
+    // --- Roster Health Check (Spotters) ---
+    if (!spotterPool.empty()) {
+        auto cap = CapacityAnalyzer::calculate_max_potential_capacity(spotterPool, input);
+        if (cap.totalCapacity < raceDurationHours) {
+            std::ostringstream ss;
+            ss << "Spotter Roster Understaffed: You have " << std::fixed << std::setprecision(1) 
+               << cap.totalCapacity << " hours of coverage for a " 
+               << raceDurationHours << " hour race.";
+            report.push_back(ss.str());
+        }
+    }
+
+    // --- Collect Violations per Stint ---
+    struct Violation {
+        int priority; // 0: Unavailable (Critical), 1: Max Busy, 2: Min Rest, 3: Other
+        std::string description;
+        std::string member;
+        std::string role; // "Driver" or "Spotter"
+    };
+    std::map<int, std::vector<Violation>> stintViolations;
+    std::vector<std::string> globalViolations;
+
+    // Build reverse map for variable index -> (Member, Stint, Role)
+    std::map<int, std::tuple<std::string, int, std::string>> varToInfo;
+    
+    for(const auto& [key, varIdx] : driverWorkVars) {
+        varToInfo[varIdx] = std::make_tuple(key.first, key.second, "Driver");
+    }
+    for(const auto& [key, varIdx] : spotterWorkVars) {
+        varToInfo[varIdx] = std::make_tuple(key.first, key.second, "Spotter");
+    }
+
+    // Check Unavailable (Priority 0)
+    for (int varIdx : unavailableVars) {
+        if (varIdx < (int)colValues.size() && colValues[varIdx] > 0.5) {
+            if (varToInfo.count(varIdx)) {
+                auto [member, stintIdx, role] = varToInfo[varIdx];
+                stintViolations[stintIdx].push_back({0, "Unavailable", member, role});
+            }
+        }
+    }
+
+    // Check Slack (Rest, Busy, etc)
+    for (const auto& [varIdx, info] : slackInfo) {
+        if (varIdx < (int)colValues.size() && colValues[varIdx] > 0.001) {
+            int priority = 3;
+            if (info.type.find("Busy") != std::string::npos) priority = 1;
+            else if (info.type.find("Rest") != std::string::npos) priority = 2;
+            else if (info.type.find("Fair Share") != std::string::npos) priority = 2;
+
+            if (info.stintIndex >= 0) {
+                 stintViolations[info.stintIndex].push_back({priority, info.type, info.memberName, "Participant"});
+            } else {
+                // Global violation
+                bool assignedAny = false;
+                for(const auto& [vIdx, tupleInfo] : varToInfo) {
+                    auto [memName, stintIdx, role] = tupleInfo;
+                    if (memName == info.memberName && colValues[vIdx] > 0.5) {
+                        stintViolations[stintIdx].push_back({priority, info.type, memName, role});
+                        assignedAny = true;
+                    }
+                }
+                
+                if (!assignedAny) {
+                    std::string reason = info.type;
+                    if (priority == 2) {
+                         if (info.type.find("Fair Share") != std::string::npos) 
+                             reason = "Fair Share Rules violated";
+                         else 
+                             reason = "Rest Rules violated";
+                    }
+                    globalViolations.push_back(reason + " (" + info.memberName + ")");
                 }
             }
         }
     }
 
-    // Helper: Get stint duration in hours
-    auto getDuration = [&](int sIdx) {
-        auto s = TimeHelpers::stringToTimePoint(input.stints[sIdx].startTime);
-        auto e = TimeHelpers::stringToTimePoint(input.stints[sIdx].endTime);
-        return std::chrono::duration<double, std::ratio<3600>>(e - s).count();
+    // --- Group & Format ---
+    std::vector<int> violationStints;
+    for(const auto& [s, _] : stintViolations) violationStints.push_back(s);
+    std::sort(violationStints.begin(), violationStints.end());
+
+    int startStint = -1;
+    int prevStint = -1;
+    std::string currentBlockReason = "";
+    int currentPriority = 999;
+    std::string currentMember = "";
+
+    auto finalizeBlock = [&](int endStint) {
+        if (startStint == -1) return;
+        
+        std::ostringstream ss;
+        if (startStint == endStint) ss << "Stint " << startStint;
+        else ss << "Stints " << startStint << "-" << endStint;
+
+        ss << ": " << currentBlockReason;
+        report.push_back(ss.str());
+
+        // Actionable Advice
+        if (currentPriority == 0) { 
+             report.push_back("   -> Advice: Mark " + currentMember + " as Available during this window.");
+        } else if (currentPriority == 1) { 
+             report.push_back("   -> Advice: Increase 'Maximum Busy Hours' or add more participants.");
+        } else if (currentPriority == 2) { 
+             report.push_back("   -> Advice: Reduce 'Minimum Rest Hours' or shuffle previous stints.");
+        }
     };
 
-    ss << "      Alternatives Analysis:";
-    
-    for (const auto& candidate : driverPool) {
-        if (candidate.name == violationDriver) continue;
-
-        ss << "\n        - " << candidate.name << ": ";
-        std::vector<std::string> reasons;
-
-        // Check Availability
-        bool isUnavailable = false;
-        auto it = input.availability.find(candidate.name);
-        if (it != input.availability.end()) {
-            auto cursor = tStart;
-            while (cursor < tEnd) {
-                std::string key = TimeHelpers::timePointToKey(cursor);
-                if (it->second.count(key) && it->second.at(key) == Availability::Unavailable) {
-                    isUnavailable = true;
-                    break;
-                }
-                cursor += std::chrono::hours(1);
-            }
+    for (int s : violationStints) {
+        auto& vs = stintViolations[s];
+        std::sort(vs.begin(), vs.end(), [](const Violation& a, const Violation& b){
+            return a.priority < b.priority;
+        });
+        
+        const auto& best = vs[0];
+        std::string reason;
+        
+        if (best.priority == 0) {
+            reason = std::string("No one could ") + (best.role == "Spotter" ? "spot" : "drive") + 
+                     " without being Unavailable (" + best.member + ")";
         }
-        if (isUnavailable) {
-            reasons.push_back("Also Unavailable");
+        else if (best.priority == 1) {
+            reason = std::string("No one could ") + (best.role == "Spotter" ? "spot" : "drive") + 
+                     " without exceeding Max Busy Time (" + best.member + ")";
         }
-
-        // Check Consecutive Stints
-        int consecutiveCount = 1;
-        for (int k = stintIndex - 1; k >= 0; --k) {
-            if (driverAssignments[candidate.name].count(k)) consecutiveCount++;
-            else break;
+        else if (best.priority == 2) {
+             if (best.description.find("Fair Share") != std::string::npos) 
+                 reason = std::string("No one could ") + (best.role == "Spotter" ? "spot" : "drive") + 
+                          " without breaking Fair Share Rules (" + best.member + ")";
+             else 
+                 reason = std::string("No one could ") + (best.role == "Spotter" ? "spot" : "drive") + 
+                          " without breaking Rest Rules (" + best.member + ")";
         }
-        for (size_t k = stintIndex + 1; k < input.stints.size(); ++k) {
-            if (driverAssignments[candidate.name].count((int)k)) consecutiveCount++;
-            else break;
-        }
+        else reason = best.description + " (" + best.member + ")";
 
-        if (consecutiveCount > input.consecutiveStints) {
-            reasons.push_back("Max Consecutive Limit (" + std::to_string(consecutiveCount) + "/" + std::to_string(input.consecutiveStints) + ")");
-        }
+        bool isContiguous = (prevStint != -1 && s == prevStint + 1);
+        bool sameReason = (reason == currentBlockReason);
 
-        // Check Minimum Rest
-        if (input.minimumRestHours > 0) {
-            double minRestSec = input.minimumRestHours * 3600.0;
-            for (int assignedS : driverAssignments[candidate.name]) {
-                auto s1_start = TimeHelpers::stringToTimePoint(input.stints[stintIndex].startTime);
-                auto s1_end = TimeHelpers::stringToTimePoint(input.stints[stintIndex].endTime);
-                auto s2_start = TimeHelpers::stringToTimePoint(input.stints[assignedS].startTime);
-                auto s2_end = TimeHelpers::stringToTimePoint(input.stints[assignedS].endTime);
-
-                double gap = 0.0;
-                if (s1_end <= s2_start) gap = std::chrono::duration<double>(s2_start - s1_end).count();
-                else if (s2_end <= s1_start) gap = std::chrono::duration<double>(s1_start - s2_end).count();
-                else gap = -1.0; 
-
-                if (gap < minRestSec - 1.0) {
-                    double needed = (minRestSec - gap) / 3600.0;
-                    std::ostringstream rss;
-                    rss << std::fixed << std::setprecision(1) << " Needs " << needed << "h more rest";
-                    reasons.push_back(rss.str());
-                    break;
-                }
-            }
-        }
-
-        // Check Max Busy Time
-        if (input.maximumBusyHours > 0) {
-            double busyDuration = getDuration(stintIndex);
-            for (int k = stintIndex - 1; k >= 0; --k) {
-                if (driverAssignments[candidate.name].count(k)) busyDuration += getDuration(k);
-                else break;
-            }
-            for (size_t k = stintIndex + 1; k < input.stints.size(); ++k) {
-                if (driverAssignments[candidate.name].count((int)k)) busyDuration += getDuration(k);
-                else break;
-            }
-            if (busyDuration > input.maximumBusyHours) {
-                 reasons.push_back("Max Busy Time Exceeded (" + std::to_string(busyDuration) + "h > " + std::to_string(input.maximumBusyHours) + "h)");
-            }
-        }
-
-        if (reasons.empty()) {
-             ss << "Available (Unknown constraint or softer optimization preference)";
+        if (isContiguous && sameReason) {
+            prevStint = s;
         } else {
-             for (size_t i=0; i<reasons.size(); ++i) {
-                 if (i > 0) ss << ", ";
-                 ss << reasons[i];
-             }
+            finalizeBlock(prevStint);
+            startStint = s;
+            prevStint = s;
+            currentBlockReason = reason;
+            currentPriority = best.priority;
+            currentMember = best.member;
         }
     }
-    return ss.str();
+    finalizeBlock(prevStint);
+
+    // Append Global Violations (Unattributed)
+    for (const auto& g : globalViolations) {
+        report.push_back("Global Violation: " + g);
+    }
+
+    return report;
 }
 
 } // namespace jres::analysis
