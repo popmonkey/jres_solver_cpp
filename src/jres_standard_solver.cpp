@@ -5,6 +5,7 @@
  */
 #include "jres_standard_solver.hpp"
 #include "analysis/capacity_analyzer.hpp"
+#include "analysis/solver_diagnostics.hpp"
 #include "constraints/balancing.hpp"
 #include "constraints/minimum_rest.hpp"
 #include "constraints/max_busy_time.hpp"
@@ -19,8 +20,8 @@
 #include "Highs.h"
 
 // Penalty Constants
-static const double kPenaltySlack = 1000000.0;
-static const double kPenaltyUnavailable = 10000000.0;
+static const double kPenaltySlack = 100000.0;       // Soft constraint (Rest, Fair Share)
+static const double kPenaltyUnavailable = 10000000.0;    // Original value, high enough
 static const double kRewardPreferred = -1.0;
 static const double kRewardProximity = -0.5; // Incentive for spotting adjacent to driving
 
@@ -423,6 +424,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                     entry.driver = p.name;
                     if (m_unavailableVars.count(idx)) {
                         output.diagnosis.push_back("Violation: Unavailable Driver " + p.name + " assigned to Stint " + std::to_string(s));
+                        output.diagnosis.push_back(jres::analysis::explain_assignment_failure((int)s, p.name, m_input, m_driverPool, m_driverWorkVars, colValues));
                     }
                     break;
                 }
@@ -458,6 +460,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             // Clear slack info for spotter run to avoid confusion (indices will reset)
             m_slackInfo.clear();
             m_unavailableVars.clear();
+            m_spotterWorkVars.clear();
 
             Highs spotterSolver;
             spotterSolver.setOptionValue("output_flag", false);

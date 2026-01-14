@@ -5,7 +5,7 @@
 
 namespace jres::constraints {
 
-static const double kPenaltySlack = 1000000.0;
+static const double kPenaltySlack = 100000.0;
 
 void apply_minimum_rest_constraints(
         Highs &highs,
