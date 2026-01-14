@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <set>
 
 namespace jres::analysis {
 
@@ -26,6 +27,20 @@ std::string explain_assignment_failure(
     const std::vector<jres::internal::TeamMember>& driverPool,
     const std::map<std::pair<std::string, int>, int>& driverWorkVars,
     const std::vector<double>& colValues
+);
+
+/**
+ * @brief Formats raw solver slack and violation information into a human-readable report.
+ */
+std::vector<std::string> formatHumanDiagnostic(
+    const std::map<int, jres::internal::SlackInfo>& slackInfo,
+    const std::set<int>& unavailableVars,
+    const std::map<std::pair<std::string, int>, int>& driverWorkVars,
+    const std::map<std::pair<std::string, int>, int>& spotterWorkVars,
+    const std::vector<double>& colValues,
+    const jres::internal::SolverInput& input,
+    const std::vector<jres::internal::TeamMember>& driverPool,
+    const std::vector<jres::internal::TeamMember>& spotterPool
 );
 
 } // namespace jres::analysis
