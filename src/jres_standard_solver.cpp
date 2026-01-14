@@ -14,6 +14,7 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+#include <set>
 
 #include "Highs.h"
 
@@ -142,6 +143,16 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     output.config.minimumRestHours = m_input.minimumRestHours;
     output.config.maximumBusyHours = m_input.maximumBusyHours;
     output.config.firstStintDriver = m_input.firstStintDriver;
+
+    // --- Duplicate Name Check ---
+    std::set<std::string> namesSeen;
+    for (const auto& m : m_input.teamMembers) {
+        if (namesSeen.count(m.name)) {
+            std::string err = "Duplicate team member name: " + m.name;
+            throw std::runtime_error(err);
+        }
+        namesSeen.insert(m.name);
+    }
 
     // --- Arithmetic Pre-flight Check ---
     int totalStints = (int)m_input.stints.size();
@@ -557,6 +568,18 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         }
     } 
     
+    // --- Final Validation ---
+    for (size_t s = 0; s < output.schedule.size(); ++s) {
+        if (output.schedule[s].driver == "N/A") {
+             output.diagnosis.push_back("Stint " + std::to_string(s) + " (" + output.schedule[s].startTime + ") has no assigned driver.");
+        }
+        
+        bool spotterRequired = (m_options.spotterMode != JRES_SPOTTER_MODE_NONE && !m_options.allowNoSpotter);
+        if (spotterRequired && output.schedule[s].spotter == "N/A") {
+             output.diagnosis.push_back("Stint " + std::to_string(s) + " (" + output.schedule[s].startTime + ") has no assigned spotter.");
+        }
+    }
+
     output.teamMembers = m_input.teamMembers;
     return output;
 }
