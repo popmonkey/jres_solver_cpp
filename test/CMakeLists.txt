@@ -41,6 +41,7 @@ add_executable(solver_tests
   test_max_busy_defaults.cpp
   test_availability_overlap.cpp
   test_availability_boundaries.cpp
+  test_validation.cpp
 )
 
 add_dependencies(solver_tests jres_solver_lib)
