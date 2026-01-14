@@ -1,7 +1,7 @@
 {
   "success": true,
   "consecutiveStints": 2,
-  "minimumRestHours": 8,
+  "minimumRestHours": 0,
   "teamMembers": [
     {
       "name": "Niki",
