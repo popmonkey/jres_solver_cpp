@@ -16,48 +16,40 @@ void apply_minimum_rest_constraints(
         Highs &highs,
         const jres::internal::SolverInput& input,
         const std::vector<jres::internal::TeamMember> &participants,
-        const std::map<std::pair<std::string, int>, int>& driverVars,
-        const std::map<std::pair<std::string, int>, int>& spotterVars,
+        const std::map<std::pair<jres::internal::ID, int>, int>& driverVars,
+        const std::map<std::pair<jres::internal::ID, int>, int>& spotterVars,
         bool enforceCombined,
         std::map<int, jres::internal::SlackInfo>& slackInfo
     )
 {
     using namespace jres::internal;
 
-    // Pre-parse stint times
-    std::vector<std::chrono::system_clock::time_point> startTimes;
-    std::vector<std::chrono::system_clock::time_point> endTimes;
+    if (input.stints.empty()) return;
+
+    // Use time_t directly
+    std::vector<std::time_t> startTimes;
+    std::vector<std::time_t> endTimes;
     startTimes.reserve(input.stints.size());
     endTimes.reserve(input.stints.size());
 
     // Find race start and end
-    std::chrono::system_clock::time_point raceStart;
-    std::chrono::system_clock::time_point raceEnd;
-    bool raceTimesInit = false;
-
+    std::time_t raceStart = input.stints[0].startTime;
+    std::time_t raceEnd = input.stints[0].endTime;
+    
     for (const auto& stint : input.stints) {
-        auto s = TimeHelpers::stringToTimePoint(stint.startTime);
-        auto e = TimeHelpers::stringToTimePoint(stint.endTime);
-        startTimes.push_back(s);
-        endTimes.push_back(e);
-
-        if(!raceTimesInit) {
-            raceStart = s;
-            raceEnd = e;
-            raceTimesInit = true;
-        } else {
-            if(s < raceStart) raceStart = s;
-            if(e > raceEnd) raceEnd = e;
-        }
+        startTimes.push_back(stint.startTime);
+        endTimes.push_back(stint.endTime);
+        if (stint.startTime < raceStart) raceStart = stint.startTime;
+        if (stint.endTime > raceEnd) raceEnd = stint.endTime;
     }
 
     for (const auto &p : participants)
     {
         if (input.minimumRestHours <= 0) continue;
-        auto minRestDuration = std::chrono::hours(input.minimumRestHours);
+        long long minRestSeconds = (long long)input.minimumRestHours * 3600;
             
         // Generate Candidates
-        std::vector<std::chrono::system_clock::time_point> candidateStarts;
+        std::vector<std::time_t> candidateStarts;
         candidateStarts.push_back(raceStart);
         for(const auto& t : endTimes) candidateStarts.push_back(t);
 
@@ -66,7 +58,7 @@ void apply_minimum_rest_constraints(
         blockSets.reserve(candidateStarts.size());
         
         for(const auto& tStart : candidateStarts) {
-            auto tEnd = tStart + minRestDuration;
+            auto tEnd = tStart + minRestSeconds;
             if (tEnd > raceEnd) continue;
 
             std::set<int> blocked;
@@ -74,12 +66,12 @@ void apply_minimum_rest_constraints(
                 // Overlap check
                 if (startTimes[s] < tEnd && endTimes[s] > tStart) {
                     // Check Driver
-                    if (driverVars.count({p.name, (int)s})) {
-                        blocked.insert(driverVars.at({p.name, (int)s}));
+                    if (driverVars.count({p.nameId, (int)s})) {
+                        blocked.insert(driverVars.at({p.nameId, (int)s}));
                     }
                     // Check Spotter (if combined)
-                    if (enforceCombined && spotterVars.count({p.name, (int)s})) {
-                        blocked.insert(spotterVars.at({p.name, (int)s}));
+                    if (enforceCombined && spotterVars.count({p.nameId, (int)s})) {
+                        blocked.insert(spotterVars.at({p.nameId, (int)s}));
                     }
                 }
             }
@@ -138,7 +130,7 @@ void apply_minimum_rest_constraints(
                 
                 SlackInfo info;
                 info.type = "Minimum Rest (One Instance)";
-                info.memberName = p.name;
+                info.memberNameId = p.nameId;
                 info.stintIndex = -1; 
                 info.limit = 1.0;
                 slackInfo[slackVar] = info;

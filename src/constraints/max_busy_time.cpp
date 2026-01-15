@@ -7,6 +7,7 @@
 #include "Highs.h"
 #include <chrono>
 #include <map>
+#include <cmath>
 
 namespace jres::constraints {
 
@@ -14,8 +15,8 @@ void apply_max_busy_time_constraints(
     Highs &highs,
     const jres::internal::SolverInput& input,
     const std::vector<jres::internal::TeamMember> &participants,
-    const std::map<std::pair<std::string, int>, int>& driverVars,
-    const std::map<std::pair<std::string, int>, int>& spotterVars,
+    const std::map<std::pair<jres::internal::ID, int>, int>& driverVars,
+    const std::map<std::pair<jres::internal::ID, int>, int>& spotterVars,
     bool enforceCombined,
     std::map<int, jres::internal::SlackInfo>& slackInfo,
     const std::vector<jres::internal::ScheduleEntry>* fixedSchedule
@@ -29,10 +30,8 @@ void apply_max_busy_time_constraints(
     std::vector<double> stintDurations;
     stintDurations.reserve(input.stints.size());
     for (const auto& stint : input.stints) {
-        auto s = TimeHelpers::stringToTimePoint(stint.startTime);
-        auto e = TimeHelpers::stringToTimePoint(stint.endTime);
-        long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count();
-        stintDurations.push_back(static_cast<double>(ms) / 3600000.0);
+        double h = std::difftime(stint.endTime, stint.startTime) / 3600.0;
+        stintDurations.push_back(h);
     }
 
     for (const auto &p : participants)
@@ -53,20 +52,20 @@ void apply_max_busy_time_constraints(
                         // Driver
                         if (fixedSchedule) {
                             // Sequential Mode: Check fixed schedule
-                            if (k < fixedSchedule->size() && (*fixedSchedule)[k].driver == p.name) {
+                            if (k < fixedSchedule->size() && (*fixedSchedule)[k].driverId == p.nameId) {
                                 fixedAssignments++;
                             }
                         } else {
                             // Integrated Mode: Add driver var to constraint
-                            if (driverVars.count({p.name, (int)k})) {
-                                coefficients[driverVars.at({p.name, (int)k})] += 1.0;
+                            if (driverVars.count({p.nameId, (int)k})) {
+                                coefficients[driverVars.at({p.nameId, (int)k})] += 1.0;
                             }
                         }
                         
                         // Spotter
-                        if (spotterVars.count({p.name, (int)k})) {
+                        if (spotterVars.count({p.nameId, (int)k})) {
                              if (fixedSchedule || enforceCombined) {
-                                 coefficients[spotterVars.at({p.name, (int)k})] += 1.0;
+                                 coefficients[spotterVars.at({p.nameId, (int)k})] += 1.0;
                              }
                         }
                     }

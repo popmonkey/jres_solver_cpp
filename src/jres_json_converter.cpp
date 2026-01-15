@@ -59,9 +59,10 @@ char* allocate_and_copy(const std::string& s) {
 
 JRES_SOLVER_API JresSolverInput* jres_input_from_json(const char* jsonData) {
     last_error_message.clear(); // Clear previous error
+    JresSolverInput* input = nullptr;
     try {
         json j = json::parse(jsonData);
-        JresSolverInput* input = new JresSolverInput();
+        input = new JresSolverInput();
 
         if (j.find("teamMembers") == j.end()) {
             throw std::runtime_error("Missing 'teamMembers' key in input JSON.");
@@ -126,9 +127,11 @@ JRES_SOLVER_API JresSolverInput* jres_input_from_json(const char* jsonData) {
 
     } catch (const json::parse_error& e) {
         last_error_message = "JSON parse error: " + std::string(e.what());
+        if (input) free_jres_solver_input(input);
         return nullptr;
     } catch (const std::exception& e) {
         last_error_message = "Error: " + std::string(e.what());
+        if (input) free_jres_solver_input(input);
         return nullptr;
     }
 }
@@ -260,29 +263,37 @@ JRES_SOLVER_API void free_jres_solver_output(JresSolverOutput* output) {
 }
 
 JRES_SOLVER_API void free_jres_solver_input(JresSolverInput* input) {
+    if (!input) return;
+
     if (input->firstStintDriver) {
         delete[] input->firstStintDriver;
     }
 
-    for (int i = 0; i < input->teamMembers_len; ++i) {
-        delete[] input->teamMembers[i].name;
-    }
-    delete[] input->teamMembers;
-
-    for (int i = 0; i < input->stints_len; ++i) {
-        delete[] input->stints[i].startTime;
-        delete[] input->stints[i].endTime;
-    }
-    delete[] input->stints;
-
-    for (int i = 0; i < input->availability_len; ++i) {
-        for (int j = 0; j < input->availability[i].availability_len; ++j) {
-            delete[] input->availability[i].availability[j].time;
+    if (input->teamMembers) {
+        for (int i = 0; i < input->teamMembers_len; ++i) {
+            delete[] input->teamMembers[i].name;
         }
-        delete[] input->availability[i].availability;
-        delete[] input->availability[i].name;
+        delete[] input->teamMembers;
     }
-    delete[] input->availability;
+
+    if (input->stints) {
+        for (int i = 0; i < input->stints_len; ++i) {
+            delete[] input->stints[i].startTime;
+            delete[] input->stints[i].endTime;
+        }
+        delete[] input->stints;
+    }
+
+    if (input->availability) {
+        for (int i = 0; i < input->availability_len; ++i) {
+            for (int j = 0; j < input->availability[i].availability_len; ++j) {
+                delete[] input->availability[i].availability[j].time;
+            }
+            delete[] input->availability[i].availability;
+            delete[] input->availability[i].name;
+        }
+        delete[] input->availability;
+    }
 
     delete input;
 }

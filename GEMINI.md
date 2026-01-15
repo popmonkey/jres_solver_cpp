@@ -81,7 +81,7 @@ ctest
 
 There is also a script to test the formatter's stdout functionality:
 ```bash
-./test_formatter_stdout.sh
+./test/integration/test_formatter_stdout.sh
 ```
 
 ### Running the CLI Tools

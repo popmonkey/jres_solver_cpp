@@ -66,10 +66,13 @@ if ! grep -q -e "--- ITINERARIES ---" "$SUMMARY_TXT"; then
     exit 1
 fi
 
-echo "All checks passed."
+echo "All checks passed for file output mode."
 
 # Cleanup
 rm "$SOLUTION_JSON" "$SUMMARY_TXT"
+
+echo "Running stdout formatter test..."
+./test/integration/test_formatter_stdout.sh
 
 echo "Integration test passed!"
 exit 0

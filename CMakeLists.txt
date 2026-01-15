@@ -159,7 +159,6 @@ add_library(jres_solver_lib
   src/jres_solver.cpp
   src/jres_json_converter.cpp
   src/jres_internal_types.cpp
-  src/jres_solver_base.cpp
   src/jres_standard_solver.cpp
   src/analysis/capacity_analyzer.cpp
   src/analysis/solver_diagnostics.cpp

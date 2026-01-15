@@ -14,8 +14,8 @@ static const double kCostFairness = 10.0;
 void add_role_coupling_incentive(
     Highs* highs,
     const std::vector<jres::internal::TeamMember>& pool,
-    const std::map<std::pair<std::string, int>, int>& driverVars,
-    const std::map<std::pair<std::string, int>, int>& spotterVars,
+    const std::map<std::pair<jres::internal::ID, int>, int>& driverVars,
+    const std::map<std::pair<jres::internal::ID, int>, int>& spotterVars,
     size_t numStints,
     double weight)
 {
@@ -23,12 +23,12 @@ void add_role_coupling_incentive(
 
     for (const auto &p : pool) {
         for (size_t s = 0; s < numStints - 1; ++s) {
-            bool hasDriver = driverVars.count({p.name, (int)s});
-            bool hasSpotter = spotterVars.count({p.name, (int)s + 1});
+            bool hasDriver = driverVars.count({p.nameId, (int)s});
+            bool hasSpotter = spotterVars.count({p.nameId, (int)s + 1});
 
             if (hasDriver && hasSpotter) {
-                int d_var = driverVars.at({p.name, (int)s});
-                int s_var = spotterVars.at({p.name, (int)s + 1});
+                int d_var = driverVars.at({p.nameId, (int)s});
+                int s_var = spotterVars.at({p.nameId, (int)s + 1});
 
                 // If there is a transition from driving (stint s) to spotting (stint s+1), reward it.
                 
@@ -50,7 +50,7 @@ void add_balancing_constraints(
     Highs &highs,
     const std::vector<jres::internal::TeamMember> &participants,
     const jres::internal::SolverInput& input,
-    const std::map<std::pair<std::string, int>, int>& workVars,
+    const std::map<std::pair<jres::internal::ID, int>, int>& workVars,
     double avgStints)
 {
     for (const auto &p : participants) {
@@ -59,8 +59,8 @@ void add_balancing_constraints(
         
         std::map<int, double> varCounts;
         for (size_t s = 0; s < input.stints.size(); ++s) {
-            if (workVars.count({p.name, (int)s})) {
-                int v = workVars.at({p.name, (int)s});
+            if (workVars.count({p.nameId, (int)s})) {
+                int v = workVars.at({p.nameId, (int)s});
                 varCounts[v] += 1.0;
             }
         }

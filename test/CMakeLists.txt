@@ -42,6 +42,7 @@ add_executable(solver_tests
   test_availability_overlap.cpp
   test_availability_boundaries.cpp
   test_validation.cpp
+  test_long_race.cpp
 )
 
 add_dependencies(solver_tests jres_solver_lib)
