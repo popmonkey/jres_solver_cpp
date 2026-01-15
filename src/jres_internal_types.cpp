@@ -70,6 +70,10 @@ Availability to_internal_availability(JresAvailability availability) {
 }
 
 SolverInput from_c_input(const JresSolverInput* c_input) {
+    if (!c_input) {
+        throw std::runtime_error("Input pointer is null");
+    }
+
     SolverInput input;
 
     input.consecutiveStints = c_input->consecutiveStints;
@@ -79,36 +83,68 @@ SolverInput from_c_input(const JresSolverInput* c_input) {
         input.firstStintDriver = input.strings.get_id(c_input->firstStintDriver);
     }
 
-    for (int i = 0; i < c_input->teamMembers_len; ++i) {
-        TeamMember member;
-        member.nameId = input.strings.get_id(c_input->teamMembers[i].name);
-        member.isDriver = c_input->teamMembers[i].isDriver;
-        member.isSpotter = c_input->teamMembers[i].isSpotter;
-        member.tzOffset = c_input->teamMembers[i].tzOffset;
-        input.teamMembers.push_back(member);
+    if (c_input->teamMembers_len > 0) {
+        if (!c_input->teamMembers) {
+            throw std::runtime_error("teamMembers is null but length is > 0");
+        }
+        for (int i = 0; i < c_input->teamMembers_len; ++i) {
+            if (!c_input->teamMembers[i].name) {
+                 throw std::runtime_error("Team member name is null");
+            }
+            TeamMember member;
+            member.nameId = input.strings.get_id(c_input->teamMembers[i].name);
+            member.isDriver = c_input->teamMembers[i].isDriver;
+            member.isSpotter = c_input->teamMembers[i].isSpotter;
+            member.tzOffset = c_input->teamMembers[i].tzOffset;
+            input.teamMembers.push_back(member);
+        }
     }
 
-    for (int i = 0; i < c_input->stints_len; ++i) {
-        Stint stint;
-        stint.id = c_input->stints[i].id;
-        auto startTp = TimeHelpers::stringToTimePoint(c_input->stints[i].startTime);
-        auto endTp = TimeHelpers::stringToTimePoint(c_input->stints[i].endTime);
-        stint.startTime = std::chrono::system_clock::to_time_t(startTp);
-        stint.endTime = std::chrono::system_clock::to_time_t(endTp);
-        input.stints.push_back(stint);
+    if (c_input->stints_len > 0) {
+        if (!c_input->stints) {
+            throw std::runtime_error("stints is null but length is > 0");
+        }
+        for (int i = 0; i < c_input->stints_len; ++i) {
+            if (!c_input->stints[i].startTime || !c_input->stints[i].endTime) {
+                throw std::runtime_error("Stint start/end time is null");
+            }
+            Stint stint;
+            stint.id = c_input->stints[i].id;
+            auto startTp = TimeHelpers::stringToTimePoint(c_input->stints[i].startTime);
+            auto endTp = TimeHelpers::stringToTimePoint(c_input->stints[i].endTime);
+            stint.startTime = std::chrono::system_clock::to_time_t(startTp);
+            stint.endTime = std::chrono::system_clock::to_time_t(endTp);
+            input.stints.push_back(stint);
+        }
     }
 
-    for (int i = 0; i < c_input->availability_len; ++i) {
-        ID memberId = input.strings.get_id(c_input->availability[i].name);
-        for (int j = 0; j < c_input->availability[i].availability_len; ++j) {
-            std::string time = c_input->availability[i].availability[j].time;
-            auto tp = TimeHelpers::stringToTimePoint(time);
-            std::time_t t = std::chrono::system_clock::to_time_t(tp);
-            // Normalize to hour bucket
-            std::time_t key = TimeHelpers::roundToHour(t);
+    if (c_input->availability_len > 0) {
+        if (!c_input->availability) {
+            throw std::runtime_error("availability is null but length is > 0");
+        }
+        for (int i = 0; i < c_input->availability_len; ++i) {
+            if (!c_input->availability[i].name) {
+                 throw std::runtime_error("Availability member name is null");
+            }
+            ID memberId = input.strings.get_id(c_input->availability[i].name);
             
-            JresAvailability availability = c_input->availability[i].availability[j].availability;
-            input.availability[memberId][key] = to_internal_availability(availability);
+            if (c_input->availability[i].availability_len > 0 && !c_input->availability[i].availability) {
+                 throw std::runtime_error("Availability entries array is null");
+            }
+
+            for (int j = 0; j < c_input->availability[i].availability_len; ++j) {
+                if (!c_input->availability[i].availability[j].time) {
+                    throw std::runtime_error("Availability time string is null");
+                }
+                std::string time = c_input->availability[i].availability[j].time;
+                auto tp = TimeHelpers::stringToTimePoint(time);
+                std::time_t t = std::chrono::system_clock::to_time_t(tp);
+                // Normalize to hour bucket
+                std::time_t key = TimeHelpers::roundToHour(t);
+                
+                JresAvailability availability = c_input->availability[i].availability[j].availability;
+                input.availability[memberId][key] = to_internal_availability(availability);
+            }
         }
     }
 
