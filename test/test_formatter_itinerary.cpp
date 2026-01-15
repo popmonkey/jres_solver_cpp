@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_formatter_itinerary.cpp
  * @brief Tests for itinerary generation logic.
  */

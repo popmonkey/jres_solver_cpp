@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_spotter_modes.cpp
  * @brief Tests for different spotter scheduling modes (None, Integrated, Sequential).
  */

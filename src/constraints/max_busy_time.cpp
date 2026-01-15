@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/constraints/max_busy_time.cpp
+ * @brief Implementation of maximum busy time constraints.
+ */
 #include "max_busy_time.hpp"
 #include "Highs.h"
 #include <chrono>

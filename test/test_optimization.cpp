@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_optimization.cpp
  * @brief Tests for optimization incentives (consecutive stints, preferences, penalties).
  */

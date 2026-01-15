@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_minimum_rest.cpp
  * @brief Tests for minimum rest time enforcement.
  */

@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_diagnosis.cpp
  * @brief Tests for the solver's diagnostic output capability.
  */

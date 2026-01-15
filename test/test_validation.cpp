@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file test/test_validation.cpp
+ * @brief Tests for input validation.
+ */
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include <string>

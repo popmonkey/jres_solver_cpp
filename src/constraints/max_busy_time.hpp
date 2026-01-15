@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/constraints/max_busy_time.hpp
+ * @brief Header for maximum busy time constraints.
+ */
 #pragma once
 #include "../jres_internal_types.hpp"
 #include <map>

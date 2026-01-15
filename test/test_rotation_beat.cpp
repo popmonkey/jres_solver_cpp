@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_rotation_beat.cpp
  * @brief Tests for rotation beat (rhythm) enforcement.
  */

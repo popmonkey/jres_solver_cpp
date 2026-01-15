@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/analysis/capacity_analyzer.hpp
+ * @brief Header for capacity analysis.
+ */
 #pragma once
 #include "../jres_internal_types.hpp"
 

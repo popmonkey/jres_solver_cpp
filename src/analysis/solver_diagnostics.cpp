@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/analysis/solver_diagnostics.cpp
+ * @brief Implementation of solver diagnostics.
+ */
 #include "solver_diagnostics.hpp"
 #include "capacity_analyzer.hpp"
 #include "../utils/date_utils.hpp"

@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/analysis/capacity_analyzer.cpp
+ * @brief Implementation of capacity analysis.
+ */
 #include "capacity_analyzer.hpp"
 #include <sstream>
 #include <iomanip>

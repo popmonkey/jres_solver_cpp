@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/constraints/minimum_rest.hpp
+ * @brief Header for minimum rest constraints.
+ */
 #pragma once
 #include "../jres_internal_types.hpp"
 #include <map>

@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_constraints.cpp
  * @brief Tests for various hard constraints (infeasibility, preferred slots, coverage).
  */

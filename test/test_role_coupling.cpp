@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_role_coupling.cpp
  * @brief Tests for role coupling incentives (Driver -> Spotter transition).
  */

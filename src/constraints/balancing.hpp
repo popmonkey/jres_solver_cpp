@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/constraints/balancing.hpp
+ * @brief Header for load balancing constraints.
+ */
 #pragma once
 #include "../jres_internal_types.hpp"
 #include <map>

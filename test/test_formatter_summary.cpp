@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_formatter_summary.cpp
  * @brief Tests for summary report generation.
  */

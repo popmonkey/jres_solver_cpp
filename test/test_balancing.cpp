@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_balancing.cpp
  * @brief Tests for the driver stint balancing logic.
  */

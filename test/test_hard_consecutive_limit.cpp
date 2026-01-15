@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_hard_consecutive_limit.cpp
  * @brief Tests for hard constraints on consecutive stints.
  */

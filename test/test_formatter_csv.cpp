@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_formatter_csv.cpp
  * @brief Tests for CSV output formatting.
  */

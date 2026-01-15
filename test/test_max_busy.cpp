@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file test/test_max_busy.cpp
+ * @brief Tests for max busy time logic.
+ */
 #include "gtest/gtest.h"
 #include "jres_solver/jres_solver.hpp"
 #include "jres_internal_types.hpp"

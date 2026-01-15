@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_availability_boundaries.cpp
  * @brief Tests for precise availability boundary conditions.
  */

@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_availability_overlap.cpp
  * @brief Tests for availability overlap detection.
  */

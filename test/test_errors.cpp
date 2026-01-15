@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_errors.cpp
  * @brief Tests for error handling and input validation.
  */

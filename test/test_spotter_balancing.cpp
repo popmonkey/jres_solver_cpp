@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_spotter_balancing.cpp
  * @brief Tests for spotter workload balancing.
  */

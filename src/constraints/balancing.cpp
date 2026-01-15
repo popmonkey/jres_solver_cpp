@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/constraints/balancing.cpp
+ * @brief Implementation of load balancing constraints.
+ */
 #include "balancing.hpp"
 #include "Highs.h"
 #include <cmath>

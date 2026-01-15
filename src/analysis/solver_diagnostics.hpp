@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/analysis/solver_diagnostics.hpp
+ * @brief Header for solver diagnostics.
+ */
 #pragma once
 
 #include "../jres_internal_types.hpp"

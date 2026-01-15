@@ -1,3 +1,8 @@
+/**
+ * @author popmonkey+jres@gmail.com
+ * @file src/constraints/minimum_rest.cpp
+ * @brief Implementation of minimum rest constraints.
+ */
 #include "minimum_rest.hpp"
 #include "Highs.h"
 #include <algorithm>

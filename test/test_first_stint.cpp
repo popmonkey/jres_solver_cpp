@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_first_stint.cpp
  * @brief Tests for the firstStintDriver hard constraint.
  */

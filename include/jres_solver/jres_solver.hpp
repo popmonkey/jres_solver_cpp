@@ -1,6 +1,6 @@
 /**
  * @author popmonkey+jres@gmail.com
- * @file jres_solver.hpp
+ * @file include/jres_solver/jres_solver.hpp
  * @brief Public C-API for the JRES Solver Library.
  *
  * This file defines the C-style interface for the solver,

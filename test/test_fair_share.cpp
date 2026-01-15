@@ -1,4 +1,5 @@
 /**
+ * @author popmonkey+jres@gmail.com
  * @file test/test_fair_share.cpp
  * @brief Tests for the "Fair Share" rule enforcement.
  */
