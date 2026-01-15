@@ -162,6 +162,7 @@ add_library(jres_solver_lib
   src/jres_solver_base.cpp
   src/jres_standard_solver.cpp
   src/analysis/capacity_analyzer.cpp
+  src/analysis/solver_diagnostics.cpp
   src/constraints/balancing.cpp
   src/constraints/minimum_rest.cpp
   src/constraints/max_busy_time.cpp

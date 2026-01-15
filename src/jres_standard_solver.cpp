@@ -5,6 +5,7 @@
  */
 #include "jres_standard_solver.hpp"
 #include "analysis/capacity_analyzer.hpp"
+#include "analysis/solver_diagnostics.hpp"
 #include "constraints/balancing.hpp"
 #include "constraints/minimum_rest.hpp"
 #include "constraints/max_busy_time.hpp"
@@ -19,8 +20,8 @@
 #include "Highs.h"
 
 // Penalty Constants
-static const double kPenaltySlack = 1000000.0;
-static const double kPenaltyUnavailable = 10000000.0;
+static const double kPenaltySlack = 100000.0;       // Soft constraint (Rest, Fair Share)
+static const double kPenaltyUnavailable = 10000000.0;    // Original value, high enough
 static const double kRewardPreferred = -1.0;
 static const double kRewardProximity = -0.5; // Incentive for spotting adjacent to driving
 
@@ -387,25 +388,18 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     const auto& solution = m_highs->getSolution();
     const std::vector<double>& colValues = solution.col_value;
 
-    // Check Slacks (Covers both Drivers and Spotters in Integrated mode)
-    for (const auto& [varIdx, info] : m_slackInfo) {
-        if (varIdx < colValues.size() && colValues[varIdx] > 0.001) {
-            std::ostringstream ss;
-            ss << "Violation: " << info.type << " for " << info.memberName;
-            if (info.stintIndex >= 0) {
-               ss << " at Stint " << info.stintIndex;
-            }
-            ss << " (Value: " << colValues[varIdx] << ")";
-            output.diagnosis.push_back(ss.str());
-        }
-    }
-    
-    // Check Unavailable Assignments
-    for (int varIdx : m_unavailableVars) {
-         if (varIdx < colValues.size() && colValues[varIdx] > 0.5) {
-             // We can defer detailed message generation to the loop below
-         }
-    }
+    // Use human-readable diagnostic formatter
+    auto formattedDiags = jres::analysis::formatHumanDiagnostic(
+        m_slackInfo,
+        m_unavailableVars,
+        m_driverWorkVars,
+        m_spotterWorkVars,
+        colValues,
+        m_input,
+        m_driverPool,
+        m_spotterPool
+    );
+    output.diagnosis.insert(output.diagnosis.end(), formattedDiags.begin(), formattedDiags.end());
 
     for (size_t s = 0; s < m_input.stints.size(); ++s) {
         jres::internal::ScheduleEntry entry;
@@ -421,9 +415,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                 int idx = m_driverWorkVars.at({p.name, (int)s});
                 if (colValues[idx] > 0.5) {
                     entry.driver = p.name;
-                    if (m_unavailableVars.count(idx)) {
-                        output.diagnosis.push_back("Violation: Unavailable Driver " + p.name + " assigned to Stint " + std::to_string(s));
-                    }
                     break;
                 }
             }
@@ -436,9 +427,6 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                     int idx = m_spotterWorkVars.at({p.name, (int)s});
                     if (colValues[idx] > 0.5) {
                         entry.spotter = p.name;
-                        if (m_unavailableVars.count(idx)) {
-                            output.diagnosis.push_back("Violation: Unavailable Spotter " + p.name + " assigned to Stint " + std::to_string(s));
-                        }
                         break;
                     }
                 }
@@ -458,6 +446,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             // Clear slack info for spotter run to avoid confusion (indices will reset)
             m_slackInfo.clear();
             m_unavailableVars.clear();
+            m_spotterWorkVars.clear();
 
             Highs spotterSolver;
             spotterSolver.setOptionValue("output_flag", false);
