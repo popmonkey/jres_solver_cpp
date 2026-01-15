@@ -18,10 +18,32 @@ namespace TimeHelpers {
     std::chrono::system_clock::time_point stringToTimePoint(const std::string &utc_string);
     std::string timePointToString(std::chrono::system_clock::time_point tp);
     std::string timePointToKey(std::chrono::system_clock::time_point tp);
+    std::time_t roundToHour(std::time_t t);
 }
 
 
 // --- Data Structures ---
+
+using ID = int;
+
+struct StringTable {
+    std::vector<std::string> id_to_string;
+    std::map<std::string, ID> string_to_id;
+
+    ID get_id(const std::string& s) {
+        auto it = string_to_id.find(s);
+        if (it != string_to_id.end()) return it->second;
+        ID id = (ID)id_to_string.size();
+        id_to_string.push_back(s);
+        string_to_id[s] = id;
+        return id;
+    }
+    
+    std::string get_string(ID id) const {
+        if (id >= 0 && id < (ID)id_to_string.size()) return id_to_string[id];
+        return "";
+    }
+};
 
 enum class Availability {
     Unavailable,
@@ -31,7 +53,7 @@ enum class Availability {
 
 struct TeamMember
 {
-    std::string name;
+    ID nameId = -1;
     bool isDriver = true;
     bool isSpotter = false;
     double tzOffset = 0.0;
@@ -39,8 +61,8 @@ struct TeamMember
 
 struct Stint {
     int id;
-    std::string startTime;
-    std::string endTime;
+    std::time_t startTime;
+    std::time_t endTime;
 };
 
 struct SolverInput
@@ -48,23 +70,25 @@ struct SolverInput
     int consecutiveStints = 1;
     int minimumRestHours = 0;
     int maximumBusyHours = 8;
-    std::string firstStintDriver;
+    ID firstStintDriver = -1;
     std::vector<TeamMember> teamMembers;
-    std::map<std::string, std::map<std::string, Availability>> availability;
+    // Map: MemberID -> Time -> Availability
+    std::map<ID, std::map<std::time_t, Availability>> availability;
     std::vector<Stint> stints;
+    StringTable strings;
 };
 
 struct ScheduleEntry {
     int id;
-    std::string startTime;
-    std::string endTime;
-    std::string driver;
-    std::string spotter;
+    std::time_t startTime;
+    std::time_t endTime;
+    ID driverId = -1;
+    ID spotterId = -1;
 };
 
 struct SlackInfo {
     std::string type;
-    std::string memberName;
+    ID memberNameId = -1;
     int stintIndex;
     double limit = 0.0;
     double actual = 0.0;
@@ -84,7 +108,7 @@ struct InputConfig {
     int consecutiveStints = 1;
     int minimumRestHours = 0;
     int maximumBusyHours = 8;
-    std::string firstStintDriver;
+    ID firstStintDriver = -1;
 };
 
 struct SolverOutput
@@ -94,7 +118,7 @@ struct SolverOutput
     SolverStats stats;
     std::vector<TeamMember> teamMembers;
     InputConfig config;
-    // Add any other output fields here, like diagnosis or metrics
+    StringTable strings;
 };
 
 // --- Conversion Functions ---

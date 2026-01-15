@@ -27,10 +27,10 @@ namespace jres::analysis {
  */
 std::string explain_assignment_failure(
     int stintIndex,
-    const std::string& violationDriver,
+    jres::internal::ID violationDriverId,
     const jres::internal::SolverInput& input,
     const std::vector<jres::internal::TeamMember>& driverPool,
-    const std::map<std::pair<std::string, int>, int>& driverWorkVars,
+    const std::map<std::pair<jres::internal::ID, int>, int>& driverWorkVars,
     const std::vector<double>& colValues
 );
 
@@ -40,8 +40,8 @@ std::string explain_assignment_failure(
 std::vector<std::string> formatHumanDiagnostic(
     const std::map<int, jres::internal::SlackInfo>& slackInfo,
     const std::set<int>& unavailableVars,
-    const std::map<std::pair<std::string, int>, int>& driverWorkVars,
-    const std::map<std::pair<std::string, int>, int>& spotterWorkVars,
+    const std::map<std::pair<jres::internal::ID, int>, int>& driverWorkVars,
+    const std::map<std::pair<jres::internal::ID, int>, int>& spotterWorkVars,
     const std::vector<double>& colValues,
     const jres::internal::SolverInput& input,
     const std::vector<jres::internal::TeamMember>& driverPool,

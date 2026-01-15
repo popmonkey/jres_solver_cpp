@@ -14,29 +14,26 @@ CapacityAnalysis CapacityAnalyzer::calculate_max_potential_capacity(
     const std::vector<TeamMember>& participants,
     const SolverInput& input)
 {
-    // Parse stint times once
-    std::vector<std::chrono::system_clock::time_point> startTimes;
-    std::vector<std::chrono::system_clock::time_point> endTimes;
+    std::vector<std::time_t> startTimes;
+    std::vector<std::time_t> endTimes;
     startTimes.reserve(input.stints.size());
     endTimes.reserve(input.stints.size());
 
-    std::chrono::system_clock::time_point raceStart;
-    std::chrono::system_clock::time_point raceEnd;
+    std::time_t raceStart;
+    std::time_t raceEnd;
     bool raceTimesInit = false;
 
     for (const auto& stint : input.stints) {
-        auto s = TimeHelpers::stringToTimePoint(stint.startTime);
-        auto e = TimeHelpers::stringToTimePoint(stint.endTime);
-        startTimes.push_back(s);
-        endTimes.push_back(e);
+        startTimes.push_back(stint.startTime);
+        endTimes.push_back(stint.endTime);
 
         if(!raceTimesInit) {
-            raceStart = s;
-            raceEnd = e;
+            raceStart = stint.startTime;
+            raceEnd = stint.endTime;
             raceTimesInit = true;
         } else {
-            if(s < raceStart) raceStart = s;
-            if(e > raceEnd) raceEnd = e;
+            if(stint.startTime < raceStart) raceStart = stint.startTime;
+            if(stint.endTime > raceEnd) raceEnd = stint.endTime;
         }
     }
 
@@ -47,10 +44,11 @@ CapacityAnalysis CapacityAnalyzer::calculate_max_potential_capacity(
     for (const auto& p : participants) {
         // Build Availability
         std::vector<bool> is_available(input.stints.size(), true);
-        auto member_availability_it = input.availability.find(p.name);
+        auto member_availability_it = input.availability.find(p.nameId);
         if (member_availability_it != input.availability.end()) {
             for (size_t s = 0; s < input.stints.size(); ++s) {
-                std::string key = TimeHelpers::timePointToKey(startTimes[s]);
+                // Check if this stint time is unavailable
+                std::time_t key = TimeHelpers::roundToHour(startTimes[s]);
                 auto time_it = member_availability_it->second.find(key);
                 if (time_it != member_availability_it->second.end() && 
                     time_it->second == Availability::Unavailable) {
@@ -68,24 +66,24 @@ CapacityAnalysis CapacityAnalyzer::calculate_max_potential_capacity(
                 planned_drive[s] = true;
                 base_capacity++;
                 
-                auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(endTimes[s] - startTimes[s]).count();
-                driver_total_hours += static_cast<double>(duration_ms) / 3600000.0;
+                double h = std::difftime(endTimes[s], startTimes[s]) / 3600.0;
+                driver_total_hours += h;
             }
         }
         
         // Adjust for Global Minimum Rest (One Instance)
         int final_capacity = base_capacity;
         if (input.minimumRestHours > 0) {
-             auto minRestDuration = std::chrono::hours(input.minimumRestHours);
+             long long minRestSeconds = (long long)input.minimumRestHours * 3600;
              int min_loss = base_capacity; 
              bool found_valid_window = false;
 
-             std::vector<std::chrono::system_clock::time_point> candidateStarts;
+             std::vector<std::time_t> candidateStarts;
              candidateStarts.push_back(raceStart);
              for(const auto& t : endTimes) candidateStarts.push_back(t);
 
              for(const auto& tStart : candidateStarts) {
-                 auto tEnd = tStart + minRestDuration;
+                 auto tEnd = tStart + minRestSeconds;
                  if (tEnd > raceEnd) continue;
                  found_valid_window = true;
 
@@ -109,7 +107,8 @@ CapacityAnalysis CapacityAnalyzer::calculate_max_potential_capacity(
         
         analysis.totalCapacity += final_capacity;
         
-        ss << "\n- " << p.name << ": " << final_capacity 
+        std::string name = input.strings.get_string(p.nameId);
+        ss << "\n- " << name << ": " << final_capacity 
            << " stints (approx " << std::fixed << std::setprecision(1) << driver_total_hours 
            << "h, MinRest=" << input.minimumRestHours << "h)";
     }

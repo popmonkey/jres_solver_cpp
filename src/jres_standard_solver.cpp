@@ -26,8 +26,25 @@ static const double kRewardPreferred = -1.0;
 static const double kRewardProximity = -0.5; // Incentive for spotting adjacent to driving
 
 JresStandardSolver::JresStandardSolver(const jres::internal::SolverInput& input, const JresSolverOptions& options)
-    : JresSolverBase(input, options)
+    : m_input(input), m_options(options)
 {
+    // Filter Participant Pools
+    std::set<jres::internal::ID> seenNames;
+    for (const auto& member : m_input.teamMembers) {
+        if (seenNames.count(member.nameId)) {
+            std::string name = m_input.strings.get_string(member.nameId);
+            throw std::runtime_error("Duplicate team member name: " + name);
+        }
+        seenNames.insert(member.nameId);
+
+        if (member.isDriver) m_driverPool.push_back(member);
+        if (member.isSpotter) m_spotterPool.push_back(member);
+    }
+
+    if (m_driverPool.empty()) {
+        throw std::runtime_error("No drivers available for this race.");
+    }
+
     m_highs = std::make_unique<Highs>();
     
     // Set HiGHS Options
@@ -46,20 +63,9 @@ JresStandardSolver::~JresStandardSolver() = default;
 void JresStandardSolver::add_participant_model(
     Highs &highs,
     const std::vector<jres::internal::TeamMember> &participants,
-    std::map<std::pair<std::string, int>, int>& workVars)
+    std::map<std::pair<jres::internal::ID, int>, int>& workVars)
 {
     if (participants.empty()) return;
-
-    // Pre-parse stint times
-    std::vector<std::chrono::system_clock::time_point> startTimes;
-    startTimes.reserve(m_input.stints.size());
-    std::vector<std::chrono::system_clock::time_point> endTimes;
-    endTimes.reserve(m_input.stints.size());
-
-    for (const auto& stint : m_input.stints) {
-        startTimes.push_back(jres::internal::TimeHelpers::stringToTimePoint(stint.startTime));
-        endTimes.push_back(jres::internal::TimeHelpers::stringToTimePoint(stint.endTime));
-    }
 
     // Determine Block Structure
     int consecutive = m_input.consecutiveStints;
@@ -97,20 +103,18 @@ void JresStandardSolver::add_participant_model(
 
             // Map all stints in this block to this variable and accumulate cost
             for (int s_idx : block) {
-                workVars[{p.name, s_idx}] = workVarIdx;
+                workVars[{p.nameId, s_idx}] = workVarIdx;
 
-                auto s_time = startTimes[s_idx];
-                auto e_time = endTimes[s_idx];
+                auto s_time = m_input.stints[s_idx].startTime;
+                auto e_time = m_input.stints[s_idx].endTime;
 
                 // Start checking from the hour bucket where the stint starts
-                std::string startKey = jres::internal::TimeHelpers::timePointToKey(s_time);
-                auto t_cursor = jres::internal::TimeHelpers::stringToTimePoint(startKey);
+                auto t_cursor = jres::internal::TimeHelpers::roundToHour(s_time);
 
                 while (t_cursor < e_time) {
-                    std::string availabilityKey = jres::internal::TimeHelpers::timePointToKey(t_cursor);
-                    auto member_availability_it = m_input.availability.find(p.name);
+                    auto member_availability_it = m_input.availability.find(p.nameId);
                     if (member_availability_it != m_input.availability.end()) {
-                        auto time_availability_it = member_availability_it->second.find(availabilityKey);
+                        auto time_availability_it = member_availability_it->second.find(t_cursor);
                         if (time_availability_it != member_availability_it->second.end()) {
                             if (time_availability_it->second == jres::internal::Availability::Unavailable) {
                                 total_cost += kPenaltyUnavailable;
@@ -120,7 +124,7 @@ void JresStandardSolver::add_participant_model(
                             }
                         }
                     }
-                    t_cursor += std::chrono::hours(1);
+                    t_cursor += 3600;
                 }
             }
 
@@ -138,22 +142,15 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     using namespace std::chrono;
     auto startTotal = high_resolution_clock::now();
     jres::internal::SolverOutput output;
+    
+    // Copy string table to output so we can resolve IDs later
+    output.strings = m_input.strings;
 
     // Populate Config
     output.config.consecutiveStints = m_input.consecutiveStints;
     output.config.minimumRestHours = m_input.minimumRestHours;
     output.config.maximumBusyHours = m_input.maximumBusyHours;
     output.config.firstStintDriver = m_input.firstStintDriver;
-
-    // --- Duplicate Name Check ---
-    std::set<std::string> namesSeen;
-    for (const auto& m : m_input.teamMembers) {
-        if (namesSeen.count(m.name)) {
-            std::string err = "Duplicate team member name: " + m.name;
-            throw std::runtime_error(err);
-        }
-        namesSeen.insert(m.name);
-    }
 
     // --- Arithmetic Pre-flight Check ---
     int totalStints = (int)m_input.stints.size();
@@ -173,7 +170,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     add_participant_model(*m_highs, m_driverPool, m_driverWorkVars);
 
     // --- Hard Constraint: First Stint Driver ---
-    if (!m_input.firstStintDriver.empty()) {
+    if (m_input.firstStintDriver != -1) {
         bool found = false;
         if (m_driverWorkVars.count({m_input.firstStintDriver, 0})) {
             int varIdx = m_driverWorkVars.at({m_input.firstStintDriver, 0});
@@ -182,7 +179,8 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         }
 
         if (!found) {
-             throw std::runtime_error("First stint driver '" + m_input.firstStintDriver + "' is not a valid driver or is unavailable.");
+             std::string name = m_input.strings.get_string(m_input.firstStintDriver);
+             throw std::runtime_error("First stint driver '" + name + "' is not a valid driver or is unavailable.");
         }
     }
 
@@ -193,10 +191,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     stint_durations_hours.reserve(m_input.stints.size());
     
     for (const auto& stint : m_input.stints) {
-        auto s = jres::internal::TimeHelpers::stringToTimePoint(stint.startTime);
-        auto e = jres::internal::TimeHelpers::stringToTimePoint(stint.endTime);
-        long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count();
-        double h = static_cast<double>(ms) / 3600000.0;
+        double h = std::difftime(stint.endTime, stint.startTime) / 3600.0;
         stint_durations_hours.push_back(h);
         total_duration_hours += h;
     }
@@ -213,8 +208,8 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             std::map<int, double> varDurations;
 
             for (size_t s = 0; s < m_input.stints.size(); ++s) {
-                if (m_driverWorkVars.count({p.name, (int)s})) {
-                    int v = m_driverWorkVars.at({p.name, (int)s});
+                if (m_driverWorkVars.count({p.nameId, (int)s})) {
+                    int v = m_driverWorkVars.at({p.nameId, (int)s});
                     varDurations[v] += stint_durations_hours[s];
                 }
             }
@@ -233,7 +228,7 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             
             jres::internal::SlackInfo info;
             info.type = "Fair Share Rule (Minimum Time)";
-            info.memberName = p.name;
+            info.memberNameId = p.nameId;
             info.stintIndex = -1;
             info.limit = min_fair_share_hours;
             m_slackInfo[slackVar] = info;
@@ -260,8 +255,8 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         std::vector<double> values;
         for (const auto &p : m_driverPool)
         {
-            if (m_driverWorkVars.count({p.name, (int)s})) {
-                indices.push_back(m_driverWorkVars.at({p.name, (int)s}));
+            if (m_driverWorkVars.count({p.nameId, (int)s})) {
+                indices.push_back(m_driverWorkVars.at({p.nameId, (int)s}));
                 values.push_back(1.0);
             }
         }
@@ -279,9 +274,9 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                 size_t target_s = s % N;
                 
                 for (const auto& p : m_driverPool) {
-                    if (m_driverWorkVars.count({p.name, (int)s}) && m_driverWorkVars.count({p.name, (int)target_s})) {
-                        int var_current = m_driverWorkVars.at({p.name, (int)s});
-                        int var_target = m_driverWorkVars.at({p.name, (int)target_s});
+                    if (m_driverWorkVars.count({p.nameId, (int)s}) && m_driverWorkVars.count({p.nameId, (int)target_s})) {
+                        int var_current = m_driverWorkVars.at({p.nameId, (int)s});
+                        int var_target = m_driverWorkVars.at({p.nameId, (int)target_s});
 
                         // Create deviation variable d >= |current - target|
                         // We minimize d, so cost is +weight
@@ -326,8 +321,8 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             std::vector<int> indices;
             std::vector<double> values;
             for (const auto& p : m_spotterPool) {
-                if (m_spotterWorkVars.count({p.name, (int)s})) {
-                    indices.push_back(m_spotterWorkVars.at({p.name, (int)s}));
+                if (m_spotterWorkVars.count({p.nameId, (int)s})) {
+                    indices.push_back(m_spotterWorkVars.at({p.nameId, (int)s}));
                     values.push_back(1.0);
                 }
             }
@@ -341,8 +336,8 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         for (const auto& p : m_input.teamMembers) {
             if (p.isDriver && p.isSpotter) {
                 for (size_t s = 0; s < m_input.stints.size(); ++s) {
-                    if (m_driverWorkVars.count({p.name, (int)s}) && m_spotterWorkVars.count({p.name, (int)s})) {
-                        std::vector<int> idx = { m_driverWorkVars.at({p.name, (int)s}), m_spotterWorkVars.at({p.name, (int)s}) };
+                    if (m_driverWorkVars.count({p.nameId, (int)s}) && m_spotterWorkVars.count({p.nameId, (int)s})) {
+                        std::vector<int> idx = { m_driverWorkVars.at({p.nameId, (int)s}), m_spotterWorkVars.at({p.nameId, (int)s}) };
                         std::vector<double> val = {1.0, 1.0};
                         m_highs->addRow(0.0, 1.0, 2, idx.data(), val.data());
                     }
@@ -406,15 +401,13 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         entry.id = m_input.stints[s].id;
         entry.startTime = m_input.stints[s].startTime;
         entry.endTime = m_input.stints[s].endTime;
-        entry.driver = "N/A";
-        entry.spotter = "N/A";
         
         // Extract Driver
         for (const auto& p : m_driverPool) {
-            if (m_driverWorkVars.count({p.name, (int)s})) {
-                int idx = m_driverWorkVars.at({p.name, (int)s});
+            if (m_driverWorkVars.count({p.nameId, (int)s})) {
+                int idx = m_driverWorkVars.at({p.nameId, (int)s});
                 if (colValues[idx] > 0.5) {
-                    entry.driver = p.name;
+                    entry.driverId = p.nameId;
                     break;
                 }
             }
@@ -423,10 +416,10 @@ jres::internal::SolverOutput JresStandardSolver::solve()
         // Extract Spotter (if Integrated)
         if (m_options.spotterMode == JRES_SPOTTER_MODE_INTEGRATED) {
             for (const auto& p : m_spotterPool) {
-                if (m_spotterWorkVars.count({p.name, (int)s})) {
-                    int idx = m_spotterWorkVars.at({p.name, (int)s});
+                if (m_spotterWorkVars.count({p.nameId, (int)s})) {
+                    int idx = m_spotterWorkVars.at({p.nameId, (int)s});
                     if (colValues[idx] > 0.5) {
-                        entry.spotter = p.name;
+                        entry.spotterId = p.nameId;
                         break;
                     }
                 }
@@ -464,8 +457,8 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                 std::vector<int> indices;
                 std::vector<double> values;
                 for (const auto& p : m_spotterPool) {
-                    if (m_spotterWorkVars.count({p.name, (int)s})) {
-                        indices.push_back(m_spotterWorkVars.at({p.name, (int)s}));
+                    if (m_spotterWorkVars.count({p.nameId, (int)s})) {
+                        indices.push_back(m_spotterWorkVars.at({p.nameId, (int)s}));
                         values.push_back(1.0);
                     }
                 }
@@ -477,9 +470,9 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             
             // Cannot spot if driving
             for (size_t s = 0; s < m_input.stints.size(); ++s) {
-                const std::string& driverName = output.schedule[s].driver;
-                if (driverName != "N/A" && m_spotterWorkVars.count({driverName, (int)s})) {
-                    spotterSolver.changeColBounds(m_spotterWorkVars.at({driverName, (int)s}), 0.0, 0.0);
+                jres::internal::ID driverId = output.schedule[s].driverId;
+                if (driverId != -1 && m_spotterWorkVars.count({driverId, (int)s})) {
+                    spotterSolver.changeColBounds(m_spotterWorkVars.at({driverId, (int)s}), 0.0, 0.0);
                 }
             }
 
@@ -491,14 +484,14 @@ jres::internal::SolverOutput JresStandardSolver::solve()
             std::map<int, double> spotterRewards;
             for (const auto& p : m_spotterPool) {
                 for (size_t s = 0; s < m_input.stints.size(); ++s) {
-                     if (!m_spotterWorkVars.count({p.name, (int)s})) continue;
-                     int varIdx = m_spotterWorkVars.at({p.name, (int)s});
+                     if (!m_spotterWorkVars.count({p.nameId, (int)s})) continue;
+                     int varIdx = m_spotterWorkVars.at({p.nameId, (int)s});
                      
                      double additionalReward = 0.0;
-                     if (s > 0 && output.schedule[s-1].driver == p.name) {
+                     if (s > 0 && output.schedule[s-1].driverId == p.nameId) {
                          additionalReward += (std::abs(m_options.roleCouplingWeight) > 1e-6) ? -m_options.roleCouplingWeight : kRewardProximity;
                      }
-                     if (s < m_input.stints.size() - 1 && output.schedule[s+1].driver == p.name) {
+                     if (s < m_input.stints.size() - 1 && output.schedule[s+1].driverId == p.nameId) {
                         additionalReward += kRewardProximity;
                      }
                      spotterRewards[varIdx] += additionalReward;
@@ -529,7 +522,8 @@ jres::internal::SolverOutput JresStandardSolver::solve()
                 for (const auto& [varIdx, info] : m_slackInfo) {
                     if (varIdx < sColValues.size() && sColValues[varIdx] > 0.001) {
                         std::ostringstream ss;
-                        ss << "Violation: " << info.type << " for Spotter " << info.memberName;
+                        std::string memberName = m_input.strings.get_string(info.memberNameId);
+                        ss << "Violation: " << info.type << " for Spotter " << memberName;
                         if (info.stintIndex >= 0) {
                             ss << " at Stint " << info.stintIndex;
                         }
@@ -539,12 +533,13 @@ jres::internal::SolverOutput JresStandardSolver::solve()
 
                 for (size_t s = 0; s < m_input.stints.size(); ++s) {
                     for (const auto& p : m_spotterPool) {
-                        if (m_spotterWorkVars.count({p.name, (int)s})) {
-                            int idx = m_spotterWorkVars.at({p.name, (int)s});
+                        if (m_spotterWorkVars.count({p.nameId, (int)s})) {
+                            int idx = m_spotterWorkVars.at({p.nameId, (int)s});
                             if (sColValues[idx] > 0.5) {
-                                output.schedule[s].spotter = p.name;
+                                output.schedule[s].spotterId = p.nameId;
                                 if (m_unavailableVars.count(idx)) {
-                                    output.diagnosis.push_back("Violation: Unavailable Spotter " + p.name + " assigned to Stint " + std::to_string(s));
+                                    std::string name = m_input.strings.get_string(p.nameId);
+                                    output.diagnosis.push_back("Violation: Unavailable Spotter " + name + " assigned to Stint " + std::to_string(s));
                                 }
                                 break;
                             }
@@ -559,13 +554,15 @@ jres::internal::SolverOutput JresStandardSolver::solve()
     
     // --- Final Validation ---
     for (size_t s = 0; s < output.schedule.size(); ++s) {
-        if (output.schedule[s].driver == "N/A") {
-             output.diagnosis.push_back("Stint " + std::to_string(s) + " (" + output.schedule[s].startTime + ") has no assigned driver.");
+        if (output.schedule[s].driverId == -1) {
+             std::string timeStr = jres::internal::TimeHelpers::timePointToString(std::chrono::system_clock::from_time_t(output.schedule[s].startTime));
+             output.diagnosis.push_back("Stint " + std::to_string(s) + " (" + timeStr + ") has no assigned driver.");
         }
         
         bool spotterRequired = (m_options.spotterMode != JRES_SPOTTER_MODE_NONE && !m_options.allowNoSpotter);
-        if (spotterRequired && output.schedule[s].spotter == "N/A") {
-             output.diagnosis.push_back("Stint " + std::to_string(s) + " (" + output.schedule[s].startTime + ") has no assigned spotter.");
+        if (spotterRequired && output.schedule[s].spotterId == -1) {
+             std::string timeStr = jres::internal::TimeHelpers::timePointToString(std::chrono::system_clock::from_time_t(output.schedule[s].startTime));
+             output.diagnosis.push_back("Stint " + std::to_string(s) + " (" + timeStr + ") has no assigned spotter.");
         }
     }
 

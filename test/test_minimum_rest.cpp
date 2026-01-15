@@ -16,25 +16,31 @@
 #define TOSTRING(x) STRINGIFY(x)
 
 // Helper to check rest times
-void check_rest_times(const jres::internal::SolverOutput& output, int minimumRestHours) {
-    if (output.schedule.empty()) return;
+void check_rest_times(const JresSolverOutput* output, int minimumRestHours) {
+    if (!output || output->schedule_len == 0) return;
 
     // Determine Race Start and End
-    auto raceStart = jres::internal::TimeHelpers::stringToTimePoint(output.schedule[0].startTime);
-    auto raceEnd = jres::internal::TimeHelpers::stringToTimePoint(output.schedule[0].endTime);
-    for(const auto& s : output.schedule) {
-        auto tS = jres::internal::TimeHelpers::stringToTimePoint(s.startTime);
-        auto tE = jres::internal::TimeHelpers::stringToTimePoint(s.endTime);
+    auto raceStart = jres::internal::TimeHelpers::stringToTimePoint(output->schedule[0].startTime);
+    auto raceEnd = jres::internal::TimeHelpers::stringToTimePoint(output->schedule[0].endTime);
+    for(int i=0; i<output->schedule_len; ++i) {
+        auto tS = jres::internal::TimeHelpers::stringToTimePoint(output->schedule[i].startTime);
+        auto tE = jres::internal::TimeHelpers::stringToTimePoint(output->schedule[i].endTime);
         if(tS < raceStart) raceStart = tS;
         if(tE > raceEnd) raceEnd = tE;
     }
 
     auto minRestDuration = std::chrono::hours(minimumRestHours);
 
-    std::map<std::string, std::vector<jres::internal::ScheduleEntry>> driver_stints;
-    for (const auto& entry : output.schedule) {
-        if (entry.driver != "N/A") {
-            driver_stints[entry.driver].push_back(entry);
+    struct Entry {
+        std::string startTime;
+        std::string endTime;
+    };
+    std::map<std::string, std::vector<Entry>> driver_stints;
+    
+    for (int i=0; i<output->schedule_len; ++i) {
+        std::string driver = output->schedule[i].driver;
+        if (driver != "N/A") {
+            driver_stints[driver].push_back({output->schedule[i].startTime, output->schedule[i].endTime});
         }
     }
 
@@ -120,19 +126,7 @@ TEST(MinimumRestTest, Enforcement) {
         
         // If it returns valid output, check constraints.
         if (output && output->schedule_len > 0) {
-            jres::internal::SolverOutput internal_output;
-            // Reconstruct internal output for helper
-            for(int i=0; i<output->schedule_len; ++i) {
-                internal_output.schedule.push_back({
-                    output->schedule[i].id,
-                    output->schedule[i].startTime,
-                    output->schedule[i].endTime,
-                    output->schedule[i].driver,
-                    output->schedule[i].spotter
-                });
-            }
-            // Check for 2 hours minimum rest as defined in the JSON
-            check_rest_times(internal_output, 2);
+            check_rest_times(output, 2);
         } else {
              // If infeasible, that's also a valid outcome for certain constraints,
              // though this specific scenario should be feasible.
@@ -183,18 +177,7 @@ TEST(MinimumRestTest, FeasibleScenario) {
     ASSERT_NE(output, nullptr);
     ASSERT_EQ(output->schedule_len, 4);
     
-    jres::internal::SolverOutput internal_output;
-    for(int i=0; i<output->schedule_len; ++i) {
-        internal_output.schedule.push_back({
-            output->schedule[i].id,
-            output->schedule[i].startTime,
-            output->schedule[i].endTime,
-            output->schedule[i].driver,
-            output->schedule[i].spotter
-        });
-    }
-    
-    check_rest_times(internal_output, 1);
+    check_rest_times(output, 1);
     
     free_jres_solver_input(input);
     free_jres_solver_output(output);

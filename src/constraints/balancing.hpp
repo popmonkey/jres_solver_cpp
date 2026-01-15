@@ -15,8 +15,8 @@ namespace jres::constraints {
     void add_role_coupling_incentive(
         Highs* highs,
         const std::vector<jres::internal::TeamMember>& pool,
-        const std::map<std::pair<std::string, int>, int>& driverVars,
-        const std::map<std::pair<std::string, int>, int>& spotterVars,
+        const std::map<std::pair<jres::internal::ID, int>, int>& driverVars,
+        const std::map<std::pair<jres::internal::ID, int>, int>& spotterVars,
         size_t numStints,
         double weight);
 
@@ -24,7 +24,7 @@ namespace jres::constraints {
         Highs &highs,
         const std::vector<jres::internal::TeamMember> &participants,
         const jres::internal::SolverInput& input,
-        const std::map<std::pair<std::string, int>, int>& workVars,
+        const std::map<std::pair<jres::internal::ID, int>, int>& workVars,
         double avgStints);
 
 }

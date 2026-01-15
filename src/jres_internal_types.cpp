@@ -34,7 +34,7 @@ namespace TimeHelpers {
         std::time_t time = std::chrono::system_clock::to_time_t(tp);
         std::tm tm = *std::gmtime(&time);
         std::stringstream ss;
-        ss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+        ss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
         return ss.str();
     }
 
@@ -45,6 +45,13 @@ namespace TimeHelpers {
         std::stringstream ss;
         ss << std::put_time(&tm, "%Y-%m-%dT%H:00:00.000Z");
         return ss.str();
+    }
+    
+    std::time_t roundToHour(std::time_t t) {
+        std::tm tm = *std::gmtime(&t);
+        tm.tm_min = 0;
+        tm.tm_sec = 0;
+        return timegm_portable(&tm);
     }
 }
 
@@ -69,12 +76,12 @@ SolverInput from_c_input(const JresSolverInput* c_input) {
     input.minimumRestHours = c_input->minimumRestHours;
     input.maximumBusyHours = c_input->maximumBusyHours;
     if (c_input->firstStintDriver) {
-        input.firstStintDriver = c_input->firstStintDriver;
+        input.firstStintDriver = input.strings.get_id(c_input->firstStintDriver);
     }
 
     for (int i = 0; i < c_input->teamMembers_len; ++i) {
         TeamMember member;
-        member.name = c_input->teamMembers[i].name;
+        member.nameId = input.strings.get_id(c_input->teamMembers[i].name);
         member.isDriver = c_input->teamMembers[i].isDriver;
         member.isSpotter = c_input->teamMembers[i].isSpotter;
         member.tzOffset = c_input->teamMembers[i].tzOffset;
@@ -84,21 +91,24 @@ SolverInput from_c_input(const JresSolverInput* c_input) {
     for (int i = 0; i < c_input->stints_len; ++i) {
         Stint stint;
         stint.id = c_input->stints[i].id;
-        stint.startTime = c_input->stints[i].startTime;
-        stint.endTime = c_input->stints[i].endTime;
+        auto startTp = TimeHelpers::stringToTimePoint(c_input->stints[i].startTime);
+        auto endTp = TimeHelpers::stringToTimePoint(c_input->stints[i].endTime);
+        stint.startTime = std::chrono::system_clock::to_time_t(startTp);
+        stint.endTime = std::chrono::system_clock::to_time_t(endTp);
         input.stints.push_back(stint);
     }
 
     for (int i = 0; i < c_input->availability_len; ++i) {
-        std::string name = c_input->availability[i].name;
+        ID memberId = input.strings.get_id(c_input->availability[i].name);
         for (int j = 0; j < c_input->availability[i].availability_len; ++j) {
             std::string time = c_input->availability[i].availability[j].time;
-            // Normalize time to key format used by solver
             auto tp = TimeHelpers::stringToTimePoint(time);
-            std::string key = TimeHelpers::timePointToKey(tp);
+            std::time_t t = std::chrono::system_clock::to_time_t(tp);
+            // Normalize to hour bucket
+            std::time_t key = TimeHelpers::roundToHour(t);
             
             JresAvailability availability = c_input->availability[i].availability[j].availability;
-            input.availability[name][key] = to_internal_availability(availability);
+            input.availability[memberId][key] = to_internal_availability(availability);
         }
     }
 
@@ -119,10 +129,18 @@ JresSolverOutput* to_c_output(const SolverOutput& output, const JresSolverOption
 
     for (size_t i = 0; i < output.schedule.size(); ++i) {
         c_output->schedule[i].id = output.schedule[i].id;
-        c_output->schedule[i].startTime = allocate_and_copy(output.schedule[i].startTime);
-        c_output->schedule[i].endTime = allocate_and_copy(output.schedule[i].endTime);
-        c_output->schedule[i].driver = allocate_and_copy(output.schedule[i].driver);
-        c_output->schedule[i].spotter = allocate_and_copy(output.schedule[i].spotter);
+        
+        auto startTp = std::chrono::system_clock::from_time_t(output.schedule[i].startTime);
+        auto endTp = std::chrono::system_clock::from_time_t(output.schedule[i].endTime);
+        
+        c_output->schedule[i].startTime = allocate_and_copy(TimeHelpers::timePointToString(startTp));
+        c_output->schedule[i].endTime = allocate_and_copy(TimeHelpers::timePointToString(endTp));
+        
+        std::string driver = (output.schedule[i].driverId != -1) ? output.strings.get_string(output.schedule[i].driverId) : "N/A";
+        std::string spotter = (output.schedule[i].spotterId != -1) ? output.strings.get_string(output.schedule[i].spotterId) : "N/A";
+        
+        c_output->schedule[i].driver = allocate_and_copy(driver);
+        c_output->schedule[i].spotter = allocate_and_copy(spotter);
     }
 
     c_output->diagnosis_len = output.diagnosis.size();
@@ -153,8 +171,8 @@ JresSolverOutput* to_c_output(const SolverOutput& output, const JresSolverOption
     c_output->config->consecutiveStints = output.config.consecutiveStints;
     c_output->config->minimumRestHours = output.config.minimumRestHours;
     c_output->config->maximumBusyHours = output.config.maximumBusyHours;
-    if (!output.config.firstStintDriver.empty()) {
-        c_output->config->firstStintDriver = allocate_and_copy(output.config.firstStintDriver);
+    if (output.config.firstStintDriver != -1) {
+        c_output->config->firstStintDriver = allocate_and_copy(output.strings.get_string(output.config.firstStintDriver));
     } else {
         c_output->config->firstStintDriver = nullptr;
     }
@@ -163,7 +181,8 @@ JresSolverOutput* to_c_output(const SolverOutput& output, const JresSolverOption
     c_output->teamMembers_len = output.teamMembers.size();
     c_output->teamMembers = new JresTeamMember[c_output->teamMembers_len];
     for (size_t i = 0; i < output.teamMembers.size(); ++i) {
-        c_output->teamMembers[i].name = allocate_and_copy(output.teamMembers[i].name);
+        std::string name = output.strings.get_string(output.teamMembers[i].nameId);
+        c_output->teamMembers[i].name = allocate_and_copy(name);
         c_output->teamMembers[i].isDriver = output.teamMembers[i].isDriver;
         c_output->teamMembers[i].isSpotter = output.teamMembers[i].isSpotter;
         c_output->teamMembers[i].tzOffset = output.teamMembers[i].tzOffset;
